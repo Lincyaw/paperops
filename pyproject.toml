@@ -1,6 +1,6 @@
 [project]
 name = "draw-paper"
-version = "0.1.0"
+version = "0.1.1"
 description = "A specialized plotting library for academic papers with LaTeX-compatible templates"
 readme = "README.md"
 requires-python = ">=3.13"
