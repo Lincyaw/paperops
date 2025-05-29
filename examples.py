@@ -7,7 +7,7 @@ using different templates and color schemes.
 
 import pandas as pd
 import numpy as np
-from src.draw_paper import AcademicPlotter, ColorScheme
+from src.paperops.core import AcademicPlotter
 
 
 def create_sample_data():

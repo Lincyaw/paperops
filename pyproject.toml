@@ -28,3 +28,7 @@ target-version = ['py313']
 [tool.isort]
 profile = "black"
 line_length = 88
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/paperops"]
