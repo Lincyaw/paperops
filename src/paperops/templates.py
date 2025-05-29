@@ -6,7 +6,13 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 import matplotlib.pyplot as plt
 
-from .config import FigureSize, FIGURE_DIMENSIONS, FONT_SIZES, ACADEMIC_STYLE
+from .config import (
+    FigureSize,
+    FIGURE_DIMENSIONS,
+    FONT_SIZES,
+    ACADEMIC_STYLE,
+    CustomConfig,
+)
 from .styles import ColorScheme, get_color_scheme, get_plot_style
 
 
@@ -14,7 +20,10 @@ class Template(ABC):
     """Abstract base class for plotting templates."""
 
     def __init__(
-        self, figure_size: FigureSize, color_scheme: ColorScheme = ColorScheme.ACADEMIC
+        self,
+        figure_size: FigureSize,
+        color_scheme: ColorScheme = ColorScheme.ACADEMIC,
+        custom_config: Optional[CustomConfig] = None,
     ):
         """
         Initialize template.
@@ -25,17 +34,28 @@ class Template(ABC):
             Size configuration for the figure
         color_scheme : ColorScheme
             Color scheme to use for plots
+        custom_config : CustomConfig, optional
+            Custom configuration to override defaults
         """
         self.figure_size = figure_size
         self.color_scheme = color_scheme
-        self.dimensions = FIGURE_DIMENSIONS[figure_size]
-        self.font_sizes = FONT_SIZES[figure_size]
+        self.custom_config = custom_config
+
+        # Use custom config if provided, otherwise use defaults
+        if custom_config:
+            self.dimensions = custom_config.get_figure_dimensions(figure_size)
+            self.font_sizes = custom_config.get_font_sizes(figure_size)
+            self.academic_style = custom_config.get_academic_style()
+        else:
+            self.dimensions = FIGURE_DIMENSIONS[figure_size]
+            self.font_sizes = FONT_SIZES[figure_size]
+            self.academic_style = ACADEMIC_STYLE
 
     def apply_style(self, plot_type: str = "line") -> None:
         """Apply academic style settings to matplotlib."""
-        # Apply base academic style
+        # Apply base academic style (from custom config or default)
         plt.style.use("default")  # Reset to default first
-        plt.rcParams.update(ACADEMIC_STYLE)
+        plt.rcParams.update(self.academic_style)
 
         # Apply font sizes
         plt.rcParams.update(
@@ -79,7 +99,10 @@ class SingleColumn(Template):
     """Template for single-column figures in academic papers."""
 
     def __init__(
-        self, size: str = "medium", color_scheme: ColorScheme = ColorScheme.ACADEMIC
+        self,
+        size: str = "medium",
+        color_scheme: ColorScheme = ColorScheme.ACADEMIC,
+        custom_config: Optional[CustomConfig] = None,
     ):
         """
         Initialize single-column template.
@@ -90,6 +113,8 @@ class SingleColumn(Template):
             Size variant ('small', 'medium', 'large')
         color_scheme : ColorScheme
             Color scheme to use
+        custom_config : CustomConfig, optional
+            Custom configuration to override defaults
         """
         size_map = {
             "small": FigureSize.SINGLE_SMALL,
@@ -100,7 +125,7 @@ class SingleColumn(Template):
         if size not in size_map:
             raise ValueError(f"Size must be one of {list(size_map.keys())}")
 
-        super().__init__(size_map[size], color_scheme)
+        super().__init__(size_map[size], color_scheme, custom_config)
 
     def get_layout_info(self) -> Dict[str, Any]:
         """Get single-column layout information."""
@@ -117,7 +142,10 @@ class DoubleColumn(Template):
     """Template for double-column (full-width) figures in academic papers."""
 
     def __init__(
-        self, size: str = "medium", color_scheme: ColorScheme = ColorScheme.ACADEMIC
+        self,
+        size: str = "medium",
+        color_scheme: ColorScheme = ColorScheme.ACADEMIC,
+        custom_config: Optional[CustomConfig] = None,
     ):
         """
         Initialize double-column template.
@@ -128,6 +156,8 @@ class DoubleColumn(Template):
             Size variant ('small', 'medium', 'large')
         color_scheme : ColorScheme
             Color scheme to use
+        custom_config : CustomConfig, optional
+            Custom configuration to override defaults
         """
         size_map = {
             "small": FigureSize.DOUBLE_SMALL,
@@ -138,7 +168,7 @@ class DoubleColumn(Template):
         if size not in size_map:
             raise ValueError(f"Size must be one of {list(size_map.keys())}")
 
-        super().__init__(size_map[size], color_scheme)
+        super().__init__(size_map[size], color_scheme, custom_config)
 
     def get_layout_info(self) -> Dict[str, Any]:
         """Get double-column layout information."""

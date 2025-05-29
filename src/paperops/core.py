@@ -2,7 +2,7 @@
 Main plotting interface for academic papers.
 """
 
-from typing import Optional, Union, List, Dict, Any
+from typing import Optional, Union, Dict, List, Any
 import pandas as pd
 import numpy as np
 from matplotlib.figure import Figure
@@ -10,6 +10,7 @@ from matplotlib.figure import Figure
 from .templates import SingleColumn, DoubleColumn
 from .styles import ColorScheme
 from .plots import LinePlot, BarPlot, ScatterPlot, PiePlot, HeatmapPlot
+from .config import CustomConfig
 
 
 class AcademicPlotter:
@@ -25,6 +26,7 @@ class AcademicPlotter:
         layout: str = "single",
         size: str = "medium",
         color_scheme: Union[str, ColorScheme] = "academic",
+        custom_config: Optional[CustomConfig] = None,
     ):
         """
         Initialize the academic plotter.
@@ -37,6 +39,8 @@ class AcademicPlotter:
             Figure size ('small', 'medium', 'large')
         color_scheme : str or ColorScheme
             Color scheme to use
+        custom_config : CustomConfig, optional
+            Custom configuration to override defaults
         """
         # Convert string to ColorScheme if needed
         if isinstance(color_scheme, str):
@@ -44,9 +48,9 @@ class AcademicPlotter:
 
         # Create template based on layout
         if layout.lower() == "single":
-            self.template = SingleColumn(size, color_scheme)
+            self.template = SingleColumn(size, color_scheme, custom_config)
         elif layout.lower() == "double":
-            self.template = DoubleColumn(size, color_scheme)
+            self.template = DoubleColumn(size, color_scheme, custom_config)
         else:
             raise ValueError("Layout must be 'single' or 'double'")
 
@@ -66,6 +70,7 @@ class AcademicPlotter:
         save_path: Optional[str] = None,
         legend_location: Optional[str] = None,
         legend_outside: bool = False,
+        legend_style: Union[str, Any] = "clean",
         ylim_mode: str = "auto",
         ylim: Optional[tuple] = None,
         **kwargs,
@@ -114,6 +119,7 @@ class AcademicPlotter:
             title=fig_name,
             legend_preference=legend_location,
             legend_outside=legend_outside,
+            legend_style=legend_style,
             ylim_mode=ylim_mode,
             ylim=ylim,
             **kwargs,
@@ -133,6 +139,7 @@ class AcademicPlotter:
         save_path: Optional[str] = None,
         legend_location: Optional[str] = None,
         legend_outside: bool = False,
+        legend_style: Union[str, Any] = "clean",
         ylim_mode: str = "auto",
         ylim: Optional[tuple] = None,
         **kwargs,
@@ -181,6 +188,7 @@ class AcademicPlotter:
             title=fig_name,
             legend_preference=legend_location,
             legend_outside=legend_outside,
+            legend_style=legend_style,
             ylim_mode=ylim_mode,
             ylim=ylim,
             **kwargs,

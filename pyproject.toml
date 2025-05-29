@@ -1,7 +1,7 @@
 [project]
-name = "draw-paper"
-version = "0.1.2"
-description = "A specialized plotting library for academic papers with LaTeX-compatible templates"
+name = "paperops"
+version = "0.1.3"
+description = "utilities for writing papers"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

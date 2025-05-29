@@ -12,6 +12,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from .templates import Template
+from .config import LegendStyle, LEGEND_STYLES
 
 
 class YLimMode(Enum):
@@ -42,6 +43,47 @@ class PlotGenerator:
         """Prepare the plot with template styling."""
         self.template.apply_style(plot_type)
         return self.template.create_figure()
+
+    def _get_legend_style_config(
+        self, legend_style: Union[str, LegendStyle]
+    ) -> Dict[str, Any]:
+        """
+        Get legend style configuration from config or custom config.
+
+        Parameters:
+        -----------
+        legend_style : str or LegendStyle
+            Style of the legend
+
+        Returns:
+        --------
+        Dict[str, Any]
+            Dictionary with legend style parameters
+        """
+        # Get legend styles from custom config if available, otherwise use defaults
+        if hasattr(self.template, "custom_config") and self.template.custom_config:
+            legend_styles = self.template.custom_config.get_legend_styles()
+        else:
+            legend_styles = LEGEND_STYLES
+
+        # Try to find the style in the legend styles dictionary
+        if legend_style in legend_styles:
+            return legend_styles[legend_style].copy()
+
+        # Convert string to enum if needed
+        if isinstance(legend_style, str):
+            try:
+                style_enum = LegendStyle(legend_style)
+                if style_enum in legend_styles:
+                    return legend_styles[style_enum].copy()
+            except ValueError:
+                pass  # Fall through to default
+
+        # Fall back to clean style
+        if LegendStyle.CLEAN in legend_styles:
+            return legend_styles[LegendStyle.CLEAN].copy()
+        else:
+            return LEGEND_STYLES[LegendStyle.CLEAN].copy()
 
     def _adjust_xlabel_rotation(
         self, ax: Axes, x_data: Union[pd.Series, List[Any]], max_label_length: int = 8
@@ -96,6 +138,7 @@ class PlotGenerator:
         ax: Axes,
         legend_preference: Optional[str] = None,
         legend_outside: bool = False,
+        legend_style: Union[str, LegendStyle] = LegendStyle.CLEAN,
         **legend_kwargs: Any,
     ) -> None:
         """
@@ -110,6 +153,8 @@ class PlotGenerator:
             If None, will automatically determine best location
         legend_outside : bool
             If True, place legend outside the plot area
+        legend_style : str or LegendStyle
+            Style of the legend background and frame
         **legend_kwargs
             Additional arguments passed to ax.legend()
         """
@@ -120,11 +165,18 @@ class PlotGenerator:
             # Place legend outside the plot area
             legend_kwargs.setdefault("bbox_to_anchor", (1.05, 1))
             legend_kwargs.setdefault("loc", "upper left")
+
+            # Apply legend style
+            style_config = self._get_legend_style_config(legend_style)
+            legend_kwargs.update(style_config)
+
             ax.legend(**legend_kwargs)
             return
 
         if legend_preference:
             # Use user-specified location
+            style_config = self._get_legend_style_config(legend_style)
+            legend_kwargs.update(style_config)
             ax.legend(loc=legend_preference, **legend_kwargs)
             return
 
@@ -132,13 +184,9 @@ class PlotGenerator:
         # TODO: Re-implement intelligent positioning with better type safety
         best_location = "upper right"
 
-        # Set default legend style for academic papers
-        legend_kwargs.setdefault("frameon", False)
-        legend_kwargs.setdefault("fancybox", False)
-        legend_kwargs.setdefault("shadow", False)
-        legend_kwargs.setdefault("framealpha", 0.9)
-        legend_kwargs.setdefault("facecolor", "white")
-        legend_kwargs.setdefault("edgecolor", "none")
+        # Apply legend style
+        style_config = self._get_legend_style_config(legend_style)
+        legend_kwargs.update(style_config)
 
         ax.legend(loc=best_location, **legend_kwargs)
 
@@ -313,6 +361,7 @@ class LinePlot(PlotGenerator):
         legend: bool = True,
         legend_preference: Optional[str] = None,
         legend_outside: bool = False,
+        legend_style: Union[str, LegendStyle] = LegendStyle.CLEAN,
         ylim_mode: Union[str, YLimMode] = "auto",
         ylim: Optional[Tuple[float, float]] = None,
         **kwargs: Any,
@@ -340,6 +389,8 @@ class LinePlot(PlotGenerator):
             Specific legend location preference
         legend_outside : bool
             Whether to place legend outside plot area
+        legend_style : str or LegendStyle
+            Style of the legend ("clean", "gray_transparent", "white_frame", "minimal")
         ylim_mode : str or YLimMode
             Y-axis limit mode ("auto", "data_extend", "percentage", "zero_extend", "custom")
         ylim : tuple, optional
@@ -383,7 +434,10 @@ class LinePlot(PlotGenerator):
         # Add legend if requested and multiple lines
         if legend and len(y_cols) > 1:
             self._place_legend_intelligently(
-                ax, legend_preference=legend_preference, legend_outside=legend_outside
+                ax,
+                legend_preference=legend_preference,
+                legend_outside=legend_outside,
+                legend_style=legend_style,
             )
 
         # Adjust x-axis label rotation if needed
@@ -411,6 +465,7 @@ class BarPlot(PlotGenerator):
         legend: bool = True,
         legend_preference: Optional[str] = None,
         legend_outside: bool = False,
+        legend_style: Union[str, LegendStyle] = LegendStyle.CLEAN,
         bar_width: float = 0.8,
         ylim_mode: Union[str, YLimMode] = "auto",
         ylim: Optional[Tuple[float, float]] = None,
@@ -441,6 +496,8 @@ class BarPlot(PlotGenerator):
             Specific legend location preference
         legend_outside : bool
             Whether to place legend outside plot area
+        legend_style : str or LegendStyle
+            Style of the legend ("clean", "gray_transparent", "white_frame", "minimal")
         bar_width : float
             Width of bars (default: 0.8)
         ylim_mode : str or YLimMode
@@ -531,7 +588,10 @@ class BarPlot(PlotGenerator):
         # Add legend for grouped bars
         if legend and n_groups > 1:
             self._place_legend_intelligently(
-                ax, legend_preference=legend_preference, legend_outside=legend_outside
+                ax,
+                legend_preference=legend_preference,
+                legend_outside=legend_outside,
+                legend_style=legend_style,
             )
 
         # Adjust x-axis label rotation if needed (only for vertical bars)

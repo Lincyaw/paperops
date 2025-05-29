@@ -166,7 +166,7 @@ def get_plot_style(plot_type: str) -> Dict[str, Any]:
             "axes.grid": True,
         },
         "bar": {
-            "axes.grid": True,
+            "axes.grid": False,
             "axes.axisbelow": True,
         },
         "scatter": {
