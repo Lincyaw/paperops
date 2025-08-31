@@ -3,3 +3,4 @@ scripts
 tmp
 dist
 *.pyc
+.venv

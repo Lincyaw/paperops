@@ -2,15 +2,38 @@
 Main plotting interface for academic papers.
 """
 
-from typing import Optional, Union, Dict, List, Any
-import pandas as pd
-import numpy as np
+from typing import Optional, Union, Dict, List, Any, Tuple, Literal
 from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 
-from .templates import SingleColumn, DoubleColumn
+from .templates import SingleColumn, DoubleColumn, Template
 from .styles import ColorScheme
-from .plots import LinePlot, BarPlot, ScatterPlot, PiePlot, HeatmapPlot
+from .plots import (
+    LinePlot,
+    BarPlot,
+    ScatterPlot,
+    PiePlot,
+    HeatmapPlot,
+    RadarPlot,
+    DataDict,
+)
 from .config import CustomConfig
+
+
+LayoutType = Literal["single", "double"]
+SizeType = Literal["small", "medium", "large"]
+YLimMode = Literal["auto", "data_extend", "percentage", "zero_extend", "custom"]
+LegendLocation = Literal[
+    "upper right",
+    "upper left",
+    "lower left",
+    "lower right",
+    "center",
+    "upper center",
+    "lower center",
+    "center left",
+    "center right",
+]
 
 
 class AcademicPlotter:
@@ -23,19 +46,19 @@ class AcademicPlotter:
 
     def __init__(
         self,
-        layout: str = "single",
-        size: str = "medium",
+        layout: LayoutType = "single",
+        size: SizeType = "medium",
         color_scheme: Union[str, ColorScheme] = "academic",
         custom_config: Optional[CustomConfig] = None,
-    ):
+    ) -> None:
         """
         Initialize the academic plotter.
 
         Parameters:
         -----------
-        layout : str
+        layout : LayoutType
             Layout type ('single' or 'double')
-        size : str
+        size : SizeType
             Figure size ('small', 'medium', 'large')
         color_scheme : str or ColorScheme
             Color scheme to use
@@ -48,39 +71,40 @@ class AcademicPlotter:
 
         # Create template based on layout
         if layout.lower() == "single":
-            self.template = SingleColumn(size, color_scheme, custom_config)
+            self.template: Template = SingleColumn(size, color_scheme, custom_config)
         elif layout.lower() == "double":
             self.template = DoubleColumn(size, color_scheme, custom_config)
         else:
             raise ValueError("Layout must be 'single' or 'double'")
 
         # Initialize plot generators
-        self._line_generator = LinePlot(self.template)
-        self._bar_generator = BarPlot(self.template)
-        self._scatter_generator = ScatterPlot(self.template)
-        self._pie_generator = PiePlot(self.template)
-        self._heatmap_generator = HeatmapPlot(self.template)
+        self._line_generator: LinePlot = LinePlot(self.template)
+        self._bar_generator: BarPlot = BarPlot(self.template)
+        self._scatter_generator: ScatterPlot = ScatterPlot(self.template)
+        self._pie_generator: PiePlot = PiePlot(self.template)
+        self._heatmap_generator: HeatmapPlot = HeatmapPlot(self.template)
+        self._radar_generator: RadarPlot = RadarPlot(self.template)
 
     def line_plot(
         self,
-        data: Union[pd.DataFrame, Dict[str, List]],
+        data: DataDict,
         x: str,
         y: Union[str, List[str]],
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
-        legend_location: Optional[str] = None,
+        legend_location: Optional[LegendLocation] = None,
         legend_outside: bool = False,
-        legend_style: Union[str, Any] = "clean",
-        ylim_mode: str = "auto",
-        ylim: Optional[tuple] = None,
-        **kwargs,
-    ) -> tuple:
+        legend_style: str = "clean",
+        ylim_mode: YLimMode = "auto",
+        ylim: Optional[Tuple[float, float]] = None,
+        **kwargs: Any,
+    ) -> Tuple[Figure, Axes]:
         """
         Create a line plot.
 
         Parameters:
         -----------
-        data : DataFrame or dict
+        data : DataDict
             Data to plot
         x : str
             Column name for x-axis
@@ -90,12 +114,12 @@ class AcademicPlotter:
             Figure name/title
         save_path : str, optional
             Path to save the figure
-        legend_location : str, optional
+        legend_location : LegendLocation, optional
             Specific legend location ('upper right', 'lower left', etc.)
             If None, will automatically find best location
         legend_outside : bool
             If True, place legend outside the plot area
-        ylim_mode : str
+        ylim_mode : YLimMode
             Y-axis limit mode:
             - "auto": matplotlib default (automatic)
             - "data_extend": min(data) to max(data)*1.1
@@ -109,7 +133,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        tuple
+        Tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._line_generator.create(
@@ -132,24 +156,24 @@ class AcademicPlotter:
 
     def bar_plot(
         self,
-        data: Union[pd.DataFrame, Dict[str, List]],
+        data: DataDict,
         x: str,
         y: Union[str, List[str]],
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
-        legend_location: Optional[str] = None,
+        legend_location: Optional[LegendLocation] = None,
         legend_outside: bool = False,
-        legend_style: Union[str, Any] = "clean",
-        ylim_mode: str = "auto",
-        ylim: Optional[tuple] = None,
-        **kwargs,
-    ) -> tuple:
+        legend_style: str = "clean",
+        ylim_mode: YLimMode = "auto",
+        ylim: Optional[Tuple[float, float]] = None,
+        **kwargs: Any,
+    ) -> Tuple[Figure, Axes]:
         """
         Create a bar plot. Supports both single and grouped bar charts.
 
         Parameters:
         -----------
-        data : DataFrame or dict
+        data : DataDict
             Data to plot
         x : str
             Column name for categories
@@ -159,12 +183,12 @@ class AcademicPlotter:
             Figure name/title
         save_path : str, optional
             Path to save the figure
-        legend_location : str, optional
+        legend_location : LegendLocation, optional
             Specific legend location ('upper right', 'lower left', etc.)
             If None, will automatically find best location
         legend_outside : bool
             If True, place legend outside the plot area
-        ylim_mode : str
+        ylim_mode : YLimMode
             Y-axis limit mode:
             - "auto": matplotlib default (automatic)
             - "data_extend": min(data) to max(data)*1.1
@@ -178,7 +202,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        tuple
+        Tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._bar_generator.create(
@@ -201,19 +225,19 @@ class AcademicPlotter:
 
     def scatter_plot(
         self,
-        data: Union[pd.DataFrame, Dict[str, List]],
+        data: DataDict,
         x: str,
         y: str,
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
-        **kwargs,
-    ) -> tuple:
+        **kwargs: Any,
+    ) -> Tuple[Figure, Axes]:
         """
         Create a scatter plot.
 
         Parameters:
         -----------
-        data : DataFrame or dict
+        data : DataDict
             Data to plot
         x : str
             Column name for x-axis
@@ -228,7 +252,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        tuple
+        Tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._scatter_generator.create(data, x, y, title=fig_name, **kwargs)
@@ -240,18 +264,18 @@ class AcademicPlotter:
 
     def pie_chart(
         self,
-        data: Union[pd.DataFrame, Dict[str, List], pd.Series],
+        data: DataDict,
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
-        **kwargs,
-    ) -> tuple:
+        **kwargs: Any,
+    ) -> Tuple[Figure, Axes]:
         """
         Create a pie chart.
 
         Parameters:
         -----------
-        data : DataFrame, dict, or Series
-            Data to plot
+        data : DataDict
+            Data to plot - should contain 'labels' and 'values' keys
         fig_name : str, optional
             Figure name/title
         save_path : str, optional
@@ -261,7 +285,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        tuple
+        Tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._pie_generator.create(data, title=fig_name, **kwargs)
@@ -273,17 +297,17 @@ class AcademicPlotter:
 
     def heatmap(
         self,
-        data: Union[pd.DataFrame, np.ndarray],
+        data: DataDict,
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
-        **kwargs,
-    ) -> tuple:
+        **kwargs: Any,
+    ) -> Tuple[Figure, Axes]:
         """
         Create a heatmap.
 
         Parameters:
         -----------
-        data : DataFrame or array
+        data : DataDict or List[List[Union[int, float]]]
             Data to plot as heatmap
         fig_name : str, optional
             Figure name/title
@@ -294,10 +318,51 @@ class AcademicPlotter:
 
         Returns:
         --------
-        tuple
+        Tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._heatmap_generator.create(data, title=fig_name, **kwargs)
+
+        if save_path:
+            self._save_figure(fig, save_path)
+
+        return fig, ax
+
+    def radar(
+        self,
+        data: DataDict,
+        categories: str,
+        values: Union[str, List[str]],
+        fig_name: Optional[str] = None,
+        save_path: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Tuple[Figure, Axes]:
+        """
+        Create a radar/spider plot.
+
+        Parameters:
+        -----------
+        data : DataDict
+            Data to plot
+        categories : str
+            Column name for categories (radar chart axes)
+        values : str or list of str
+            Column name(s) for values. If list, creates multiple radar lines
+        fig_name : str, optional
+            Figure name/title
+        save_path : str, optional
+            Path to save the figure
+        **kwargs
+            Additional arguments passed to radar plot
+
+        Returns:
+        --------
+        Tuple[Figure, Axes]
+            (figure, axes) objects
+        """
+        fig, ax = self._radar_generator.create(
+            data, categories=categories, values=values, title=fig_name, **kwargs
+        )
 
         if save_path:
             self._save_figure(fig, save_path)
@@ -326,7 +391,8 @@ class AcademicPlotter:
 
     def get_template_info(self) -> Dict[str, Any]:
         """Get information about the current template."""
-        return self.template.get_layout_info()
+        template_info = self.template.get_layout_info()
+        return dict(template_info)
 
     def set_color_scheme(self, color_scheme: Union[str, ColorScheme]) -> None:
         """

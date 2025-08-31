@@ -3,7 +3,8 @@ Template classes for academic paper plotting.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Optional
+from typing_extensions import TypedDict
 import matplotlib.pyplot as plt
 
 from .config import (
@@ -14,6 +15,16 @@ from .config import (
     CustomConfig,
 )
 from .styles import ColorScheme, get_color_scheme, get_plot_style
+
+
+class LayoutInfo(TypedDict):
+    """Type definition for layout information dictionary."""
+
+    layout: str
+    width_inches: float
+    height_inches: float
+    recommended_dpi: int
+    text_width_ratio: float
 
 
 class Template(ABC):
@@ -90,7 +101,7 @@ class Template(ABC):
         return get_color_scheme(self.color_scheme, n_colors)
 
     @abstractmethod
-    def get_layout_info(self) -> Dict[str, Any]:
+    def get_layout_info(self) -> LayoutInfo:
         """Get layout-specific information."""
         pass
 
@@ -127,7 +138,7 @@ class SingleColumn(Template):
 
         super().__init__(size_map[size], color_scheme, custom_config)
 
-    def get_layout_info(self) -> Dict[str, Any]:
+    def get_layout_info(self) -> LayoutInfo:
         """Get single-column layout information."""
         return {
             "layout": "single_column",
@@ -170,7 +181,7 @@ class DoubleColumn(Template):
 
         super().__init__(size_map[size], color_scheme, custom_config)
 
-    def get_layout_info(self) -> Dict[str, Any]:
+    def get_layout_info(self) -> LayoutInfo:
         """Get double-column layout information."""
         return {
             "layout": "double_column",

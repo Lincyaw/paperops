@@ -1,11 +1,8 @@
-"""
-Plot generators for different chart types.
-"""
-
-from typing import Optional, Union, List, Dict, Tuple, Any
+from typing import Optional, Union, Any
+from collections.abc import Sequence
 from enum import Enum
-import pandas as pd
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.axes import Axes
@@ -15,9 +12,10 @@ from .templates import Template
 from .config import LegendStyle, LEGEND_STYLES
 
 
-class YLimMode(Enum):
-    """Y-axis limit modes for intelligent limit setting."""
+DataDict = dict[str, list[Union[str, int, float]]]
 
+
+class YLimMode(Enum):
     AUTO = "auto"
     DATA_EXTEND = "data_extend"
     PERCENTAGE = "percentage"
@@ -26,8 +24,6 @@ class YLimMode(Enum):
 
 
 class PlotGenerator:
-    """Base class for generating academic plots."""
-
     def __init__(self, template: Template) -> None:
         """
         Initialize plot generator with a template.
@@ -39,14 +35,14 @@ class PlotGenerator:
         """
         self.template = template
 
-    def _prepare_plot(self, plot_type: str) -> Tuple[Figure, Axes]:
+    def _prepare_plot(self, plot_type: str) -> tuple[Figure, Axes]:
         """Prepare the plot with template styling."""
         self.template.apply_style(plot_type)
         return self.template.create_figure()
 
     def _get_legend_style_config(
         self, legend_style: Union[str, LegendStyle]
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get legend style configuration from config or custom config.
 
@@ -57,7 +53,7 @@ class PlotGenerator:
 
         Returns:
         --------
-        Dict[str, Any]
+        dict[str, Any]
             Dictionary with legend style parameters
         """
         # Get legend styles from custom config if available, otherwise use defaults
@@ -67,11 +63,11 @@ class PlotGenerator:
             legend_styles = LEGEND_STYLES
 
         # Try to find the style in the legend styles dictionary
-        if legend_style in legend_styles:
+        # Handle both LegendStyle enum and string keys
+        if isinstance(legend_style, LegendStyle) and legend_style in legend_styles:
             return legend_styles[legend_style].copy()
-
-        # Convert string to enum if needed
-        if isinstance(legend_style, str):
+        elif isinstance(legend_style, str):
+            # Try to convert to enum first
             try:
                 style_enum = LegendStyle(legend_style)
                 if style_enum in legend_styles:
@@ -86,7 +82,7 @@ class PlotGenerator:
             return LEGEND_STYLES[LegendStyle.CLEAN].copy()
 
     def _adjust_xlabel_rotation(
-        self, ax: Axes, x_data: Union[pd.Series, List[Any]], max_label_length: int = 8
+        self, ax: Axes, x_data: Sequence[Any], max_label_length: int = 8
     ) -> None:
         """
         Automatically adjust x-axis label rotation if labels are too long.
@@ -95,7 +91,7 @@ class PlotGenerator:
         -----------
         ax : Axes
             The matplotlib axes object
-        x_data : Series or List
+        x_data : Sequence
             The x-axis data
         max_label_length : int
             Maximum label length before rotation (default: 8)
@@ -113,16 +109,10 @@ class PlotGenerator:
                     break
         else:
             # Check the data directly if no labels are set yet
-            if isinstance(x_data, pd.Series):
-                # pandas Series
-                str_data = x_data.astype(str)
-                max_len = str_data.str.len().max() if len(str_data) > 0 else 0
-            else:
-                # List or other iterable
-                max_len = (
-                    max(len(str(item)) for item in x_data) if len(x_data) > 0 else 0
-                )
+            if len(x_data) == 0:
+                return  # No data to check
 
+            max_len = max(len(str(item)) for item in x_data)
             if max_len > max_label_length:
                 needs_rotation = True
 
@@ -275,10 +265,10 @@ class PlotGenerator:
     def _set_ylim_intelligently(
         self,
         ax: Axes,
-        data: pd.DataFrame,
-        y_columns: Union[str, List[str]],
+        data: DataDict,
+        y_columns: Union[str, list[str]],
         ylim_mode: Union[str, YLimMode] = "auto",
-        ylim: Optional[Tuple[float, float]] = None,
+        ylim: Optional[tuple[float, float]] = None,
     ) -> None:
         """
         Intelligently set y-axis limits based on the specified mode.
@@ -287,7 +277,7 @@ class PlotGenerator:
         -----------
         ax : Axes
             The matplotlib axes object
-        data : DataFrame
+        data : DataDict
             The data being plotted
         y_columns : str or list of str
             Column name(s) for y-axis data
@@ -317,11 +307,16 @@ class PlotGenerator:
             y_columns = [y_columns]
 
         # Get all y-axis data
-        y_data_all = []
+        y_data_all: list[float] = []
         for col in y_columns:
-            if col in data.columns:
-                y_values = data[col].dropna()  # Remove NaN values
-                y_data_all.extend(y_values.tolist())
+            if col in data:
+                y_values = data[col]
+                # Convert to float and filter out non-numeric values
+                for val in y_values:
+                    try:
+                        y_data_all.append(float(val))
+                    except (ValueError, TypeError):
+                        continue  # Skip non-numeric values
 
         if not y_data_all:
             return  # No valid data found
@@ -352,9 +347,9 @@ class LinePlot(PlotGenerator):
 
     def create(
         self,
-        data: Union[pd.DataFrame, Dict[str, List[Any]]],
+        data: DataDict,
         x: str,
-        y: Union[str, List[str]],
+        y: Union[str, list[str]],
         title: Optional[str] = None,
         xlabel: Optional[str] = None,
         ylabel: Optional[str] = None,
@@ -363,15 +358,15 @@ class LinePlot(PlotGenerator):
         legend_outside: bool = False,
         legend_style: Union[str, LegendStyle] = LegendStyle.CLEAN,
         ylim_mode: Union[str, YLimMode] = "auto",
-        ylim: Optional[Tuple[float, float]] = None,
+        ylim: Optional[tuple[float, float]] = None,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a line plot.
 
         Parameters:
         -----------
-        data : DataFrame or dict
+        data : DataDict
             Data to plot
         x : str
             Column name for x-axis
@@ -400,14 +395,10 @@ class LinePlot(PlotGenerator):
 
         Returns:
         --------
-        Tuple[Figure, Axes]
+        tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._prepare_plot("line")
-
-        # Convert dict to DataFrame if needed
-        if isinstance(data, dict):
-            data = pd.DataFrame(data)
 
         # Get colors from template
         y_cols = [y] if isinstance(y, str) else y
@@ -455,9 +446,9 @@ class BarPlot(PlotGenerator):
 
     def create(
         self,
-        data: Union[pd.DataFrame, Dict[str, List[Any]]],
+        data: DataDict,
         x: str,
-        y: Union[str, List[str]],
+        y: Union[str, list[str]],
         title: Optional[str] = None,
         xlabel: Optional[str] = None,
         ylabel: Optional[str] = None,
@@ -468,15 +459,15 @@ class BarPlot(PlotGenerator):
         legend_style: Union[str, LegendStyle] = LegendStyle.CLEAN,
         bar_width: float = 0.8,
         ylim_mode: Union[str, YLimMode] = "auto",
-        ylim: Optional[Tuple[float, float]] = None,
+        ylim: Optional[tuple[float, float]] = None,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a bar plot. Supports both single and grouped bar charts.
 
         Parameters:
         -----------
-        data : DataFrame or dict
+        data : DataDict
             Data to plot
         x : str
             Column name for categories
@@ -509,14 +500,10 @@ class BarPlot(PlotGenerator):
 
         Returns:
         --------
-        Tuple[Figure, Axes]
+        tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._prepare_plot("bar")
-
-        # Convert dict to DataFrame if needed
-        if isinstance(data, dict):
-            data = pd.DataFrame(data)
 
         # Handle single or multiple y columns
         y_cols = [y] if isinstance(y, str) else y
@@ -556,7 +543,7 @@ class BarPlot(PlotGenerator):
 
                 # Set y-axis ticks and labels
                 ax.set_yticks(y_positions)
-                ax.set_yticklabels(x_values)
+                ax.set_yticklabels([str(val) for val in x_values])
             else:
                 # For vertical bars
                 bar_width_single = bar_width / n_groups
@@ -575,7 +562,7 @@ class BarPlot(PlotGenerator):
 
                 # Set x-axis ticks and labels
                 ax.set_xticks(x_positions)
-                ax.set_xticklabels(x_values)
+                ax.set_xticklabels([str(val) for val in x_values])
 
         # Set labels and title
         if xlabel:
@@ -610,7 +597,7 @@ class ScatterPlot(PlotGenerator):
 
     def create(
         self,
-        data: Union[pd.DataFrame, Dict[str, List[Any]]],
+        data: DataDict,
         x: str,
         y: str,
         size: Optional[str] = None,
@@ -619,13 +606,13 @@ class ScatterPlot(PlotGenerator):
         xlabel: Optional[str] = None,
         ylabel: Optional[str] = None,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a scatter plot.
 
         Parameters:
         -----------
-        data : DataFrame or dict
+        data : DataDict
             Data to plot
         x : str
             Column name for x-axis
@@ -646,14 +633,10 @@ class ScatterPlot(PlotGenerator):
 
         Returns:
         --------
-        Tuple[Figure, Axes]
+        tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._prepare_plot("scatter")
-
-        # Convert dict to DataFrame if needed
-        if isinstance(data, dict):
-            data = pd.DataFrame(data)
 
         # Prepare scatter arguments
         scatter_kwargs = kwargs.copy()
@@ -696,24 +679,24 @@ class PiePlot(PlotGenerator):
 
     def create(
         self,
-        data: Union[pd.DataFrame, Dict[str, List[Any]], pd.Series],
+        data: DataDict,
         labels: Optional[str] = None,
         values: Optional[str] = None,
         title: Optional[str] = None,
         autopct: str = "%1.1f%%",
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a pie chart.
 
         Parameters:
         -----------
-        data : DataFrame, dict, or Series
-            Data to plot
-        labels : str, optional
-            Column name for labels (if DataFrame)
-        values : str, optional
-            Column name for values (if DataFrame)
+        data : DataDict
+            Data to plot with 'labels' and 'values' column names
+        labels : str
+            Column name for labels
+        values : str
+            Column name for values
         title : str, optional
             Plot title
         autopct : str
@@ -728,26 +711,14 @@ class PiePlot(PlotGenerator):
         """
         fig, ax = self._prepare_plot("pie")
 
-        # Prepare data
-        if isinstance(data, pd.Series):
-            plot_labels = list(data.index.astype(str))
-            plot_values = list(data.values)
-        elif isinstance(data, dict):
-            plot_labels = [str(k) for k in data.keys()]
-            plot_values = list(data.values())
-            # Handle case where values might be lists (flatten them)
-            if len(plot_values) > 0 and isinstance(plot_values[0], list):
-                plot_values = [
-                    val[0] if isinstance(val, list) and len(val) > 0 else val
-                    for val in plot_values
-                ]
-        else:  # DataFrame
-            if labels is None or values is None:
-                raise ValueError(
-                    "For DataFrame input, both 'labels' and 'values' must be specified"
-                )
-            plot_labels = list(data[labels].astype(str))
-            plot_values = list(data[values])
+        # Prepare data - both labels and values must be specified for DataDict
+        if labels is None or values is None:
+            raise ValueError(
+                "Both 'labels' and 'values' must be specified for DataDict input"
+            )
+
+        plot_labels = [str(lbl) for lbl in data[labels]]
+        plot_values = [val for val in data[values]]
 
         # Get colors
         colors = self.template.get_colors(len(plot_labels))
@@ -766,24 +737,22 @@ class PiePlot(PlotGenerator):
 
 
 class HeatmapPlot(PlotGenerator):
-    """Generate heatmaps for academic papers."""
-
     def create(
         self,
-        data: Union[pd.DataFrame, np.ndarray],
+        data: DataDict,
         title: Optional[str] = None,
         xlabel: Optional[str] = None,
         ylabel: Optional[str] = None,
         cmap: str = "viridis",
         annot: bool = False,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a heatmap.
 
         Parameters:
         -----------
-        data : DataFrame or array
+        data : DataDict or array
             Data to plot as heatmap
         title : str, optional
             Plot title
@@ -805,16 +774,164 @@ class HeatmapPlot(PlotGenerator):
         """
         fig, ax = self._prepare_plot("heatmap")
 
-        # Create heatmap using seaborn
-        sns.heatmap(data, ax=ax, cmap=cmap, annot=annot, **kwargs)
+        plot_data = pd.DataFrame(data)
 
-        # Set labels and title
+        sns.heatmap(
+            plot_data, ax=ax, cmap=cmap, annot=annot, **kwargs
+        )  # Set labels and title
         if xlabel:
             ax.set_xlabel(xlabel)
         if ylabel:
             ax.set_ylabel(ylabel)
         if title:
             ax.set_title(title)
+
+        plt.tight_layout()
+        return fig, ax
+
+
+class RadarPlot(PlotGenerator):
+    """Generate radar/spider plots for academic papers."""
+
+    def create(
+        self,
+        data: DataDict,
+        categories: str,
+        values: Union[str, list[str]],
+        title: Optional[str] = None,
+        legend: bool = True,
+        legend_preference: Optional[str] = None,
+        legend_outside: bool = False,
+        legend_style: Union[str, LegendStyle] = LegendStyle.CLEAN,
+        fill_alpha: float = 0.1,
+        line_width: float = 2.0,
+        marker_size: float = 6.0,
+        ylim: Optional[tuple[float, float]] = None,
+        grid: bool = True,
+        **kwargs: Any,
+    ) -> tuple[Figure, Axes]:
+        """
+        Create a radar/spider plot.
+
+        Parameters:
+        -----------
+        data : DataDict
+            Data to plot
+        categories : str
+            Column name for categories (radar chart axes)
+        values : str or list of str
+            Column name(s) for values. If list, creates multiple radar lines
+        title : str, optional
+            Plot title
+        legend : bool
+            Whether to show legend (only for multiple value series)
+        legend_preference : str, optional
+            Specific legend location preference
+        legend_outside : bool
+            Whether to place legend outside plot area
+        legend_style : str or LegendStyle
+            Style of the legend
+        fill_alpha : float
+            Transparency for filled areas (default: 0.1)
+        line_width : float
+            Width of radar lines (default: 2.0)
+        marker_size : float
+            Size of markers on radar lines (default: 6.0)
+        ylim : tuple, optional
+            Y-axis limits (min, max) for radar scales
+        grid : bool
+            Whether to show grid lines
+        **kwargs
+            Additional matplotlib arguments
+
+        Returns:
+        --------
+        Tuple[Figure, Axes]
+            (figure, axes) objects
+        """
+        # Get categories and values
+        category_labels = data[categories]
+        value_cols = [values] if isinstance(values, str) else values
+        n_categories = len(category_labels)
+        n_series = len(value_cols)
+
+        # Calculate angles for each category
+        angles = np.linspace(0, 2 * np.pi, n_categories, endpoint=False).tolist()
+        # Close the circle
+        angles += angles[:1]
+
+        # Create polar subplot
+        fig, ax = plt.subplots(
+            figsize=self.template.dimensions, subplot_kw=dict(projection="polar")
+        )
+
+        # Apply template styling
+        self.template.apply_style("radar")
+
+        # Get colors for each series
+        colors = self.template.get_colors(n_series)
+
+        # Plot each value series
+        for i, col in enumerate(value_cols):
+            values_list = [float(v) for v in data[col]]
+            # Close the circle
+            values_list += values_list[:1]
+
+            # Plot line
+            ax.plot(
+                angles,
+                values_list,
+                "o-",
+                linewidth=line_width,
+                markersize=marker_size,
+                label=col if legend and n_series > 1 else None,
+                color=colors[i],
+                **kwargs,
+            )
+
+            # Fill area
+            ax.fill(angles, values_list, alpha=fill_alpha, color=colors[i])
+
+        # Set category labels
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels([str(label) for label in category_labels])
+
+        # Apply font sizes to radar chart labels using new configuration
+        radar_category_size = self.template.font_sizes.get(
+            "radar_category", self.template.font_sizes["tick"]
+        )
+        radar_value_size = self.template.font_sizes.get(
+            "radar_value", self.template.font_sizes["tick"]
+        )
+
+        for label in ax.get_xticklabels():
+            label.set_fontsize(radar_category_size)
+
+        for label in ax.get_yticklabels():
+            label.set_fontsize(radar_value_size)
+
+        # Set y-axis limits if specified
+        if ylim:
+            ax.set_ylim(*ylim)
+
+        # Configure grid
+        if grid:
+            ax.grid(True)
+        else:
+            ax.grid(False)
+
+        # Set title
+        if title:
+            ax.set_title(title, pad=20)
+
+        # Add legend if requested and multiple series
+        if legend and n_series > 1:
+            self._place_legend_intelligently(
+                ax,
+                legend_preference=legend_preference,
+                legend_outside=legend_outside,
+                legend_style=legend_style,
+            )
 
         plt.tight_layout()
         return fig, ax

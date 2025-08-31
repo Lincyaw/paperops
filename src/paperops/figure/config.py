@@ -3,8 +3,39 @@ Configuration settings for academic paper plotting templates.
 """
 
 from enum import Enum
-from typing import Any, Dict, Tuple, Optional
+from typing import Any, Dict, Tuple, Optional, Union
+from typing_extensions import TypedDict
 import copy
+
+
+class LegendConfig(TypedDict):
+    """Type definition for legend configuration dictionary."""
+
+    frameon: bool
+    fancybox: bool
+    shadow: bool
+    framealpha: float
+    facecolor: str
+    edgecolor: str
+
+
+class PlotStyleConfig(TypedDict, total=False):
+    """Type definition for matplotlib style configuration dictionary."""
+
+    font_family: str
+    font_size: Union[int, float]
+    axes_linewidth: float
+    axes_labelsize: Union[int, float]
+    axes_titlesize: Union[int, float]
+    xtick_labelsize: Union[int, float]
+    ytick_labelsize: Union[int, float]
+    legend_fontsize: Union[int, float]
+    legend_numpoints: int
+    legend_scatterpoints: int
+    figure_dpi: int
+    savefig_dpi: int
+    savefig_bbox: str
+    savefig_pad_inches: float
 
 
 class PageLayout(Enum):
@@ -50,50 +81,83 @@ FIGURE_DIMENSIONS: Dict[FigureSize, Tuple[float, float]] = {
     FigureSize.DOUBLE_LARGE: (7.0, 5.0),  # ~1.4:1 ratio
 }
 
+
+class FontSizeConfig(TypedDict):
+    """Type definition for font size configuration."""
+
+    title: int
+    label: int
+    tick: int
+    legend: int
+    radar_category: int  # Radar chart category label font size
+    radar_value: int  # Radar chart value label font size
+
+
+class RadarConfig(TypedDict):
+    """Type definition for radar chart specific configuration."""
+
+    category_fontsize: int  # Category label font size
+    value_fontsize: int  # Value label font size
+    grid_alpha: float  # Grid transparency
+    radial_limit_padding: float  # Radial limit padding
+
+
 # Font sizes for different layouts and figure sizes
-FONT_SIZES: Dict[FigureSize, Dict[str, int]] = {
+FONT_SIZES: Dict[FigureSize, FontSizeConfig] = {
     FigureSize.SINGLE_SMALL: {
         "title": 10,
         "label": 8,
         "tick": 7,
         "legend": 7,
+        "radar_category": 8,
+        "radar_value": 7,
     },
     FigureSize.SINGLE_MEDIUM: {
         "title": 11,
         "label": 9,
         "tick": 8,
         "legend": 8,
+        "radar_category": 9,
+        "radar_value": 8,
     },
     FigureSize.SINGLE_LARGE: {
         "title": 12,
         "label": 10,
         "tick": 9,
         "legend": 9,
+        "radar_category": 10,
+        "radar_value": 9,
     },
     FigureSize.DOUBLE_SMALL: {
         "title": 12,
         "label": 10,
         "tick": 9,
         "legend": 9,
+        "radar_category": 10,
+        "radar_value": 9,
     },
     FigureSize.DOUBLE_MEDIUM: {
         "title": 14,
         "label": 12,
         "tick": 10,
         "legend": 10,
+        "radar_category": 12,
+        "radar_value": 10,
     },
     FigureSize.DOUBLE_LARGE: {
         "title": 16,
         "label": 14,
         "tick": 12,
         "legend": 12,
+        "radar_category": 14,
+        "radar_value": 12,
     },
 }
 
 # Default matplotlib settings for academic papers
 ACADEMIC_STYLE = {
     "font.family": "serif",
-    "font.serif": ["Times New Roman", "Computer Modern Roman"],
+    "font.serif": ["DejaVu Serif", "Liberation Serif", "Noto Serif", "serif"],
     "text.usetex": False,  # Set to True if LaTeX is available
     "axes.linewidth": 0.8,
     "axes.spines.top": False,
@@ -159,7 +223,7 @@ class CustomConfig:
     def __init__(
         self,
         figure_dimensions: Optional[Dict[FigureSize, Tuple[float, float]]] = None,
-        font_sizes: Optional[Dict[FigureSize, Dict[str, int]]] = None,
+        font_sizes: Optional[Dict[FigureSize, FontSizeConfig]] = None,
         academic_style: Optional[Dict[str, Any]] = None,
         legend_styles: Optional[Dict[Any, Dict[str, Any]]] = None,
     ):
@@ -251,13 +315,14 @@ class CustomConfig:
         size : FigureSize
             The figure size to update
         **font_sizes : int
-            Font sizes to update (title, label, tick, legend)
+            Font sizes to update (title, label, tick, legend, radar_category, radar_value)
         """
         if size not in self.font_sizes:
-            self.font_sizes[size] = {}
+            # 初始化为默认值
+            self.font_sizes[size] = copy.deepcopy(FONT_SIZES[size])
 
         for font_type, font_size in font_sizes.items():
-            self.font_sizes[size][font_type] = font_size
+            self.font_sizes[size][font_type] = font_size  # type: ignore
 
     def update_academic_style(self, **style_params: Any) -> None:
         """
@@ -288,7 +353,7 @@ class CustomConfig:
         """Get figure dimensions for a specific size."""
         return self.figure_dimensions.get(size, FIGURE_DIMENSIONS[size])
 
-    def get_font_sizes(self, size: FigureSize) -> Dict[str, int]:
+    def get_font_sizes(self, size: FigureSize) -> FontSizeConfig:
         """Get font sizes for a specific figure size."""
         return self.font_sizes.get(size, FONT_SIZES[size])
 
