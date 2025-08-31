@@ -23,13 +23,13 @@ class PlotStyleConfig(TypedDict, total=False):
     """Type definition for matplotlib style configuration dictionary."""
 
     font_family: str
-    font_size: Union[int, float]
+    font_size: int | float
     axes_linewidth: float
-    axes_labelsize: Union[int, float]
-    axes_titlesize: Union[int, float]
-    xtick_labelsize: Union[int, float]
-    ytick_labelsize: Union[int, float]
-    legend_fontsize: Union[int, float]
+    axes_labelsize: int | float
+    axes_titlesize: int | float
+    xtick_labelsize: int | float
+    ytick_labelsize: int | float
+    legend_fontsize: int | float
     legend_numpoints: int
     legend_scatterpoints: int
     figure_dpi: int

@@ -12,7 +12,7 @@ from .templates import Template
 from .config import LegendStyle, LEGEND_STYLES
 
 
-DataDict = dict[str, list[Union[str, int, float]]]
+DataDict = dict[str, list[Any]]
 
 
 class YLimMode(Enum):
@@ -41,7 +41,7 @@ class PlotGenerator:
         return self.template.create_figure()
 
     def _get_legend_style_config(
-        self, legend_style: Union[str, LegendStyle]
+        self, legend_style: str | LegendStyle
     ) -> dict[str, Any]:
         """
         Get legend style configuration from config or custom config.

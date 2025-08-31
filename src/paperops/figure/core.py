@@ -2,7 +2,7 @@
 Main plotting interface for academic papers.
 """
 
-from typing import Optional, Union, Dict, List, Any, Tuple, Literal
+from typing import Optional, Any, Literal
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 
@@ -48,7 +48,7 @@ class AcademicPlotter:
         self,
         layout: LayoutType = "single",
         size: SizeType = "medium",
-        color_scheme: Union[str, ColorScheme] = "academic",
+        color_scheme: str | ColorScheme = "academic",
         custom_config: Optional[CustomConfig] = None,
     ) -> None:
         """
@@ -89,16 +89,16 @@ class AcademicPlotter:
         self,
         data: DataDict,
         x: str,
-        y: Union[str, List[str]],
+        y: str | list[str],
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
         legend_location: Optional[LegendLocation] = None,
         legend_outside: bool = False,
         legend_style: str = "clean",
         ylim_mode: YLimMode = "auto",
-        ylim: Optional[Tuple[float, float]] = None,
+        ylim: Optional[tuple[float, float]] = None,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a line plot.
 
@@ -133,7 +133,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        Tuple[Figure, Axes]
+        tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._line_generator.create(
@@ -158,16 +158,16 @@ class AcademicPlotter:
         self,
         data: DataDict,
         x: str,
-        y: Union[str, List[str]],
+        y: str | list[str],
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
         legend_location: Optional[LegendLocation] = None,
         legend_outside: bool = False,
         legend_style: str = "clean",
         ylim_mode: YLimMode = "auto",
-        ylim: Optional[Tuple[float, float]] = None,
+        ylim: Optional[tuple[float, float]] = None,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a bar plot. Supports both single and grouped bar charts.
 
@@ -202,7 +202,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        Tuple[Figure, Axes]
+        tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._bar_generator.create(
@@ -231,7 +231,7 @@ class AcademicPlotter:
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a scatter plot.
 
@@ -252,7 +252,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        Tuple[Figure, Axes]
+        tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._scatter_generator.create(data, x, y, title=fig_name, **kwargs)
@@ -268,7 +268,7 @@ class AcademicPlotter:
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a pie chart.
 
@@ -285,7 +285,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        Tuple[Figure, Axes]
+        tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._pie_generator.create(data, title=fig_name, **kwargs)
@@ -301,13 +301,13 @@ class AcademicPlotter:
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a heatmap.
 
         Parameters:
         -----------
-        data : DataDict or List[List[Union[int, float]]]
+        data : DataDict or list[list[Union[int, float]]]
             Data to plot as heatmap
         fig_name : str, optional
             Figure name/title
@@ -318,7 +318,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        Tuple[Figure, Axes]
+        tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._heatmap_generator.create(data, title=fig_name, **kwargs)
@@ -332,11 +332,11 @@ class AcademicPlotter:
         self,
         data: DataDict,
         categories: str,
-        values: Union[str, List[str]],
+        values: str | list[str],
         fig_name: Optional[str] = None,
         save_path: Optional[str] = None,
         **kwargs: Any,
-    ) -> Tuple[Figure, Axes]:
+    ) -> tuple[Figure, Axes]:
         """
         Create a radar/spider plot.
 
@@ -357,7 +357,7 @@ class AcademicPlotter:
 
         Returns:
         --------
-        Tuple[Figure, Axes]
+        tuple[Figure, Axes]
             (figure, axes) objects
         """
         fig, ax = self._radar_generator.create(
@@ -389,12 +389,12 @@ class AcademicPlotter:
 
         fig.savefig(save_path, dpi=dpi, bbox_inches="tight", pad_inches=0.1)
 
-    def get_template_info(self) -> Dict[str, Any]:
+    def get_template_info(self) -> dict[str, Any]:
         """Get information about the current template."""
         template_info = self.template.get_layout_info()
         return dict(template_info)
 
-    def set_color_scheme(self, color_scheme: Union[str, ColorScheme]) -> None:
+    def set_color_scheme(self, color_scheme: str | ColorScheme) -> None:
         """
         Change the color scheme.
 
