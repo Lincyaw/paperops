@@ -22,14 +22,17 @@
 \begin{document}
 \maketitle
 \onehalfspacing
+\renewcommand{\thereviewerSection}{G}
 \section{General Response:}
 
 \lipsum[1]\cite{jiang2023detecting}
 
-\setcounter{CommentCounter}{0} % Reset comment counter for a new section
-\section{Response to Reviewer \#1:}
+\reviewercomment{\lipsum[2]}\label{comm:g.1}
 
-\reviewercomment{\lipsum[2]}
+
+\reviewerSection{Response to Reviewer \#1:}
+
+\reviewercomment{\lipsum[2]}\label{comm:1.1}
 
 \begin{response}
 \lipsum[3]
@@ -58,6 +61,19 @@
     \end{manuscriptchangeenv}
 \end{manuscriptchangeenv}
 
+\setcounter{CommentCounter}{0} % Reset comment counter for a new section
+\reviewerSection{Response to Reviewer \#2:}
+
+\reviewercomment{\lipsum[2]}
+
+\begin{response}
+
+Reference example to g.1 \ref{comm:g.1}
+
+Reference example to 1.1 \ref{comm:1.1}
+\end{response}
+
+\manuscriptchange{title}{\lipsum[4]}
 
 \bibliographystyle{alpha}
 \bibliography{ref}

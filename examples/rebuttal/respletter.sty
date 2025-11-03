@@ -8,7 +8,7 @@
 % \setsansfont{Libertinus Sans}
 % \setmonofont{Libertinus Mono}
 \usepackage{amsmath,amsfonts,amssymb}
-
+\usepackage{chngcntr}
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{mdframed} % For creating framed environments - load after xcolor
@@ -104,13 +104,23 @@
 \newcommand{\commentlabel}[1]{\colorbox{deepred}{\textbf{\textcolor{white}{#1}}}}
 \newcommand{\responselabel}[1]{\colorbox{deepblue}{\textbf{\textcolor{white}{#1}}}}
 
+
+
+\newcounter{reviewerSection}
 \newcounter{CommentCounter}
-\newcommand{\reviewercomment}[1]{%
-    \refstepcounter{CommentCounter}%
+\counterwithin{CommentCounter}{reviewerSection}
+% \renewcommand{\thereviewerSection}{\Alph{reviewerSection}}
+\newcommand{\reviewerSection}[1]{%
+    \renewcommand{\thereviewerSection}{\Alph{reviewerSection}}
+    \refstepcounter{reviewerSection} % 增加 reviewerSection 计数器
+    \section{#1} % 创建一个无编号的section
+}
+
+\newcommand{\reviewercomment}[1]{
+    \refstepcounter{CommentCounter}
     \noindent\commentlabel{Comment \theCommentCounter:} #1\par
     \addcontentsline{toc}{subsection}{Comment \theCommentCounter}
 }
-
 
 \newcommand{\manuscriptchange}[2]{%
     \begin{changemargin}
