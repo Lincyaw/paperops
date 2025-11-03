@@ -1,0 +1,265 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{posterstyle}[2025/11/03 Custom Poster Style Package]
+
+% ============================================================================
+% REQUIRED PACKAGES
+% ============================================================================
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[T1]{fontenc}
+\RequirePackage{libertinus}                         % Libertinus font family
+\RequirePackage{graphicx}                           % For images
+\RequirePackage{tcolorbox}                          % For rounded rectangles with shadows
+\RequirePackage{tikz}                               % For custom graphics
+\RequirePackage{qrcode}                             % For QR codes
+\usetikzlibrary{calc}                               % For coordinate calculations
+\usetikzlibrary{shapes.geometric, positioning}
+
+% ============================================================================
+% COLOR PALETTE DEFINITIONS
+% ============================================================================
+% CUHK official color scheme: Purple and Gold
+\definecolor{PrimaryDark}{HTML}{72256d}         % CUHK Purple for content frames
+\definecolor{HeaderPurple}{HTML}{72256d}        % Purple for header
+\definecolor{AccentColor}{HTML}{dda527}         % CUHK Gold for section headers
+\definecolor{LightBG}{RGB}{245, 240, 245}       % Light purple-tinted background
+\definecolor{TextDark}{RGB}{51, 51, 51}         % Dark gray for text
+\definecolor{ShadowColor}{RGB}{200, 200, 200}   % Light gray for shadows
+\definecolor{GeoBG1}{RGB}{235, 220, 235}        % Geometric background color 1
+\definecolor{GeoBG2}{RGB}{250, 245, 235}        % Geometric background color 2
+
+% ============================================================================
+% TCOLORBOX LIBRARY SETUP
+% ============================================================================
+\tcbuselibrary{skins}
+
+% ============================================================================
+% GEOMETRIC BACKGROUND DEFINITION
+% ============================================================================
+\newcommand{\geometricBackground}{
+    \begin{tikzpicture}[remember picture,overlay]
+        % Large circles in corners
+        \fill[GeoBG1, opacity=0.3] (current page.north west) circle (15cm);
+        \fill[GeoBG2, opacity=0.3] (current page.north east) circle (12cm);
+        \fill[GeoBG1, opacity=0.2] (current page.south east) circle (18cm);
+        
+        % Hexagons scattered
+        \foreach \x in {1,...,8} {
+            \pgfmathsetmacro{\xpos}{random(5,95)}
+            \pgfmathsetmacro{\ypos}{random(5,95)}
+            \pgfmathsetmacro{\size}{random(2,5)}
+            \node[regular polygon, regular polygon sides=6, 
+                  draw=HeaderPurple!20, fill=GeoBG1, opacity=0.15,
+                  minimum size=\size cm, rotate=30] 
+                  at ($(current page.south west)!\xpos/100!(current page.north east)$) {};
+        }
+        
+        % Triangles
+        \foreach \x in {1,...,6} {
+            \pgfmathsetmacro{\xpos}{random(10,90)}
+            \pgfmathsetmacro{\ypos}{random(10,90)}
+            \pgfmathsetmacro{\size}{random(3,6)}
+            \pgfmathsetmacro{\angle}{random(0,359)}
+            \node[regular polygon, regular polygon sides=3, 
+                  draw=AccentColor!15, fill=GeoBG2, opacity=0.12,
+                  minimum size=\size cm, rotate=\angle] 
+                  at ($(current page.south west)!\xpos/100!(current page.north east)$) {};
+        }
+        
+        % Small circles
+        \foreach \x in {1,...,12} {
+            \pgfmathsetmacro{\xpos}{random(0,100)}
+            \pgfmathsetmacro{\ypos}{random(0,100)}
+            \pgfmathsetmacro{\size}{random(1,3)}
+            \fill[PrimaryDark!10, opacity=0.2] 
+                ($(current page.south west)!\xpos/100!(current page.north east)$) circle (\size cm);
+        }
+    \end{tikzpicture}
+}
+
+% ============================================================================
+% CUSTOM STYLE DEFINITIONS
+% ============================================================================
+
+% Style for the main poster title box
+\newtcolorbox{headerbox}{
+    colback=LightBG,
+    colframe=PrimaryDark!30,
+    arc=10mm,
+    boxrule=2pt,
+    width=\textwidth,
+    left=12mm,
+    right=12mm,
+    top=10mm,
+    bottom=10mm,
+    drop shadow
+}
+
+% Compact capsules used for hero keywords and badges
+\newtcbox{\tagpill}{
+    on line,
+    colback=AccentColor,
+    colframe=AccentColor,
+    boxrule=0pt,
+    arc=3mm,
+    top=1mm,
+    bottom=1mm,
+    left=3mm,
+    right=3mm,
+    fontupper=\scriptsize\bfseries\color{white}
+}
+
+% Metric cards for highlighting quick statistics
+\newtcolorbox{metricbox}{
+    colback=white,
+    colframe=AccentColor,
+    arc=4mm,
+    width=\textwidth,
+    boxrule=0.8pt,
+    left=3mm,
+    right=3mm,
+    top=3mm,
+    bottom=3mm,
+    colupper=TextDark,
+    fontupper=\bfseries\large,
+    drop fuzzy shadow
+}
+
+% Style for section header boxes
+\newtcolorbox{sectionbox}{
+    colback=AccentColor,
+    colframe=AccentColor,
+    arc=4mm,
+    boxrule=0pt,
+    width=\textwidth,
+    fontupper=\color{white}\bfseries\LARGE,
+    halign=left,
+    left=10mm,
+    right=10mm,
+    top=5mm,
+    bottom=5mm,
+    drop fuzzy shadow
+}
+
+% Style for content blocks
+\newtcolorbox{contentbox}{
+    colback=LightBG,
+    colframe=PrimaryDark!30,
+    arc=4mm,
+    boxrule=1.5pt,
+    width=\textwidth,
+    colupper=TextDark,
+    fontupper=\normalsize,
+    left=6mm,
+    right=6mm,
+    top=5mm,
+    bottom=5mm,
+    drop fuzzy shadow
+}
+
+% Style for figure boxes
+\newtcolorbox{figurebox}{
+    colback=white,
+    colframe=PrimaryDark!50,
+    arc=3mm,
+    boxrule=1pt,
+    width=\textwidth,
+    colupper=TextDark,
+    halign=center,
+    drop fuzzy shadow
+}
+
+% Style for references box
+\newtcolorbox{referencebox}{
+    colback=LightBG!50,
+    colframe=PrimaryDark!30,
+    arc=4mm,
+    boxrule=1.5pt,
+    width=\textwidth,
+    colupper=TextDark,
+    fontupper=\normalsize,
+    left=6mm,
+    right=6mm,
+    top=5mm,
+    bottom=5mm,
+    drop fuzzy shadow
+}
+
+% ============================================================================
+% CUSTOM COMMANDS FOR CONTENT COMPONENTS
+% ============================================================================
+
+% Compact hero tags for the header utility area
+\newcommand{\heroTag}[1]{\tagpill{#1}\hspace{0.35cm}}
+
+% Command for creating an eye-catching header
+% Usage: \posterHeader{Title}{Tagline}{Lead authors}{Affiliation block}{Tag row}
+\newcommand{\posterHeader}[5]{
+    \begin{headerbox}
+        \begin{minipage}[t]{0.5\textwidth}
+            {\color{HeaderPurple}\fontfamily{LinuxLibertineT-TLF}\selectfont\bfseries\fontsize{58}{66}\selectfont #1}\\[0.4cm]
+            {\color{PrimaryDark!70}\fontfamily{LinuxLibertineT-TLF}\selectfont\fontsize{32}{38}\selectfont #2}\\[0.9cm]
+            #5
+        \end{minipage}
+        \hfill
+        \begin{minipage}[t]{0.46\textwidth}
+            {\color{TextDark}\bfseries\normalsize #3}\\[0.25cm]
+            {\color{TextDark!85}\small #4}
+        \end{minipage}
+    \end{headerbox}
+}
+
+% Command for section headers with a slim leading rule
+% Usage: \posterSection{Section Name}
+\newcommand{\posterSection}[1]{
+    \vspace{0.2cm}
+    \begin{sectionbox}
+        #1
+    \end{sectionbox}
+}
+
+% Command for content blocks with consistent spacing
+% Usage: \posterBlock{Your content text here}
+\newcommand{\posterBlock}[1]{
+    \vspace{0.2cm}
+    \begin{contentbox}
+        #1
+    \end{contentbox}
+}
+
+% Compact highlight block for quick takeaways
+% Usage: \highlightBlock{Text}
+\newcommand{\highlightBlock}[1]{
+    \vspace{0.2cm}
+    \begin{tcolorbox}[
+        colback=PrimaryDark!6,
+        colframe=PrimaryDark!40,
+        arc=4mm,
+        boxrule=0.8pt,
+        width=\textwidth,
+        left=4mm,
+        right=4mm,
+        top=4mm,
+        bottom=4mm,
+        colupper=TextDark,
+        fontupper=\bfseries\normalsize,
+        drop fuzzy shadow
+    ]
+        #1
+    \end{tcolorbox}
+}
+
+% Command for figures with captions framed in a soft card
+% Usage: \posterFigure{path/to/image.png}{Caption text}
+\newcommand{\posterFigure}[2]{
+    \vspace{0.25cm}
+    \begin{figurebox}
+        \vspace{0.45cm}
+        \includegraphics[width=0.92\textwidth]{#1}
+        
+        \vspace{0.35cm}
+        {\color{TextDark}\large\textbf{#2}}
+        \vspace{0.45cm}
+    \end{figurebox}
+}
+
+\endinput

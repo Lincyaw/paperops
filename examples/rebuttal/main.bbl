@@ -1,0 +1,9 @@
+\newcommand{\etalchar}[1]{$^{#1}$}
+\begin{thebibliography}{JLB{\etalchar{+}}23}
+
+\bibitem[JLB{\etalchar{+}}23]{jiang2023detecting}
+Yuancheng Jiang, Jiahao Liu, Jinsheng Ba, Roland Hock~Chuan Yap, Zhenkai Liang, and Manuel Rigger.
+\newblock Detecting logic bugs in graph database management systems via injective and surjective graph query transformation.
+\newblock In {\em 2024 IEEE/ACM 46th International Conference on Software Engineering (ICSE)}, pages 531--542. IEEE Computer Society, 2023.
+
+\end{thebibliography}

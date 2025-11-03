@@ -1,0 +1,121 @@
+% Contents of respletter.sty
+\ProvidesPackage{respletter}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{mathptmx} % Times New Roman-like font
+% \usepackage{fontspec}
+% \setmainfont{Libertinus Serif}
+% \setsansfont{Libertinus Sans}
+% \setmonofont{Libertinus Mono}
+\usepackage{amsmath,amsfonts,amssymb}
+
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{mdframed} % For creating framed environments - load after xcolor
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{parskip}
+% Define custom colors
+
+\definecolor{lightgreen}{HTML}{EDF5F5}
+\definecolor{deepgreen}{HTML}{8FBCBA}
+
+\definecolor{lightpurple}{HTML}{F2EDF5}
+\definecolor{deepurple}{HTML}{A88FBD}
+
+\definecolor{deepbrown}{HTML}{BDA091}
+\definecolor{lightbrown}{HTML}{F5F2F0}
+
+
+\definecolor{purple}{HTML}{979DE4}
+\definecolor{red}{HTML}{E39494}
+\definecolor{green}{HTML}{94E3AA}
+\definecolor{yellow}{HTML}{E3D294}
+\definecolor{deepred}{HTML}{8F4343}
+\definecolor{deepblue}{HTML}{4C508F}
+
+\definecolor{customred}{HTML}{C0606A}
+\definecolor{customblue}{HTML}{80A1C1}
+
+
+\definecolor{xxblue}{HTML}{E1EBF5}
+\definecolor{xxred}{HTML}{F5D7D5}
+\definecolor{xxgreen}{HTML}{EDF5F4}
+\definecolor{xxyellow}{HTML}{F5E9D5}
+\definecolor{xxngreen}{HTML}{DCF5E6}
+\definecolor{graybg}{gray}{0.95} % Light gray background
+
+\newenvironment{response}%
+    {\par\noindent\responselabel{Response:} \ignorespaces}%
+    {\par\addvspace{\baselineskip}}
+
+% Environment for manuscript changes
+\newmdenv[
+    backgroundcolor=lightbrown, % 灰色背景
+    linecolor=deepbrown, % 左边框颜色
+    leftline=true, % 启用左边框
+    rightline=false, % 禁用右边框
+    topline=false, % 禁用顶部边框
+    bottomline=false, % 禁用底部边框
+    linewidth=2pt, % 边框宽度
+    innerleftmargin=10pt,
+    innerrightmargin=10pt,
+    innertopmargin=10pt,
+    innerbottommargin=10pt
+]{changemargin}
+
+% 定义带有浅蓝色背景和加深左边框的环境
+\newmdenv[
+    backgroundcolor=lightgreen, % 浅蓝色背景
+    linecolor=deepgreen, % 左边框颜色
+    leftline=true, % 启用左边框
+    rightline=false, % 禁用右边框
+    topline=false, % 禁用顶部边框
+    bottomline=false, % 禁用底部边框
+    linewidth=2pt, % 边框宽度
+    innerleftmargin=4pt,
+    innerrightmargin=4pt,
+    innertopmargin=10pt,
+    innerbottommargin=4pt
+]{changemarginblue}
+
+\newcounter{changelevel}
+\newenvironment{manuscriptchangeenv}[1]%
+    {%
+     \ifnum\value{changelevel}=0%
+        \begin{changemarginblue}%
+     \else%
+        \begin{changemargin}%
+     \fi%
+     \stepcounter{changelevel}%
+     \textbf{\underline{#1}}\\%
+     \ignorespaces%
+    }%
+    {%
+     \addtocounter{changelevel}{-1}%
+     \ifnum\value{changelevel}=0%
+        \end{changemarginblue}%
+     \else%
+        \end{changemargin}%
+     \fi%
+     \par\addvspace{\baselineskip}%
+    }
+
+\newcommand{\commentlabel}[1]{\colorbox{deepred}{\textbf{\textcolor{white}{#1}}}}
+\newcommand{\responselabel}[1]{\colorbox{deepblue}{\textbf{\textcolor{white}{#1}}}}
+
+\newcounter{CommentCounter}
+\newcommand{\reviewercomment}[1]{%
+    \refstepcounter{CommentCounter}%
+    \noindent\commentlabel{Comment \theCommentCounter:} #1\par
+    \addcontentsline{toc}{subsection}{Comment \theCommentCounter}
+}
+
+
+\newcommand{\manuscriptchange}[2]{%
+    \begin{changemargin}
+    \textbf{\underline{#1}}\\
+    #2
+    \end{changemargin}}
+
+

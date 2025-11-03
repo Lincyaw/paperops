@@ -1,0 +1,250 @@
+\documentclass[final,20pt]{beamer}
+
+% ============================================================================
+% PACKAGES
+% ============================================================================
+\usepackage[size=a0,scale=1.24,orientation=portrait]{beamerposter}  % A0 poster size, portrait orientation
+\usepackage{lipsum}                             % Placeholder text
+
+% ============================================================================
+% BEAMER THEME CUSTOMIZATION
+% ============================================================================
+\usetheme{default}
+\setbeamertemplate{navigation symbols}{}        % Remove navigation symbols
+\setbeamercolor{background canvas}{bg=white}
+
+% ============================================================================
+% CUSTOM POSTER STYLE PACKAGE
+% ============================================================================
+\usepackage{posterstyle}
+
+% ============================================================================
+% DOCUMENT CONTENT
+% ============================================================================
+
+\begin{document}
+
+\begin{frame}[t]
+\vspace{0cm}
+
+\geometricBackground
+
+% ----------------------------------------------------------------------------
+% HEADER SECTION: Title, Authors, and Logo
+% ----------------------------------------------------------------------------
+
+\posterHeader{
+    \color{HeaderPurple}Triangle: Empowering Incident Triage with Multi-Agent
+}{
+    \color{PrimaryDark}A Multi-Agent System Reducing Incident Engagement Time by up to 91%
+}{
+    {\footnotesize\color{TextDark}Zhaoyang Yu$^{1}$ \textbullet{} Aoyang Fang$^{5}$ \textbullet{} Minghua Ma$^{2}$ \textbullet{} Jaskaran Singh Walia$^{3}$ \textbullet{} Chaoyun Zhang$^{3}$ \textbullet{} Shu Chi$^{1}$}\\[0.1cm]
+    {\footnotesize\color{TextDark}Ze Li$^{2}$ \textbullet{} Murali Chintalapati$^{2}$ \textbullet{} Xuchao Zhang$^{2}$ \textbullet{} Rujia Wang$^{2}$ \textbullet{} Chetan Bansal$^{2}$ \textbullet{} Saravan Rajmohan$^{2}$}\\[0.1cm]
+    {\footnotesize\color{TextDark}Qingwei Lin$^{3}$ \textbullet{} Shenglin Zhang$^{4}$ \textbullet{} Dan Pei$^{1}$ \textbullet{} Pinjia He$^{5}$}
+}{
+    {\scriptsize\color{TextDark}$^{1}$Tsinghua University \textbullet{} $^{2}$Microsoft \textbullet{} $^{3}$Microsoft, Beijing\\
+    $^{4}$Nankai University \textbullet{} $^{5}$The Chinese University of Hong Kong, Shenzhen}\\[0.25cm]
+    \centering
+    \includegraphics[height=2cm]{figure/af1.png}\hspace{0.5cm}%
+    \includegraphics[height=1.85cm]{figure/af2.png}\hspace{0.5cm}%
+    \includegraphics[height=1.7cm]{figure/af3.png}\hspace{0.5cm}%
+    \includegraphics[height=2cm]{figure/af4.png}
+}{
+    \heroTag{Multi-Agent System}\heroTag{Incident Management}\heroTag{Cloud Operations}
+}
+
+
+% ----------------------------------------------------------------------------
+% THREE-COLUMN LAYOUT FOR MAIN CONTENT
+% ----------------------------------------------------------------------------
+
+\begin{columns}[T,onlytextwidth]
+
+% ============================================================================
+% COLUMN 1: The Problem & Motivation
+% ============================================================================
+
+\begin{column}{0.32\textwidth}
+
+% Section 1: The Problem
+\posterSection{1. Why Incident Triage Matters}
+
+\posterBlock{
+    High-profile outages demonstrate the critical importance of rapid incident response:
+}
+
+\posterFigure{figure/incident1.png}{CrowdStrike and Windows Outage (July 19, 2024): Caused massive global service disruptions and economic losses.}
+
+\posterFigure{figure/incident2.png}{Amazon Web Services Outage (Oct 19, 2025): Impacted millions of users and businesses worldwide.}
+
+\highlightBlock{Even minutes of downtime translate to millions in revenue loss and severe customer impact.}
+
+\vspace{0.4cm}
+
+\posterSection{2. The Core Challenge: Triage Cycles}
+
+\posterBlock{
+    At the heart of incident management lies \textbf{Incident Triage}: assigning incidents to the correct team. A wrong assignment triggers costly "triage cycles" where incidents bounce between teams.
+}
+
+\posterFigure{figure/incidentloop.png}{The triage process relies on slow manual operations, vague alerts, and has high business impact from delays.}
+
+\end{column}
+
+% ============================================================================
+% COLUMN 2: Our Solution & Framework
+% ============================================================================
+
+\begin{column}{0.32\textwidth}
+\posterFigure{figure/triageexample.png}{Real example: A Mac sign-in issue escalated across Teams A, B, and C before reaching the team with correct expertise.}
+
+\posterFigure{figure/study1.png}{Our study of 3,000+ teams: Each hop exponentially increases triage time and communication overhead.}
+
+\vspace{0.4cm}
+
+% Section 3: Our Approach
+\posterSection{3. Our Solution: Triangle}
+
+\posterBlock{
+    \textbf{Triangle} is a multi-agent system that automates triage by simulating expert team collaboration:
+    \begin{itemize}
+        \setlength{\itemsep}{5pt}
+        \item \textbf{Semantic Distillation:} Analyzer Agent extracts key information from noisy data.
+        \item \textbf{Collaborative Negotiation:} Team Manager Agents discuss, enrich with tools, and vote.
+        \item \textbf{Automated Enrichment:} Agents query logs and monitoring systems automatically.
+    \end{itemize}
+}
+
+\vspace{0.35cm}
+
+% Section 4: Multi-Agent Framework
+\posterSection{4. How It Works}
+
+\posterBlock{
+    Triangle employs a three-phase workflow that mirrors expert-level diagnostics and decision-making.
+    \begin{enumerate}
+        \setlength{\itemsep}{4pt}
+        \item \textbf{Analyze:} The \textit{Analyzer Agent} distills the core issue from the raw incident alert.
+        \item \textbf{Propose:} The \textit{Decider Agent} uses historical data and team documentation to identify a set of candidate teams.
+        \item \textbf{Negotiate:} \textit{Team Manager Agents} for candidate teams form a discussion group. They enrich the incident with data from their tools and vote. If no consensus is reached, the enriched incident is re-evaluated.
+    \end{enumerate}
+}
+
+
+
+\end{column}
+
+% ============================================================================
+% COLUMN 3: Business Impact & Conclusion
+% ============================================================================
+
+\begin{column}{0.32\textwidth}
+\posterFigure{figure/overall.png}{The Triangle Framework: Agents collaborate to analyze, propose, and negotiate the correct team assignment.}
+
+\highlightBlock{This iterative process allows Triangle to solve complex cases that would require multiple manual reassignments.}
+
+\vspace{0.45cm}
+
+% Section 5: Performance
+\posterSection{5. Key Results}
+
+\posterBlock{
+    We evaluated Triangle on real-world incident data from a large-scale cloud provider.
+    \begin{itemize}
+        \setlength{\itemsep}{6pt}
+        \item Outperforms the state-of-the-art (DeepCT) by a relative margin of \textbf{26-42\%}.
+        \item Achieves \textbf{91.7\%} accuracy after 5 hops, without relying on manual discussion data.
+        \item Generalizes to other tasks, outperforming baselines on the MSR 2013 Bug Dataset by an average of \textbf{51\%}.
+    \end{itemize}
+}
+% Figure
+\posterFigure{figure/tool_used.pdf}{Team Manager Agents use tools to automatically enrich incidents with log data and analysis.}
+
+\vspace{0.45cm}
+
+% Section 6: Business Impact
+\posterSection{6. Real-World Business Impact}
+
+\posterBlock{
+    Triangle is deployed in production, serving tens of millions of users. Across six major services, it has delivered significant operational improvements.
+}
+
+\begin{minipage}[t]{0.31\linewidth}
+    \begin{metricbox}
+        {\color{AccentColor}\fontsize{48}{48}\selectfont 97\%}\\[0.15cm]
+        {\color{TextDark}\footnotesize Peak Triage Accuracy}
+    \end{metricbox}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.31\linewidth}
+    \begin{metricbox}
+        {\color{AccentColor}\fontsize{48}{48}\selectfont 91\%}\\[0.15cm]
+        {\color{TextDark}\footnotesize Max TTE Reduction}
+    \end{metricbox}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.31\linewidth}
+    \begin{metricbox}
+        {\color{AccentColor}\fontsize{48}{48}\selectfont 20TB+}\\[0.15cm]
+        {\color{TextDark}\footnotesize Data Processed Daily}
+    \end{metricbox}
+\end{minipage}
+
+\vspace{0.45cm}
+
+% Section 7: Conclusion
+\posterSection{7. Conclusion}
+
+\begin{referencebox}
+    \small
+    By automating triage with a collaborative multi-agent system, Triangle not only improves accuracy but fundamentally changes the operational workflow. It reduces manual toil, accelerates incident resolution, and allows engineers to focus on solving problems rather than routing them.
+\end{referencebox}
+
+\vspace{0.45cm}
+
+
+\end{column}
+
+\end{columns}
+
+% ----------------------------------------------------------------------------
+% FOOTER - Fixed at bottom of page
+% ----------------------------------------------------------------------------
+
+% Create a tikz overlay to draw the footer bar and content at the bottom
+\begin{tikzpicture}[remember picture,overlay]
+    % Footer background bar
+    \fill[PrimaryDark] (current page.south west) rectangle ([yshift=6cm] current page.south east);
+    
+    % Footer content positioned absolutely at the bottom
+    \node[anchor=south west, inner sep=0pt] at ([xshift=15mm, yshift=0.04cm] current page.south west) {
+        \begin{minipage}[t]{0.58\paperwidth}
+            {\color{white}\bfseries\small The 40th IEEE/ACM International Conference on}\\[0.1cm]
+            {\color{white}\bfseries\small Automated Software Engineering, ASE 2025}\\[0.2cm]
+            {\color{LightBG!90}\normalsize Seoul, South Korea}\\[0.15cm]
+        \end{minipage}
+    };
+    
+    \node[anchor=south east, inner sep=0pt] at ([xshift=6cm, yshift=1cm] current page.south east) {
+        \begin{minipage}[t]{0.25\paperwidth}
+            \centering
+            \begin{tabular}{@{}c@{\hspace{0.5cm}}c@{}}
+                \begin{minipage}{3.2cm}
+                    \centering
+                    {\color{white}\qrcode[height=2.2cm]{https://profile.aoyangfang.top}}\\[0.15cm]
+                    {\color{LightBG!90}\tiny Personal Page}
+                \end{minipage}
+                &
+                \begin{minipage}{3cm}
+                    \centering
+                    {\color{white}\qrcode[height=2.2cm]{https://github.com/microsoft/Triangle}}\\[0.15cm]
+                    {\color{LightBG!90}\tiny GitHub Repo}
+                \end{minipage}
+            \end{tabular}
+        \end{minipage}
+    };
+\end{tikzpicture}
+
+\end{frame}
+
+\end{document}
