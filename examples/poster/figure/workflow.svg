@@ -23,7 +23,7 @@
 
             /* --- Text Styles --- */
             .title {
-                font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+                font-family: 'Libertinus Sans';
                 font-size: 24px;
                 font-weight: 700;
             }
@@ -34,7 +34,7 @@
                 fill-opacity: 0.5;
             }
             .output-title {
-                font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+                font-family: 'Libertinus Sans';
                 font-size: 16px;
                 font-weight: 700;
             }
@@ -61,14 +61,14 @@
 
             /* --- HTML styles for foreignObject --- */
             .html-desc {
-                font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+                font-family: 'Libertinus Sans';
                 font-size: 17px;
                 color: #444;
                 line-height: 1.6;
                 margin: 0;
             }
             .html-code {
-                font-family: 'Monaco', 'Courier', monospace;
+                font-family: 'Libertinus Sans';
                 font-size: 16px;
                 font-weight: 600;
                 color: #000;
@@ -180,7 +180,7 @@
         </text>
          <foreignObject x="45" y="210" width="620" height="120">
              <div xmlns="http://www.w3.org/1999/xhtml" class="html-code">
-                 <ol style="padding-left: 25px;">
+                 <ol style="padding-left: 35px;">
                      <li style="margin-bottom: 8px;">Team-PaymentGW (Historical Match)</li>
                      <li style="margin-bottom: 8px;">Team-BillingDB (Document Match)</li>
                      <li style="margin-bottom: 8px;">Team-Frontend (Historical Match)</li>
