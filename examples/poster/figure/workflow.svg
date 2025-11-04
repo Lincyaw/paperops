@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="2200" viewBox="0 0 800 2200"
+     xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <defs>
+        <style type="text/css">
+            /* Use system fonts instead of web fonts for better PDF conversion */
+            
+            /* --- Card Styles --- */
+            .card {
+                fill: #ffffff;
+                stroke-width: 2;
+                rx: 12;
+                ry: 12;
+                filter: url(#drop-shadow);
+            }
+            .start-card { stroke: #e53935; }
+            .phase1-card { stroke: #007bff; }
+            .phase2-card { stroke: #ff9800; }
+            .phase3-card { stroke: #9c27b0; }
+            .end-card { stroke: #4caf50; }
+
+            /* --- Text Styles --- */
+            .title {
+                font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+                font-size: 24px;
+                font-weight: 700;
+            }
+            .output-box {
+                rx: 8;
+                stroke-dasharray: 4;
+                stroke-width: 2;
+                fill-opacity: 0.5;
+            }
+            .output-title {
+                font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+                font-size: 16px;
+                font-weight: 700;
+            }
+
+            /* --- Icon Styles --- */
+            .icon {
+                stroke-width: 2;
+                fill: none;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+            .start-icon { stroke: #c62828; fill: #e53935; fill-opacity: 0.1; }
+            .phase1-icon { stroke: #0056b3; }
+            .phase2-icon { stroke: #e65100; }
+            .phase3-icon { stroke: #6a1b9a; }
+            .end-icon { stroke: #2e7d32; }
+
+            /* --- Arrow --- */
+            .arrow {
+                stroke: #90a4ae;
+                stroke-width: 4;
+                marker-end: url(#arrow-head);
+            }
+
+            /* --- HTML styles for foreignObject --- */
+            .html-desc {
+                font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+                font-size: 17px;
+                color: #444;
+                line-height: 1.6;
+                margin: 0;
+            }
+            .html-code {
+                font-family: 'Monaco', 'Courier', monospace;
+                font-size: 16px;
+                font-weight: 600;
+                color: #000;
+                line-height: 1.6;
+            }
+            .html-code ul, .html-code ol {
+                margin-top: 5px;
+                margin-bottom: 0;
+                padding-left: 25px;
+            }
+            .html-code li {
+                margin-bottom: 8px;
+            }
+
+        </style>
+
+        <filter id="drop-shadow" x="-0.1" y="-0.1" width="1.2" height="1.2">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+            <feOffset dx="0" dy="4" result="offsetblur"/>
+            <feComponentTransfer>
+                <feFuncA type="linear" slope="0.3"/>
+            </feComponentTransfer>
+            <feMerge>
+                <feMergeNode/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+
+        <marker id="arrow-head" viewBox="0 0 10 10" refX="5" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#90a4ae" />
+        </marker>
+
+        <g id="icon-alert"><path d="M 10.29 3.86 L 1.82 18 a 2 2 0 0 0 1.71 3 h 16.94 a 2 2 0 0 0 1.71 -3 L 13.71 3.86 a 2 2 0 0 0 -3.42 0 z M 12 9 v 4 M 12 17 h .01"/></g>
+        <g id="icon-analyzer"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></g>
+        <g id="icon-decider"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></g>
+        <g id="icon-triage"><path d="M 17 21 v -2 a 4 4 0 0 0 -4 -4 H 5 a 4 4 0 0 0 -4 4 v 2"></path><circle cx="9" cy="7" r="4"></circle><path d="M 23 21 v -2 a 4 4 0 0 0 -3 -3.87"></path><path d="M 16 3.13 a 4 4 0 0 1 0 7.75"></path></g>
+        <g id="icon-enrich"><path d="M 21 10 c 0 7 -9 13 -9 13 s -9 -6 -9 -13 a 9 9 0 0 1 18 0 z"></path><circle cx="12" cy="10" r="3"></circle></g>
+        <g id="icon-vote"><path d="M 9 11 l 3 3 l 8 -8"></path><path d="M 21 12 v 7 a 2 2 0 0 1 -2 2 H 5 a 2 2 0 0 1 -2 -2 V 5 a 2 2 0 0 1 2 -2 h 11"></path></g>
+        <g id="icon-assignment"><path d="M 20 21 v -2 a 4 4 0 0 0 -4 -4 H 8 a 4 4 0 0 0 -4 4 v 2"></path><circle cx="12" cy="7" r="4"></circle></g>
+    </defs>
+
+    <g id="step-1" transform="translate(50, 110)">
+        <rect class="card start-card" width="700" height="220" />
+        <use xlink:href="#icon-alert" class="icon start-icon" transform="translate(30, 30) scale(2.5)" />
+        <text class="title" style="fill: #c62828;" x="100" y="58">
+            Initial Incident
+        </text>
+        <foreignObject x="30" y="80" width="640" height="70">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="html-desc">
+                An incident is ingested. It's often a vague symptom (e.g., "slow response"). Traditional manual triage is slow, error-prone, and leads to costly "triage cycles."
+            </div>
+        </foreignObject>
+        <rect class="output-box" style="stroke: #e53935; fill: #fff8f8;" x="30" y="155" width="640" height="45" />
+        <text class="output-title" style="fill: #c62828;" x="45" y="182">
+            Raw Alert:
+        </text>
+        <foreignObject x="145" y="171" width="520" height="30">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="html-desc" style="color: #222; font-size: 16px;">
+                "ID#98765: Users report 'Payment Failure: Error 503' during checkout."
+            </div>
+        </foreignObject>
+    </g>
+
+    <path class="arrow" d="M 400 330 V 360" />
+
+    <g id="step-2" transform="translate(50, 360)">
+        <rect class="card phase1-card" width="700" height="330" />
+        <use xlink:href="#icon-analyzer" class="icon phase1-icon" transform="translate(30, 30) scale(2.5)" />
+        <text class="title" style="fill: #0056b3;" x="100" y="58">
+            Phase 1: Semantic Distillation (Analyzer Agent)
+        </text>
+        <foreignObject x="30" y="80" width="640" height="85">
+             <div xmlns="http://www.w3.org/1999/xhtml" class="html-desc">
+                The Analyzer Agent tackles "Incident Semantic Heterogeneity." It uses TF-IDF and LLMs to normalize terminology and extract key phrases, aligning the raw text with team functional documents.
+            </div>
+        </foreignObject>
+        <rect class="output-box" style="stroke: #007bff; fill: #f0f8ff;" x="30" y="170" width="640" height="140" />
+        <text class="output-title" style="fill: #0056b3;" x="45" y="197">
+            Semantic-Aligned Output:
+        </text>
+        <foreignObject x="45" y="210" width="620" height="120">
+             <div xmlns="http://www.w3.org/1999/xhtml" class="html-code">
+                 <ul>
+                     <li><strong>Location:</strong> Checkout Flow</li>
+                     <li><strong>Symptom:</strong> Payment Failure, Error 503 (Service Unavailable)</li>
+                     <li><strong>Capability:</strong> API Gateway Diagnostics</li>
+                 </ul>
+            </div>
+        </foreignObject>
+    </g>
+
+    <path class="arrow" d="M 400 690 V 720" />
+
+    <g id="step-3" transform="translate(50, 720)">
+        <rect class="card phase2-card" width="700" height="330" />
+        <use xlink:href="#icon-decider" class="icon phase2-icon" transform="translate(30, 30) scale(2.5)" />
+        <text class="title" style="fill: #e65100;" x="100" y="58">
+            Phase 2: Candidate Generation (Decider Agent)
+        </text>
+        <foreignObject x="30" y="80" width="640" height="85">
+             <div xmlns="http://www.w3.org/1999/xhtml" class="html-desc">
+                The Decider Agent uses a two-pronged approach: 1) Matching against historical incidents (TF-IDF), and 2) Matching against team functional documents (LLM) to find the best candidates.
+            </div>
+        </foreignObject>
+        <rect class="output-box" style="stroke: #ff9800; fill: #fffaf0;" x="30" y="170" width="640" height="140" />
+        <text class="output-title" style="fill: #e65100;" x="45" y="197">
+            Candidate Teams (Top 3):
+        </text>
+         <foreignObject x="45" y="210" width="620" height="120">
+             <div xmlns="http://www.w3.org/1999/xhtml" class="html-code">
+                 <ol style="padding-left: 25px;">
+                     <li style="margin-bottom: 8px;">Team-PaymentGW (Historical Match)</li>
+                     <li style="margin-bottom: 8px;">Team-BillingDB (Document Match)</li>
+                     <li style="margin-bottom: 8px;">Team-Frontend (Historical Match)</li>
+                 </ol>
+            </div>
+        </foreignObject>
+    </g>
+
+    <path class="arrow" d="M 400 1050 V 1080" />
+
+    <g id="step-4" transform="translate(50, 1080)">
+        <rect class="card phase3-card" width="700" height="750" />
+        <use xlink:href="#icon-triage" class="icon phase3-icon" transform="translate(30, 30) scale(2.5)" />
+        <text class="title" style="fill: #6a1b9a;" x="100" y="58">
+            Phase 3: Collaborative Triage &amp; Negotiation
+        </text>
+        <foreignObject x="30" y="80" width="640" height="65">
+             <div xmlns="http://www.w3.org/1999/xhtml" class="html-desc">
+                The system activates Team Manager Agents for the 3 candidates to simulate an expert consultation, handling decentralized domain knowledge.
+            </div>
+        </foreignObject>
+
+        <rect class="card" style="fill: #f9f4fb; stroke: #9c27b0; stroke-dasharray: 4;" x="30" y="155" width="640" height="300" />
+        <use xlink:href="#icon-enrich" class="icon phase3-icon" transform="translate(50, 175) scale(1.8)" />
+        <text class="title" style="fill: #6a1b9a; font-size: 18px;" x="95" y="198">
+            Team Information Enrichment (TIE)
+        </text>
+        <foreignObject x="50" y="225" width="600" height="220">
+             <div xmlns="http://www.w3.org/1999/xhtml">
+                 <p class="html-desc" style="font-size: 16px;">Each agent automatically generates and executes queries against its team-specific monitoring databases (logs, metrics). An LLM then summarizes the findings.</p>
+                 <div class="html-code" style="margin-top: 10px; font-size: 15px;">
+                     <ul>
+                         <li style="color: #00695c;"><strong>Frontend Agent:</strong> "Queried UI logs. No errors found. Request was successfully sent to payment-api."</li>
+                         <li style="color: #b71c1c;"><strong>PaymentGW Agent:</strong> "Queried API logs. Detected 1,500 503 errors. Reason: Timeout connecting to BillingDB cluster."</li>
+                         <li style="color: #b71c1c; font-weight: 700;"><strong>BillingDB Agent:</strong> "Queried DB metrics. Confirmed: 14:29 CPU spiked to 100% due to a batch job."</li>
+                     </ul>
+                 </div>
+            </div>
+        </foreignObject>
+
+        <rect class="card" style="fill: #f9f4fb; stroke: #9c27b0; stroke-dasharray: 4;" x="30" y="475" width="640" height="240" />
+        <use xlink:href="#icon-vote" class="icon phase3-icon" transform="translate(50, 495) scale(1.8)" />
+        <text class="title" style="fill: #6a1b9a; font-size: 18px;" x="95" y="518">
+            Voting &amp; Consensus
+        </text>
+        <foreignObject x="50" y="545" width="600" height="90">
+             <div xmlns="http://www.w3.org/1999/xhtml" class="html-desc" style="font-size: 16px;">
+                All agents share their enriched information. Based on the new evidence (the 100% CPU), they vote. A majority consensus is reached, concluding the triage.
+            </div>
+        </foreignObject>
+        <rect class="output-box" style="stroke: #9c27b0; fill: #ffffff;" x="50" y="650" width="600" height="40" />
+        <text class="output-title" style="fill: #6a1b9a;" x="65" y="675">
+            Vote Result:
+        </text>
+        <foreignObject x="180" y="661" width="460" height="30">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="html-desc" style="color: #222; font-size: 16px;">
+                3 / 3 votes for <strong style="color: #000;">Team-BillingDB</strong>
+            </div>
+        </foreignObject>
+    </g>
+
+    <path class="arrow" d="M 400 1830 V 1860" />
+
+    <g id="step-5" transform="translate(50, 1860)">
+        <rect class="card end-card" width="700" height="240" />
+        <use xlink:href="#icon-assignment" class="icon end-icon" transform="translate(30, 30) scale(2.5)" />
+        <text class="title" style="fill: #2e7d32;" x="100" y="58">
+            Final Assignment
+        </text>
+        <foreignObject x="30" y="80" width="640" height="90">
+             <div xmlns="http://www.w3.org/1999/xhtml" class="html-desc">
+                The incident is automatically and accurately assigned to the root cause team without manual intervention or re-assignment hops, drastically reducing Time to Engage (TTE).
+            </div>
+        </foreignObject>
+        <rect class="output-box" style="stroke: #4caf50; fill: #f1f8e9;" x="30" y="180" width="640" height="40" />
+        <text class="output-title" style="fill: #2e7d32; font-size: 18px; font-family: 'Libertinus Sans', 'Linux Libertine', 'Inter', sans-serif;" x="400" y="205" text-anchor="middle">
+            Responsible Team: Team-BillingDB
+        </text>
+    </g>
+
+</svg>

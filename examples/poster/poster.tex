@@ -25,7 +25,7 @@
 \begin{document}
 
 \begin{frame}[t]
-\vspace{0cm}
+\vspace{-1cm}
 
 \geometricBackground
 
@@ -36,9 +36,9 @@
 \posterHeader{
     \color{HeaderPurple}Triangle: Empowering Incident Triage with Multi-Agent
 }{
-    \color{PrimaryDark}A Multi-Agent System Reducing Incident Engagement Time by up to 91%
+    \color{PrimaryDark}A Multi-Agent System Reducing Incident Engagement Time by up to 91\%
 }{
-    {\footnotesize\color{TextDark}Zhaoyang Yu$^{1}$ \textbullet{} Aoyang Fang$^{5}$ \textbullet{} Minghua Ma$^{2}$ \textbullet{} Jaskaran Singh Walia$^{3}$ \textbullet{} Chaoyun Zhang$^{3}$ \textbullet{} Shu Chi$^{1}$}\\[0.1cm]
+    {\footnotesize\color{TextDark}Zhaoyang Yu$^{1}$ \textbullet{} \underline{Aoyang Fang$^{5}$} \textbullet{} Minghua Ma$^{2}$ \textbullet{} Jaskaran Singh Walia$^{3}$ \textbullet{} Chaoyun Zhang$^{3}$ \textbullet{} Shu Chi$^{1}$}\\[0.1cm]
     {\footnotesize\color{TextDark}Ze Li$^{2}$ \textbullet{} Murali Chintalapati$^{2}$ \textbullet{} Xuchao Zhang$^{2}$ \textbullet{} Rujia Wang$^{2}$ \textbullet{} Chetan Bansal$^{2}$ \textbullet{} Saravan Rajmohan$^{2}$}\\[0.1cm]
     {\footnotesize\color{TextDark}Qingwei Lin$^{3}$ \textbullet{} Shenglin Zhang$^{4}$ \textbullet{} Dan Pei$^{1}$ \textbullet{} Pinjia He$^{5}$}
 }{
@@ -54,9 +54,7 @@
 }
 
 
-% ----------------------------------------------------------------------------
-% THREE-COLUMN LAYOUT FOR MAIN CONTENT
-% ----------------------------------------------------------------------------
+
 
 \begin{columns}[T,onlytextwidth]
 
@@ -64,22 +62,18 @@
 % COLUMN 1: The Problem & Motivation
 % ============================================================================
 
-\begin{column}{0.32\textwidth}
+\begin{column}{0.3\textwidth}
 
 % Section 1: The Problem
 \posterSection{1. Why Incident Triage Matters}
 
 \posterBlock{
-    High-profile outages demonstrate the critical importance of rapid incident response:
+    High-profile outages demonstrate the critical importance of rapid incident response. Even minutes of downtime translate to millions in revenue loss and severe customer impact.
 }
 
-\posterFigure{figure/incident1.png}{CrowdStrike and Windows Outage (July 19, 2024): Caused massive global service disruptions and economic losses.}
+\posterFigure[width=0.8\textwidth]{figure/incident1.png}{\small CrowdStrike and Windows Outage (July 19, 2024): Caused massive global service disruptions and economic losses.}
 
-\posterFigure{figure/incident2.png}{Amazon Web Services Outage (Oct 19, 2025): Impacted millions of users and businesses worldwide.}
-
-\highlightBlock{Even minutes of downtime translate to millions in revenue loss and severe customer impact.}
-
-\vspace{0.4cm}
+\posterFigure[width=0.8\textwidth]{figure/incident2.png}{\small Amazon Web Services Outage (Oct 19, 2025): Impacted millions of users and businesses worldwide.}
 
 \posterSection{2. The Core Challenge: Triage Cycles}
 
@@ -87,20 +81,14 @@
     At the heart of incident management lies \textbf{Incident Triage}: assigning incidents to the correct team. A wrong assignment triggers costly "triage cycles" where incidents bounce between teams.
 }
 
-\posterFigure{figure/incidentloop.png}{The triage process relies on slow manual operations, vague alerts, and has high business impact from delays.}
+\posterFigure{figure/incidentloop.png}{\small The triage process relies on slow manual operations, vague alerts, and has high business impact from delays.}
+\posterFigure[width=0.8\textwidth]{figure/study1.png}{\small Our study of 3,000+ teams: Each hop exponentially increases triage time and communication overhead.}
 
 \end{column}
 
-% ============================================================================
-% COLUMN 2: Our Solution & Framework
-% ============================================================================
-
-\begin{column}{0.32\textwidth}
-\posterFigure{figure/triageexample.png}{Real example: A Mac sign-in issue escalated across Teams A, B, and C before reaching the team with correct expertise.}
-
-\posterFigure{figure/study1.png}{Our study of 3,000+ teams: Each hop exponentially increases triage time and communication overhead.}
-
-\vspace{0.4cm}
+\begin{column}{0.33\textwidth}
+    
+\posterFigure[width=0.8\textwidth]{figure/triageexample.png}{\small  Real example: A Mac sign-in issue escalated across Teams A, B, and C before reaching the team with correct expertise.}
 
 % Section 3: Our Approach
 \posterSection{3. Our Solution: Triangle}
@@ -114,39 +102,11 @@
         \item \textbf{Automated Enrichment:} Agents query logs and monitoring systems automatically.
     \end{itemize}
 }
-
-\vspace{0.35cm}
-
-% Section 4: Multi-Agent Framework
-\posterSection{4. How It Works}
-
-\posterBlock{
-    Triangle employs a three-phase workflow that mirrors expert-level diagnostics and decision-making.
-    \begin{enumerate}
-        \setlength{\itemsep}{4pt}
-        \item \textbf{Analyze:} The \textit{Analyzer Agent} distills the core issue from the raw incident alert.
-        \item \textbf{Propose:} The \textit{Decider Agent} uses historical data and team documentation to identify a set of candidate teams.
-        \item \textbf{Negotiate:} \textit{Team Manager Agents} for candidate teams form a discussion group. They enrich the incident with data from their tools and vote. If no consensus is reached, the enriched incident is re-evaluated.
-    \end{enumerate}
-}
+\posterFigure{figure/overall.png}{\small The Triangle Framework: Agents collaborate to analyze, propose, and negotiate the correct team assignment.}
 
 
 
-\end{column}
-
-% ============================================================================
-% COLUMN 3: Business Impact & Conclusion
-% ============================================================================
-
-\begin{column}{0.32\textwidth}
-\posterFigure{figure/overall.png}{The Triangle Framework: Agents collaborate to analyze, propose, and negotiate the correct team assignment.}
-
-\highlightBlock{This iterative process allows Triangle to solve complex cases that would require multiple manual reassignments.}
-
-\vspace{0.45cm}
-
-% Section 5: Performance
-\posterSection{5. Key Results}
+\posterSection{4. Key Results}
 
 \posterBlock{
     We evaluated Triangle on real-world incident data from a large-scale cloud provider.
@@ -158,11 +118,21 @@
     \end{itemize}
 }
 % Figure
-\posterFigure{figure/tool_used.pdf}{Team Manager Agents use tools to automatically enrich incidents with log data and analysis.}
+\posterFigure{figure/tool_used.pdf}{\small Team Manager Agents use tools to automatically enrich incidents with log data and analysis.}
 
-\vspace{0.45cm}
 
-% Section 6: Business Impact
+\end{column}
+
+
+\begin{column}{0.32\textwidth}
+
+
+\posterSection{5. How It Works}
+
+
+\posterFigure[width=1\textwidth]{figure/workflow.pdf}{\small Triangle's three-phase workflow: from initial incident to final assignment through analyze, propose, and negotiate phases.}
+
+
 \posterSection{6. Real-World Business Impact}
 
 \posterBlock{
@@ -190,33 +160,13 @@
     \end{metricbox}
 \end{minipage}
 
-\vspace{0.45cm}
-
-% Section 7: Conclusion
-\posterSection{7. Conclusion}
-
-\begin{referencebox}
-    \small
-    By automating triage with a collaborative multi-agent system, Triangle not only improves accuracy but fundamentally changes the operational workflow. It reduces manual toil, accelerates incident resolution, and allows engineers to focus on solving problems rather than routing them.
-\end{referencebox}
-
-\vspace{0.45cm}
-
-
 \end{column}
 
 \end{columns}
 
-% ----------------------------------------------------------------------------
-% FOOTER - Fixed at bottom of page
-% ----------------------------------------------------------------------------
-
-% Create a tikz overlay to draw the footer bar and content at the bottom
 \begin{tikzpicture}[remember picture,overlay]
-    % Footer background bar
     \fill[PrimaryDark] (current page.south west) rectangle ([yshift=6cm] current page.south east);
     
-    % Footer content positioned absolutely at the bottom
     \node[anchor=south west, inner sep=0pt] at ([xshift=15mm, yshift=0.04cm] current page.south west) {
         \begin{minipage}[t]{0.58\paperwidth}
             {\color{white}\bfseries\small The 40th IEEE/ACM International Conference on}\\[0.1cm]

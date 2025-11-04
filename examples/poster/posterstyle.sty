@@ -131,7 +131,7 @@
     arc=4mm,
     boxrule=0pt,
     width=\textwidth,
-    fontupper=\color{white}\bfseries\LARGE,
+    fontupper=\color{white}\bfseries\Large,
     halign=left,
     left=10mm,
     right=10mm,
@@ -249,16 +249,18 @@
 }
 
 % Command for figures with captions framed in a soft card
-% Usage: \posterFigure{path/to/image.png}{Caption text}
-\newcommand{\posterFigure}[2]{
-    \vspace{0.25cm}
+% Usage: \posterFigure[width=0.88\textwidth]{path/to/image.png}{Caption text}
+%        \posterFigure[height=15cm]{path/to/image.png}{Caption text}
+% Default: width=0.88\textwidth
+\newcommand{\posterFigure}[3][width=0.88\textwidth]{
+    \vspace{0.15cm}
     \begin{figurebox}
-        \vspace{0.45cm}
-        \includegraphics[width=0.92\textwidth]{#1}
-        
         \vspace{0.35cm}
-        {\color{TextDark}\large\textbf{#2}}
-        \vspace{0.45cm}
+        \includegraphics[#1]{#2}
+        
+        \vspace{0.25cm}
+        {\color{TextDark}\large\textbf{#3}}
+        \vspace{0.35cm}
     \end{figurebox}
 }
 
