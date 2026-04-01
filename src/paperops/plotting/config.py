@@ -1,44 +1,22 @@
 # -*- coding: utf-8 -*-
-# Comprehensive plotting configuration for top-tier software engineering academic conferences.
-# This configuration aims to provide a ready-to-use setup for creating publication-quality figures
-# using Matplotlib, following best practices for clarity, readability, and aesthetics.
+"""Plotting configuration and utilities for publication-quality academic figures.
+
+Provides preset themes, figure sizing helpers, and save utilities
+optimised for top-venue papers (ACM, IEEE, NeurIPS, etc.).
+"""
+
+import logging
+import tempfile
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-# --- General Style ---
-# Use seaborn for a base style, which is generally more aesthetically pleasing than default matplotlib.
-# 'paper' context is suitable for academic papers.
-# 'ticks' style adds ticks on axes for better value tracking.
-sns.set_context("paper")
-sns.set_style("ticks")
+logger = logging.getLogger(__name__)
 
-# --- Font Configuration ---
-# Using Times New Roman, as it's a classic and widely accepted font for academic publications (e.g., ACM, IEEE).
-# If not available, common fallbacks like 'serif' are used.
-# The font sizes are chosen for readability in a two-column paper format.
-# Ensure Type 42 (TrueType) fonts are used in PDF/PS output for ACM/IEEE compliance.
-FONT_CONFIG = {
-    "font.family": "serif",
-    "font.serif": ["DejaVu Serif"],
-    "font.size": 10,
-    "axes.titlesize": 12,
-    "axes.labelsize": 11,
-    "xtick.labelsize": 10,
-    "ytick.labelsize": 10,
-    "legend.fontsize": 10,
-    "figure.titlesize": 14,
-    "pdf.fonttype": 42,  # Embed fonts in PDF
-    "ps.fonttype": 42,  # Embed fonts in PS
-}
-
-# --- Color Palettes ---
-# A colorblind-friendly palette is crucial for accessibility.
-# This palette is derived from Paul Tol's notes and is well-regarded in the scientific community.
-# It provides good contrast and is distinguishable by people with common forms of color blindness.
-
-# Base 6 colors
+# ======================================================================
+# Color Palettes
+# ======================================================================
 
 BASE_COLORS = [
     "#dd9f94",
@@ -59,194 +37,252 @@ BASE_COLORS = [
     "#c5ccdb",
 ]
 
-
-# Keep original 6-color palette for backward compatibility
 COLOR_PALETTE_QUALITATIVE = BASE_COLORS
 
-# Grayscale palette for black-and-white publications.
 GRAYSCALE_PALETTE = sns.color_palette("gray_r", n_colors=5)
 
-# Recommended colormaps for heatmaps (perceptually uniform and colorblind-friendly).
-# - 'viridis', 'plasma', 'inferno', 'magma', 'cividis' for sequential data.
-# - 'coolwarm', 'bwr', 'seismic' for diverging data.
 RECOMMENDED_CMAPS = {
     "sequential": "viridis",
     "diverging": "coolwarm",
 }
 
+# ======================================================================
+# Style Constants
+# ======================================================================
 
-# --- Figure and Axes Configuration ---
-# These settings control the layout and appearance of the figure and axes.
-FIGURE_CONFIG = {
-    # Figure layout
-    "figure.dpi": 300,  # High resolution for publication
-    "figure.autolayout": False,  # Use tight_layout() manually for better control
-    "savefig.dpi": 300,
-    "savefig.format": "pdf",  # Vector format for scalability
-    "savefig.bbox": "tight",  # Fit the saved figure tightly around the plot
-    # Axes appearance
-    "axes.edgecolor": "black",
-    "axes.linewidth": 0.8,
-    "axes.grid": True,
-    "axes.grid.axis": "y",  # Horizontal grid lines often aid in reading values
-    "grid.color": "gray",
-    "grid.linestyle": ":",
-    "grid.linewidth": 0.5,
-    "axes.spines.top": False,  # Remove top and right spines for a cleaner look
-    "axes.spines.right": False,
+HATCH_PATTERNS = ["/", "\\", "|", "-", "+", "x", "o", "O", ".", "*"]
+MARKER_STYLES = ["o", "s", "v", "^", "D", "<", ">", "p", "*"]
+LINE_STYLES = ["-", "--", "-.", ":"]
+
+# ======================================================================
+# Figure Size Presets (inches)
+# ======================================================================
+
+FIGURE_SIZES = {
+    "single": (3.5, 2.5),     # Single-column figure
+    "double": (7.0, 3.5),     # Double-column / full-width figure
+    "square": (3.5, 3.5),     # Square (confusion matrix, heatmap)
+    "wide": (7.0, 2.5),       # Wide panoramic (timeline, multi-panel)
 }
 
-# --- Tick Configuration ---
-# Controls the appearance of axis ticks.
-TICK_CONFIG = {
+# ======================================================================
+# Theme Definitions
+# ======================================================================
+
+_COMMON_CONFIG = {
+    # Figure output
+    "figure.dpi": 300,
+    "figure.autolayout": False,
+    "savefig.dpi": 300,
+    "savefig.format": "pdf",
+    "savefig.bbox": "tight",
+    # Font embedding (Type 42 for ACM/IEEE compliance)
+    "pdf.fonttype": 42,
+    "ps.fonttype": 42,
+    # Axes
+    "axes.edgecolor": "black",
+    "axes.linewidth": 0.8,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    # Ticks
     "xtick.direction": "in",
     "ytick.direction": "in",
     "xtick.major.size": 3,
     "xtick.minor.size": 1.5,
     "ytick.major.size": 3,
     "ytick.minor.size": 1.5,
-}
-
-# --- Legend Configuration ---
-# Settings for the plot legend.
-LEGEND_CONFIG = {
-    "legend.frameon": False,  # No frame around the legend for a cleaner look
+    # Legend
+    "legend.frameon": False,
     "legend.loc": "best",
-}
-
-# --- Bar Plot Specifics ---
-# Settings for bar plots, including hatch patterns for black-and-white printing.
-BAR_CONFIG = {
-    "hatch.linewidth": 0.5,
-}
-HATCH_PATTERNS = ["/", "\\", "|", "-", "+", "x", "o", "O", ".", "*"]
-
-# --- Line Plot Specifics ---
-# Define a cycle of markers and line styles for multi-line plots to ensure distinguishability.
-LINE_CONFIG = {
+    # Lines
     "lines.linewidth": 1.5,
     "lines.markersize": 5,
-}
-MARKER_STYLES = ["o", "s", "v", "^", "D", "<", ">", "p", "*"]
-LINE_STYLES = ["-", "--", "-.", ":"]
-
-# --- Box Plot Specifics ---
-# Enhance visibility of box plot components.
-BOXPLOT_CONFIG = {
+    # Bar
+    "hatch.linewidth": 0.5,
+    # Box plot
     "boxplot.boxprops.linewidth": 1.5,
     "boxplot.medianprops.linewidth": 1.5,
     "boxplot.whiskerprops.linewidth": 1.5,
     "boxplot.capprops.linewidth": 1.5,
     "boxplot.flierprops.markeredgecolor": "gray",
     "boxplot.flierprops.marker": ".",
-}
-
-# --- Error Bar Specifics ---
-ERRORBAR_CONFIG = {
+    # Error bars
     "errorbar.capsize": 2,
-}
-
-# --- Scatter Plot Specifics ---
-SCATTER_CONFIG = {
+    # Scatter
     "scatter.marker": "o",
 }
 
+THEMES = {
+    "classic": {
+        **_COMMON_CONFIG,
+        "font.family": "serif",
+        "font.serif": ["DejaVu Serif"],
+        "font.size": 10,
+        "axes.titlesize": 12,
+        "axes.labelsize": 11,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "legend.fontsize": 10,
+        "figure.titlesize": 14,
+        "axes.grid": True,
+        "axes.grid.axis": "y",
+        "grid.color": "gray",
+        "grid.linestyle": ":",
+        "grid.linewidth": 0.5,
+    },
+    "modern": {
+        **_COMMON_CONFIG,
+        "font.family": "sans-serif",
+        "font.sans-serif": ["DejaVu Sans"],
+        "font.size": 10,
+        "axes.titlesize": 12,
+        "axes.labelsize": 11,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "legend.fontsize": 10,
+        "figure.titlesize": 14,
+        "axes.linewidth": 0.6,
+        "axes.grid": False,
+        "lines.linewidth": 1.2,
+        "lines.markersize": 4,
+    },
+    "grayscale": {
+        **_COMMON_CONFIG,
+        "font.family": "serif",
+        "font.serif": ["DejaVu Serif"],
+        "font.size": 10,
+        "axes.titlesize": 12,
+        "axes.labelsize": 11,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "legend.fontsize": 10,
+        "figure.titlesize": 14,
+        "axes.grid": True,
+        "axes.grid.axis": "y",
+        "grid.color": "gray",
+        "grid.linestyle": ":",
+        "grid.linewidth": 0.5,
+    },
+}
 
-def apply_plot_config(palette="color"):
-    """
-    Applies the comprehensive plotting configuration.
+# Palette associated with each theme
+_THEME_PALETTES = {
+    "classic": COLOR_PALETTE_QUALITATIVE,
+    "modern": COLOR_PALETTE_QUALITATIVE,
+    "grayscale": GRAYSCALE_PALETTE,
+}
+
+# ======================================================================
+# Core API
+# ======================================================================
+
+
+def apply_plot_config(theme="classic"):
+    """Apply a publication-ready plotting theme.
+
     Args:
-        palette (str): The color palette to use. Options:
-            - 'color': 6-color colorblind-friendly palette
-            - '18tones': 18-color palette with 3 tones per base color
-            - 'gray': grayscale palette
-            - or any custom palette
+        theme: Theme name ("classic", "modern", "grayscale") or a custom
+               dict of matplotlib rcParams.
     """
-    plt.rcParams.update(FONT_CONFIG)
-    plt.rcParams.update(FIGURE_CONFIG)
-    plt.rcParams.update(TICK_CONFIG)
-    plt.rcParams.update(LEGEND_CONFIG)
-    plt.rcParams.update(BAR_CONFIG)
-    plt.rcParams.update(LINE_CONFIG)
-    plt.rcParams.update(BOXPLOT_CONFIG)
-    plt.rcParams.update(ERRORBAR_CONFIG)
-    plt.rcParams.update(SCATTER_CONFIG)
+    if isinstance(theme, dict):
+        plt.rcParams.update(theme)
+        return
 
-    if palette == "color":
-        sns.set_palette(COLOR_PALETTE_QUALITATIVE)
-    elif palette == "gray":
-        sns.set_palette(GRAYSCALE_PALETTE)
-    else:
-        sns.set_palette(palette)
-
-    print(
-        f"Plotting configuration for academic publications applied (Palette: {palette})."
-    )
-
-
-# Example usage:
-if __name__ == "__main__":
-    apply_plot_config()
-
-    # --- Example 1: Bar Plot ---
-    fig, ax = plt.subplots(figsize=(5, 3.5))
-    x = ["Group A", "Group B", "Group C", "Group D"]
-    y1 = [20, 35, 30, 35]
-    y2 = [25, 32, 34, 20]
-    ax.bar(x, y1, label="Metric 1", width=0.4)
-    ax.bar(x, y2, label="Metric 2", width=0.4, bottom=y1)
-    ax.set_xlabel("Experiment Groups")
-    ax.set_ylabel("Measured Value")
-    ax.set_title("Example Bar Plot")
-    ax.legend()
-    ax.set_ylim(0)
-    plt.tight_layout()
-    fig.savefig("example_bar_plot.pdf")
-    print("Example bar plot saved to example_bar_plot.pdf")
-    plt.close(fig)
-
-    # --- Example 2: Line Plot ---
-    fig, ax = plt.subplots(figsize=(5, 3.5))
-    x = np.linspace(0, 10, 10)
-    for i in range(4):
-        ax.plot(
-            x,
-            x + i,
-            marker=MARKER_STYLES[i],
-            linestyle=LINE_STYLES[i],
-            label=f"Line {i + 1}",
+    if theme not in THEMES:
+        raise ValueError(
+            f"Unknown theme '{theme}'. Available: {sorted(THEMES.keys())}"
         )
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Performance Metric")
-    ax.set_title("Example Line Plot")
-    ax.legend()
-    plt.tight_layout()
-    fig.savefig("example_line_plot.pdf")
-    print("Example line plot saved to example_line_plot.pdf")
-    plt.close(fig)
 
-    # --- Example 3: Box Plot ---
-    fig, ax = plt.subplots(figsize=(5, 3.5))
-    data = [np.random.normal(0, std, 100) for std in range(1, 5)]
-    sns.boxplot(data=data, ax=ax)
-    ax.set_xlabel("Distribution")
-    ax.set_ylabel("Value")
-    ax.set_title("Example Box Plot")
-    plt.tight_layout()
-    fig.savefig("example_box_plot.pdf")
-    print("Example box plot saved to example_box_plot.pdf")
-    plt.close(fig)
+    plt.rcParams.update(THEMES[theme])
 
-    # --- Example 4: Grayscale Plot ---
-    apply_plot_config(palette="gray")
-    fig, ax = plt.subplots(figsize=(5, 3.5))
-    for i in range(4):
-        ax.bar(f"Bar {i + 1}", i + 2, label=f"Bar {i + 1}", hatch=HATCH_PATTERNS[i])
-    ax.set_xlabel("Categories")
-    ax.set_ylabel("Value")
-    ax.set_title("Example Grayscale Bar Plot with Hatches")
-    ax.legend()
-    plt.tight_layout()
-    fig.savefig("example_grayscale_plot.pdf")
-    print("Example grayscale plot saved to example_grayscale_plot.pdf")
+    palette = _THEME_PALETTES[theme]
+    sns.set_palette(palette)
+
+    if theme == "classic" or theme == "grayscale":
+        sns.set_context("paper")
+        sns.set_style("ticks")
+    elif theme == "modern":
+        sns.set_context("paper")
+        sns.set_style("white")
+
+    logger.info("Plotting theme '%s' applied.", theme)
+
+
+def figure(size="single", nrows=1, ncols=1, **kwargs):
+    """Create a figure with preset academic sizing.
+
+    Args:
+        size: Preset name ("single", "double", "square", "wide") or
+              a (width, height) tuple in inches.
+        nrows: Number of subplot rows.
+        ncols: Number of subplot columns.
+        **kwargs: Forwarded to plt.subplots().
+
+    Returns:
+        (fig, ax) or (fig, axes) — same as plt.subplots().
+    """
+    if isinstance(size, str):
+        if size not in FIGURE_SIZES:
+            raise ValueError(
+                f"Unknown size '{size}'. Available: {sorted(FIGURE_SIZES.keys())}"
+            )
+        w, h = FIGURE_SIZES[size]
+    else:
+        w, h = size
+
+    return plt.subplots(nrows=nrows, ncols=ncols, figsize=(w, h), **kwargs)
+
+
+def save(fig, path=None, dpi=300, **kwargs):
+    """Save figure with academic defaults and close it.
+
+    Applies tight_layout, saves with bbox_inches='tight', then closes
+    the figure to free memory.
+
+    Args:
+        fig: Matplotlib Figure object.
+        path: Output file path. If None, saves to a temporary PNG file.
+        dpi: Resolution (default 300).
+        **kwargs: Forwarded to fig.savefig().
+
+    Returns:
+        The file path (useful when path is None for temp files, or for
+        passing directly to paperops.slides.Image).
+    """
+    if path is None:
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tmp.close()
+        path = tmp.name
+
+    fig.tight_layout()
+    kwargs.setdefault("bbox_inches", "tight")
+    fig.savefig(path, dpi=dpi, **kwargs)
     plt.close(fig)
+    return path
+
+
+def colors(n=None):
+    """Get colors from the current qualitative palette.
+
+    Args:
+        n: Number of colors to return. None returns the full palette.
+
+    Returns:
+        List of hex color strings.
+    """
+    palette = list(COLOR_PALETTE_QUALITATIVE)
+    if n is None:
+        return palette
+    return palette[:n]
+
+
+# Keep backward-compatible module-level config dicts for direct access
+FONT_CONFIG = {k: v for k, v in THEMES["classic"].items() if k.startswith("font.") or "size" in k}
+FIGURE_CONFIG = {k: v for k, v in THEMES["classic"].items() if k.startswith(("figure.", "savefig.", "axes."))}
+TICK_CONFIG = {k: v for k, v in THEMES["classic"].items() if k.startswith(("xtick.", "ytick."))}
+LEGEND_CONFIG = {k: v for k, v in THEMES["classic"].items() if k.startswith("legend.")}
+BAR_CONFIG = {k: v for k, v in THEMES["classic"].items() if k.startswith("hatch.")}
+LINE_CONFIG = {k: v for k, v in THEMES["classic"].items() if k.startswith("lines.")}
+BOXPLOT_CONFIG = {k: v for k, v in THEMES["classic"].items() if k.startswith("boxplot.")}
+ERRORBAR_CONFIG = {k: v for k, v in THEMES["classic"].items() if k.startswith("errorbar.")}
+SCATTER_CONFIG = {k: v for k, v in THEMES["classic"].items() if k.startswith("scatter.")}

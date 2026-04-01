@@ -81,6 +81,8 @@ All nodes accept `width`, `height`, `min_width`, `min_height` as keyword args to
 
 **For full API details including all parameters, data formats, and examples: read [references/api.md](references/api.md)**
 
+**For the end-to-end production workflow (logic flow → visual vocabulary → layout → content): read [references/workflow.md](references/workflow.md)**
+
 ---
 
 ## Themes
@@ -162,87 +164,98 @@ Group by logical progression (premise -> evidence -> conclusion). Every content 
 
 ## Design Philosophy
 
-A good presentation is not a document read aloud — it is a **narrative arc** delivered visually. These principles apply to every presentation.
+**A presentation is the flow of thinking, not the accumulation of content.**
 
-### 0. Narrative Coherence Across the Entire Deck
+Every slide deck is a chain of reasoning delivered visually. The audience should feel your logic unfold — premise by premise, step by step — not read a document projected on a wall. If a slide doesn't advance the argument, it doesn't belong. If a slide dumps information without guiding interpretation, it has failed.
 
-Before touching any individual slide, design the **story** first. Every slide must earn its place in a logical chain: each one should answer "why am I here after the previous slide?" and "what does the audience need to know before the next slide?" If you can shuffle slides without the audience noticing, the narrative is broken.
+This is the single principle behind every rule below.
 
-Think in terms of:
-- **Setup** (context, problem, motivation) → **Development** (evidence, analysis, method) → **Resolution** (findings, implications, call to action)
-- Each slide advances the argument by exactly one step — no more, no less
-- Transitions between slides should feel inevitable, not arbitrary
-- Section dividers (`prs.section()`) mark major narrative beats, not arbitrary groupings
+### 1. Design the Thinking Chain First
 
-Plan the full slide sequence and its logical flow before writing any code. If the structure doesn't hold together as a story, no amount of visual polish will save it.
+Before writing any code, design the **logical structure** of the entire deck. Every slide must answer two questions:
 
-### 1. Every Slide Must Have Animation
+- **Why does this slide come after the previous one?** (logical dependency)
+- **What must the audience understand here before the next slide?** (prerequisite)
 
-Never present an entire slide at once. The audience will read ahead and stop listening to you. Use `sb.animate()` on **every content slide** to control pacing:
+If you can reorder slides without the audience noticing, there is no chain — just a pile of content.
 
-- Group by logical progression: premise → evidence → conclusion
-- One click = one idea appears
-- The presenter controls attention, not the audience's reading speed
+Think in terms of logical progression:
+- **Setup** (context → problem → why it matters) → **Development** (approach → evidence → analysis) → **Resolution** (findings → implications → what's next)
+- Each slide = exactly one logical step. Not zero (padding), not two (overloaded).
+- Section dividers (`prs.section()`) mark major turns in the argument — "we've established the problem, now here's our approach" — not arbitrary groupings.
 
-The only exceptions are cover slides, section dividers, and closing slides — these are simple enough to show all at once.
+**Plan the full slide sequence and its logical dependencies before touching any code.** The structure is the presentation. Everything else is rendering.
+
+### 2. Animate the Reasoning, Not the Slide
+
+Animation exists to pace the logic within a single slide. Each click reveals the next step in a local argument:
 
 ```python
-# Good: audience follows your reasoning step by step
+# The slide's logic: "Here's a problem → here's evidence → here's what it means"
 sb.animate([
-    [problem_statement],      # Click 1: "Here's the problem"
-    [data_chart],             # Click 2: "Here's what we measured"
-    [conclusion_callout],     # Click 3: "Here's what it means"
+    [problem_statement],      # Click 1: establish the claim
+    [data_chart],             # Click 2: show the evidence
+    [conclusion_callout],     # Click 3: deliver the interpretation
 ])
 ```
 
-### 2. Visual Structure Over Text Walls
+Rules:
+- **Every content slide must have animation.** Showing everything at once lets the audience read ahead and stop listening. The presenter controls attention, not the audience's reading speed.
+- **One click = one logical step.** Not one visual element — if two components together form one idea, they appear together.
+- **Animation order = reasoning order.** Premise before evidence. Question before answer. Data before interpretation.
+- Exceptions: cover slides, section dividers, and closing slides are simple enough to show all at once.
 
-Every slide needs a **visual element** — not just text. If a slide is just TextBlocks and BulletLists, it belongs in a document, not a presentation. Express ideas through structure:
+### 3. Encode Logic Through Structure, Not Text
 
-- **Processes/sequences** → `Flow`, `Flowchart`, or custom Arrow chains
-- **Comparisons** → Side-by-side `HStack` with contrasting colors
-- **Data** → `BarChart`, `RadarChart`, or `Table`
-- **Key insights** → `Callout` with accent color
-- **Hierarchies/relationships** → `Grid` of `RoundedBox` with `Arrow` connectors
+The layout itself should express the relationship between ideas. If you need a sentence to explain how two things relate, you've chosen the wrong visual structure.
 
-**Rendering priority for visual content:**
-1. **Native shapes first** — Box, RoundedBox, Circle, Arrow, Flowchart, Flow, Callout all render as real PPT shapes. They scale perfectly, stay crisp, and the audience can select/copy text from them.
-2. **SvgCanvas for custom diagrams** — When native shapes can't express the visual (e.g., curved paths, custom geometries, complex spatial layouts), use `SvgCanvas` to draw it, then embed via `SvgImage(svg=canvas)`. This converts SVG→PNG at render time.
-3. **BarChart/RadarChart** — These use SvgCanvas internally. Use them for data visualization.
+| Logical relationship | Visual encoding | NOT this |
+|---------------------|----------------|----------|
+| A causes/leads to B | `Flow`, `Arrow` chain | "A leads to B" in a bullet point |
+| A vs B | Side-by-side `HStack`, contrasting colors | Two paragraphs describing each |
+| Parts of a whole | `Grid` of `RoundedBox` | Bullet list of parts |
+| Key insight | `Callout` with accent color | Bold text in a paragraph |
+| Process / pipeline | `Flowchart` with directed edges | Numbered list of steps |
+| Quantitative comparison | `BarChart`, `Table` | "X is 3x faster than Y" in text |
+| Hierarchy / containment | Nested boxes, `Padding` | Indented bullets |
 
-Avoid SVG when native shapes suffice — SVG images can distort if the allocated region aspect ratio doesn't match.
+**The test**: if you removed all text from a slide and only saw shapes, colors, and arrows, could the audience still grasp the structure of the argument? If not, the visual structure isn't carrying enough weight.
 
-### 3. Emphasis for Attention Guidance
+For concrete guidance on when to use native shapes vs SVG icons vs charts, see [references/workflow.md](references/workflow.md) § Visual Vocabulary.
 
-Use `italic=True` and `color` to highlight key content. Color-match emphasis to meaning:
-- `"negative"` (red) for warnings/problems
-- `"positive"` (green) for results/solutions
-- `"primary"` (blue) for key insights
-- `"highlight"` (purple) for theoretical concepts
+### 4. Minimize Text, Maximize Signal
 
-On every slide with >2 TextBlocks, identify the single most important phrase and give it `italic=True` + semantic color.
+Text on a slide is not prose — it is **anchor points** for spoken reasoning. The presenter's voice carries the explanation; the slide carries the structure.
 
-### 4. Layout Variety
+Guidelines:
+- **No full sentences.** If text reads like a paragraph, it belongs in a document.
+- **Each TextBlock ≤ 15 words.** Beyond that, split into structure or cut.
+- **BulletList items are keywords, not explanations.** "Latency reduced 3×" not "We observed that the latency was reduced by a factor of three compared to the baseline."
+- **One emphasis per slide.** Identify the single most important phrase and give it `italic=True` + semantic color (`"primary"` for key insights, `"positive"` for results, `"negative"` for problems, `"highlight"` for concepts). Everything else is supporting context.
 
-Never repeat the same layout pattern on consecutive slides. Mix:
-- HStack + VStack combinations
-- Grid for multi-item layouts
-- Callout for highlighted insights
-- Flow/Flowchart for processes
-- BarChart/RadarChart for data
-- Custom combinations
+### 5. Every Slide Must Look Different
 
-Prefer custom `slide.layout()` over template calls like `prs.comparison()` for non-trivial content.
+Repeating the same layout signals repetitive thinking. If three slides in a row are "title + bullet list," the audience assumes the content is equally uniform and disengages.
 
-### 5. Content Density
+Mix layouts deliberately:
+- `HStack` (side-by-side) → `VStack` (top-down) → `Grid` → `Flowchart` → `HStack` with `Callout`
+- Prefer custom `slide.layout()` over template calls like `prs.content()` for anything beyond the simplest slides.
+- When two slides share the same logical structure (e.g., comparing results for dataset A then dataset B), the same layout is acceptable — the repetition reinforces the parallel.
 
-For a 30-minute talk: ~22-25 slides (1-1.5 min/slide). Merge related concepts into fewer, richer slides. Cut redundant slides that repeat what a visual already shows.
+### 6. Density and Pacing
+
+- **Target: 1–1.5 minutes per slide** for a typical talk. A 30-minute presentation ≈ 22–25 slides.
+- **Merge related concepts** into fewer, richer slides rather than spreading thin ideas across many slides.
+- **Cut slides that don't advance the argument.** A slide that only repeats what a visual already showed, or that exists only "for completeness," weakens the chain.
+- **Breathing room matters.** Not every slide needs to be dense. A single `Callout` with one sentence can be the most powerful slide in the deck — if it's the right sentence at the right moment in the argument.
 
 ---
 
 ## QA Workflow
 
-Always validate after generating:
+Two levels of validation: automated checks and visual review.
+
+### Automated checks (always run)
 
 ```python
 # 1. In-memory validation
@@ -256,12 +269,20 @@ from paperops.slides.preview import check_presentation
 issues = check_presentation("output.pptx")
 # Checks: off-slide shapes, text overflow, overlapping text
 
-# 3. Visual preview (PIL-based)
+# 3. Generate preview PNGs
 paths = prs.preview(output_dir="./preview")
-# Then read the PNG files to visually verify layout
 ```
 
-Fix any issues found, then re-validate. Don't declare success until a full pass reveals no new issues.
+### Visual review (delegate to `slide-reviewer` agent)
+
+After generating preview PNGs, dispatch the **`slide-reviewer`** agent with:
+- The `.pptx` file path
+- The preview PNG paths
+- The slide outline from Phase 1 (if available)
+
+The reviewer examines every slide for layout issues, design principle violations, and logic flow coherence. Fix its findings, then re-run the automated checks.
+
+Don't declare success until both automated checks and visual review pass cleanly.
 
 ---
 
