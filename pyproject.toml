@@ -1,17 +1,28 @@
 [project]
 name = "paperops"
-version = "0.1.5"
-description = "utilities for writing papers"
+version = "0.2.0"
+description = "Utilities for academic papers, presentations, and publications"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
+dependencies = []
+
+[project.optional-dependencies]
+plotting = [
     "matplotlib>=3.7.0",
     "seaborn>=0.12.0",
     "numpy>=1.24.0",
 ]
-
-[project.optional-dependencies]
+slides = [
+    "python-pptx>=1.0.0",
+    "cairosvg>=2.7.0",
+    "Pillow>=10.0.0",
+    "lxml>=4.9.0",
+]
 dev = ["pytest>=7.0.0", "black>=23.0.0", "isort>=5.12.0", "flake8>=6.0.0"]
+all = [
+    "paperops[plotting]",
+    "paperops[slides]",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -24,7 +35,6 @@ target-version = ['py313']
 [tool.isort]
 profile = "black"
 line_length = 88
-
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/paperops"]

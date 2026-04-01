@@ -11,4 +11,4 @@ dist
 *.snm
 *.gz
 *.toc
-.DS_Store
+.DS_Store__pycache__/
