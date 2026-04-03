@@ -20,6 +20,7 @@ A Python toolkit for generating native PowerPoint presentations with declarative
 | Validate layout | `report = prs.review()` |
 | Preview to PNG | `paths = prs.preview(slides=[0, 2], output_dir="./preview")` |
 | Check saved file | `from paperops.slides.preview import check_presentation; check_presentation("output.pptx")` |
+| Integrated deck review | `prs.review_deck("output.pptx", render_preview=True, output_dir="./preview")` |
 
 ## Setup
 
@@ -169,6 +170,28 @@ Group by logical progression (premise -> evidence -> conclusion). Every content 
 Every slide deck is a chain of reasoning delivered visually. The audience should feel your logic unfold — premise by premise, step by step — not read a document projected on a wall. If a slide doesn't advance the argument, it doesn't belong. If a slide dumps information without guiding interpretation, it has failed.
 
 This is the single principle behind every rule below.
+
+## Review-Driven Workflow
+
+For real deck work in this repo, do not stop at `prs.save(...)`.
+
+Default loop:
+
+1. Plan the deck's logic chain.
+2. Build the deck in code.
+3. Run `prs.review_deck(...)`.
+4. Inspect the returned issue summary and preview PNGs.
+5. Apply targeted fixes to content, layout, or sizing.
+6. Rerun `prs.review_deck(...)` until the deck state is stable.
+
+Use integrated review to decide whether a problem is:
+
+- content density: too much visible text for the intended visual structure
+- intrinsic sizing: text-bearing components are underestimating their natural width/height
+- container negotiation: parent layout is compressing children too aggressively
+- saved-file mismatch: preview and `.pptx` checks disagree
+
+Trust intrinsic sizing for ordinary text-bearing components first. Add manual `width` / `height` only when the visual intent is genuinely fixed.
 
 ### 1. Design the Thinking Chain First
 

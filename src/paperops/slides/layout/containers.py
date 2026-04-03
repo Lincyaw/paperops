@@ -20,6 +20,12 @@ class LayoutNode:
     height: float | None = field(default=None, kw_only=True)
     min_width: float | None = field(default=None, kw_only=True)
     min_height: float | None = field(default=None, kw_only=True)
+    size_mode_x: str = field(default="auto", kw_only=True)
+    size_mode_y: str = field(default="auto", kw_only=True)
+    grow: float = field(default=0.0, kw_only=True)
+    shrink: float = field(default=1.0, kw_only=True)
+    basis: float | None = field(default=None, kw_only=True)
+    wrap: bool = field(default=False, kw_only=True)
 
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
         """Return (width, height) this node would like.  Override in subclasses."""

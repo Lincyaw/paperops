@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from paperops.slides.core.constants import Align, Direction
 from paperops.slides.layout.containers import LayoutNode
-from paperops.slides.layout.auto_size import measure_text
+from paperops.slides.layout.auto_size import estimate_min_text_width, measure_text
 
 
 def _resolve_font_pt(theme, size: str | float) -> float:
@@ -41,6 +41,11 @@ def _estimate_text_size(
     return (w, h)
 
 
+def _apply_min_text_width(node, text: str, pt: float, font_family: str, padding_x: float) -> None:
+    if node.min_width is None and text:
+        node.min_width = max(estimate_min_text_width(text, font_family, pt) + padding_x, 0.25)
+
+
 @dataclass
 class Box(LayoutNode):
     """Rectangle with optional text."""
@@ -57,6 +62,7 @@ class Box(LayoutNode):
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
         pt = _resolve_font_pt(theme, self.font_size)
         ff = getattr(theme, 'font_family', 'Calibri') if theme else 'Calibri'
+        _apply_min_text_width(self, self.text, pt, ff, 0.3)
         return _estimate_text_size(self.text, pt, self.width, self.height,
                                    font_family=ff)
 
@@ -108,6 +114,7 @@ class Badge(LayoutNode):
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
         pt = _resolve_font_pt(theme, self.font_size)
         ff = getattr(theme, 'font_family', 'Calibri') if theme else 'Calibri'
+        _apply_min_text_width(self, self.text, pt, ff, 0.2)
         return _estimate_text_size(
             self.text, pt, self.width, self.height,
             margin_x=0.2, margin_y=0.16, font_family=ff,

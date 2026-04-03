@@ -52,6 +52,12 @@ class Callout(LayoutNode):
             children=[accent_bar, text_stack],
             width=self.width,
             height=self.height,
+            size_mode_x=self.size_mode_x,
+            size_mode_y=self.size_mode_y,
+            grow=self.grow,
+            shrink=self.shrink,
+            basis=self.basis,
+            wrap=self.wrap,
         )
 
 
@@ -86,6 +92,7 @@ class Flow(LayoutNode):
                     color=color,
                     font_size="caption",
                     height=0.82,
+                    size_mode_x="fit",
                 )
             )
 
@@ -106,4 +113,10 @@ class Flow(LayoutNode):
             children=children,
             width=self.width,
             height=self.height,
+            size_mode_x=self.size_mode_x,
+            size_mode_y=self.size_mode_y,
+            grow=self.grow,
+            shrink=self.shrink,
+            basis=self.basis,
+            wrap=self.wrap,
         )

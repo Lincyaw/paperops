@@ -450,7 +450,7 @@ def _build_slide_7(prs: Presentation):
     cost_circle = Circle(text="Cost", color="warning", width=1.65, height=1.65)
 
     triangle = VStack(
-        gap=0.20,
+        gap=0.14,
         children=[
             HStack(
                 gap=0.20,
@@ -464,7 +464,7 @@ def _build_slide_7(prs: Presentation):
         children=[
             Callout(
                 title="Effectiveness",
-                body="Higher diagnosis quality and richer causal coverage.",
+                body="Better diagnosis quality and broader causal coverage.",
                 color="primary",
             ),
             Callout(
@@ -474,27 +474,22 @@ def _build_slide_7(prs: Presentation):
             ),
             Callout(
                 title="Cost",
-                body="Ingestion, storage, and compute all rise with scope and granularity.",
+                body="Ingestion, storage, and compute rise with scope.",
                 color="warning",
             ),
         ],
     )
     tension = TextBlock(
-        text="Higher effectiveness usually demands richer data, and richer data raises system cost.",
-        font_size="body",
+        text="Better RCA needs richer data, and richer data raises cost.",
+        font_size="small",
         color="text_mid",
         italic=True,
-    )
-    note = Callout(
-        title="Trade-off",
-        body="Richer observation can improve RCA effectiveness, but it inevitably raises data and compute costs.",
-        color="warning",
     )
 
     sb.layout(
         VStack(
-            gap=0.20,
-            children=[triangle, detail_row, tension, note],
+            gap=0.14,
+            children=[triangle, detail_row, tension],
         )
     )
     sb.notes(
@@ -507,7 +502,7 @@ def _build_slide_7(prs: Presentation):
         [
             [effectiveness_circle],
             [data_circle, cost_circle, detail_row],
-            [tension, note],
+            [tension],
         ]
     )
     return sb
@@ -589,7 +584,7 @@ def _build_slide_9(prs: Presentation):
             RoundedBox(
                 text="Graph models\nmulti-modal reasoning\ncausal inference",
                 color="bg_alt",
-                height=1.10,
+                height=1.28,
             ),
             TextBlock(
                 text="Looks strong on paper, but the benchmark may be testing easy correlations instead of hard causality.",
@@ -899,9 +894,10 @@ def _build_slide_15(prs: Presentation):
             stat_card("Triage accuracy", "97%", tone="positive"),
             stat_card("TTE reduction", "91%", tone="accent"),
             Callout(
-                title="Operational lesson",
-                body="Role separation plus negotiation can outperform a single monolithic prompt on high-stakes routing tasks.",
+                title="Lesson",
+                body="Role separation plus negotiation can outperform one monolithic prompt on high-stakes routing.",
                 color="primary",
+                height=1.34,
             ),
         ],
     )

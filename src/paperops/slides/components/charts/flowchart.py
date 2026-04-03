@@ -64,6 +64,7 @@ class Flowchart(LayoutNode):
                 bold=True,
                 font_size="caption",
                 height=box_height,
+                size_mode_x="fit",
             )
 
         # Build edge-ordered sequence following the edges
@@ -102,6 +103,12 @@ class Flowchart(LayoutNode):
             children=children,
             width=self.width,
             height=self.height,
+            size_mode_x=self.size_mode_x,
+            size_mode_y=self.size_mode_y,
+            grow=self.grow,
+            shrink=self.shrink,
+            basis=self.basis,
+            wrap=self.wrap,
         )
 
     def _edge_order(self, node_list: list[str]) -> list[str]:

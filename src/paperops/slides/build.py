@@ -67,6 +67,29 @@ class Presentation:
             "issues": all_issues,
         }
 
+    def review_deck(self, output_path: str, render_preview: bool = True, output_dir: str | None = None) -> dict:
+        """Build deck artifacts and return an integrated review report."""
+        from paperops.slides.preview import review_deck_artifacts
+        import os
+
+        layout_report = self.review()
+        self.save(output_path)
+        preview_paths = []
+        if render_preview:
+            if output_dir is not None:
+                os.makedirs(output_dir, exist_ok=True)
+                for filename in os.listdir(output_dir):
+                    if filename.startswith("slide_") and filename.endswith(".png"):
+                        os.unlink(os.path.join(output_dir, filename))
+            preview_paths = self.preview(output_dir=output_dir)
+        slide_titles = [getattr(sb, "_title", None) for sb in self._builders]
+        return review_deck_artifacts(
+            output_path,
+            layout_issues=layout_report["issues"],
+            preview_paths=preview_paths,
+            slide_titles=slide_titles,
+        )
+
     def preview(self, slides=None, output_dir=None) -> list[str]:
         """Render slides to PNG for visual inspection.
 

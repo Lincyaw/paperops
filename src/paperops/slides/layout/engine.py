@@ -45,42 +45,180 @@ def _layout(node: LayoutNode, region: Region, theme) -> None:
         node._region = region
 
 
+def _size_mode_x(node: LayoutNode) -> str:
+    if getattr(node, "width", None) is not None:
+        return "fixed"
+    mode = getattr(node, "size_mode_x", "auto")
+    return "fit" if mode == "auto" else mode
+
+
+def _size_mode_y(node: LayoutNode) -> str:
+    if getattr(node, "height", None) is not None:
+        return "fixed"
+    mode = getattr(node, "size_mode_y", "auto")
+    return "fit" if mode == "auto" else mode
+
+
+def _preferred_width(node: LayoutNode, theme, available_width: float) -> float:
+    if getattr(node, "basis", None) is not None:
+        return node.basis
+    if getattr(node, "width", None) is not None:
+        return node.width
+    preferred_w, _preferred_h = node.preferred_size(theme, max(available_width, 0.0))
+    return preferred_w
+
+
+def _preferred_height(node: LayoutNode, theme, available_width: float) -> float:
+    if getattr(node, "basis", None) is not None:
+        return node.basis
+    if getattr(node, "height", None) is not None:
+        return node.height
+    _preferred_w, preferred_h = node.preferred_size(theme, max(available_width, 0.0))
+    return preferred_h
+
+
+def _resolve_hstack_widths(node: HStack, available: float, theme) -> dict[int, float]:
+    widths: dict[int, float] = {}
+    fill_children: list[int] = []
+    used = 0.0
+
+    for i, child in enumerate(node.children):
+        mode = _size_mode_x(child)
+        if mode == "fill":
+            fill_children.append(i)
+            continue
+        preferred_w = _preferred_width(child, theme, available)
+        widths[i] = preferred_w
+        used += preferred_w
+
+    remaining = max(available - used, 0.0)
+    grow_total = sum(max(getattr(node.children[i], "grow", 0.0), 1.0) for i in fill_children)
+    for i in fill_children:
+        child = node.children[i]
+        share = max(getattr(child, "grow", 0.0), 1.0)
+        widths[i] = remaining * (share / grow_total) if grow_total > 0 else 0.0
+
+    total = sum(widths.values())
+    if total > available and total > 0:
+        overflow = total - available
+        shrinkable = [
+            i for i, child in enumerate(node.children)
+            if getattr(child, "shrink", 1.0) > 0 and widths.get(i, 0.0) > (getattr(child, "min_width", 0.0) or 0.0)
+        ]
+        shrink_total = sum(getattr(node.children[i], "shrink", 1.0) for i in shrinkable)
+        if shrink_total > 0:
+            for i in shrinkable:
+                child = node.children[i]
+                min_w = getattr(child, "min_width", 0.0) or 0.0
+                delta = overflow * (getattr(child, "shrink", 1.0) / shrink_total)
+                widths[i] = max(widths[i] - delta, min_w)
+
+    for i, child in enumerate(node.children):
+        min_w = getattr(child, "min_width", None)
+        if min_w is not None:
+            widths[i] = max(widths.get(i, 0.0), min_w)
+
+    return widths
+
+
+def _resolve_vstack_heights(node: VStack, available: float, region_width: float, theme) -> dict[int, float]:
+    heights: dict[int, float] = {}
+    fill_children: list[int] = []
+    used = 0.0
+
+    for i, child in enumerate(node.children):
+        mode = _size_mode_y(child)
+        if mode == "fill":
+            fill_children.append(i)
+            continue
+        child_width = region_width
+        if hasattr(child, "width") and child.width is not None:
+            child_width = min(child.width, region_width)
+        preferred_h = _preferred_height(child, theme, child_width)
+        heights[i] = preferred_h
+        used += preferred_h
+
+    remaining = max(available - used, 0.0)
+    grow_total = sum(max(getattr(node.children[i], "grow", 0.0), 1.0) for i in fill_children)
+    for i in fill_children:
+        child = node.children[i]
+        share = max(getattr(child, "grow", 0.0), 1.0)
+        heights[i] = remaining * (share / grow_total) if grow_total > 0 else 0.0
+
+    total = sum(heights.values())
+    if total > available and total > 0:
+        overflow = total - available
+        shrinkable = [
+            i for i, child in enumerate(node.children)
+            if getattr(child, "shrink", 1.0) > 0 and heights.get(i, 0.0) > (getattr(child, "min_height", 0.0) or 0.0)
+        ]
+        shrink_total = sum(getattr(node.children[i], "shrink", 1.0) for i in shrinkable)
+        if shrink_total > 0:
+            for i in shrinkable:
+                child = node.children[i]
+                min_h = getattr(child, "min_height", 0.0) or 0.0
+                delta = overflow * (getattr(child, "shrink", 1.0) / shrink_total)
+                heights[i] = max(heights[i] - delta, min_h)
+
+    for i, child in enumerate(node.children):
+        min_h = getattr(child, "min_height", None)
+        if min_h is not None:
+            heights[i] = max(heights.get(i, 0.0), min_h)
+
+    return heights
+
+
+def _layout_wrapped_hstack(node: HStack, region: Region, theme) -> None:
+    x = region.left
+    y = region.top
+    row_height = 0.0
+
+    for child in node.children:
+        preferred_w = _preferred_width(child, theme, region.width)
+        preferred_h = _preferred_height(child, theme, preferred_w)
+        min_w = getattr(child, "min_width", 0.0) or 0.0
+        cw = max(preferred_w, min_w)
+        ch = preferred_h
+
+        if x > region.left and x + cw > region.right:
+            x = region.left
+            y += row_height + node.gap
+            row_height = 0.0
+
+        if hasattr(child, "height") and child.height is not None:
+            ch = min(child.height, max(region.bottom - y, 0.0))
+
+        child_region = Region(left=x, top=y, width=min(cw, region.width), height=ch)
+        _layout(child, child_region, theme)
+        x += child_region.width + node.gap
+        row_height = max(row_height, ch)
+
+
 def _layout_hstack(node: HStack, region: Region, theme) -> None:
     node._region = region
 
     if not node.children:
         return
 
+    if getattr(node, "wrap", False):
+        _layout_wrapped_hstack(node, region, theme)
+        return
+
     total_gap = node.gap * (len(node.children) - 1)
     available = region.width - total_gap
-
-    fixed_total = 0.0
-    flex_preferred: dict[int, float] = {}
-    for i, child in enumerate(node.children):
-        if hasattr(child, "width") and child.width is not None:
-            fixed_total += child.width
-        else:
-            preferred_w, _preferred_h = child.preferred_size(theme, max(available, 0.0))
-            flex_preferred[i] = preferred_w
-
-    remaining = max(available - fixed_total, 0.0)
-    preferred_total = sum(flex_preferred.values())
-    scale = min(1.0, remaining / preferred_total) if preferred_total > 0 else 1.0
+    widths = _resolve_hstack_widths(node, available, theme)
 
     x = region.left
     for i, child in enumerate(node.children):
-        if hasattr(child, "width") and child.width is not None:
-            cw = child.width
-        else:
-            cw = flex_preferred.get(i, 0.0) * scale
-        # Respect min_width
-        if hasattr(child, "min_width") and child.min_width is not None:
-            cw = max(cw, child.min_width)
+        cw = widths.get(i, 0.0)
         # Respect explicit height: use child's height and vertically center
         ch = region.height
         ct = region.top
         if hasattr(child, "height") and child.height is not None:
             ch = min(child.height, region.height)
+            ct = region.top + (region.height - ch) / 2
+        elif _size_mode_y(child) == "fit":
+            ch = min(_preferred_height(child, theme, cw), region.height)
             ct = region.top + (region.height - ch) / 2
         child_region = Region(left=x, top=ct, width=cw, height=ch)
         _layout(child, child_region, theme)
@@ -95,36 +233,22 @@ def _layout_vstack(node: VStack, region: Region, theme) -> None:
 
     total_gap = node.gap * (len(node.children) - 1)
     available = region.height - total_gap
-
-    fixed_total = 0.0
-    flex_preferred: dict[int, float] = {}
-    for i, child in enumerate(node.children):
-        if hasattr(child, "height") and child.height is not None:
-            fixed_total += child.height
-        else:
-            child_width = region.width
-            if hasattr(child, "width") and child.width is not None:
-                child_width = min(child.width, region.width)
-            _preferred_w, preferred_h = child.preferred_size(theme, child_width)
-            flex_preferred[i] = preferred_h
-
-    remaining = max(available - fixed_total, 0.0)
-    preferred_total = sum(flex_preferred.values())
-    scale = min(1.0, remaining / preferred_total) if preferred_total > 0 else 1.0
+    heights = _resolve_vstack_heights(node, available, region.width, theme)
 
     y = region.top
     for i, child in enumerate(node.children):
-        if hasattr(child, "height") and child.height is not None:
-            ch = child.height
-        else:
-            ch = flex_preferred.get(i, 0.0) * scale
-        if hasattr(child, "min_height") and child.min_height is not None:
-            ch = max(ch, child.min_height)
+        ch = heights.get(i, 0.0)
         # Respect explicit width: use child's width and horizontally center
         cw = region.width
         cl = region.left
         if hasattr(child, "width") and child.width is not None:
             cw = min(child.width, region.width)
+            cl = region.left + (region.width - cw) / 2
+        elif _size_mode_x(child) == "fit":
+            cw = min(_preferred_width(child, theme, region.width), region.width)
+            min_w = getattr(child, "min_width", None)
+            if min_w is not None:
+                cw = max(cw, min_w)
             cl = region.left + (region.width - cw) / 2
         child_region = Region(left=cl, top=y, width=cw, height=ch)
         _layout(child, child_region, theme)

@@ -7,7 +7,11 @@ from dataclasses import dataclass, field
 from paperops.slides.core.constants import Align
 from paperops.slides.layout.containers import LayoutNode
 from paperops.slides.components.shapes import _resolve_font_pt
-from paperops.slides.layout.auto_size import measure_text
+from paperops.slides.layout.auto_size import (
+    estimate_min_text_width,
+    measure_text,
+    measure_wrapped_text_height,
+)
 
 
 @dataclass
@@ -45,12 +49,10 @@ class TextBlock(LayoutNode):
         wrap_width = self.width if self.width is not None else available_width
         # Match the default left/right margins applied by PowerPoint text boxes.
         usable_width = max(wrap_width - 0.10, 0.10)
-        _text_w, text_h = measure_text(
-            text,
-            font_family,
-            pt,
-            max_width_inches=usable_width,
-        )
+        min_text_width = estimate_min_text_width(text, font_family, pt)
+        if self.min_width is None:
+            self.min_width = max(min_text_width + 0.10, 0.35)
+        _text_w, text_h = measure_text(text, font_family, pt, max_width_inches=usable_width)
         h = text_h + 0.14
 
         w = self.width if self.width is not None else available_width
@@ -74,9 +76,18 @@ class BulletList(LayoutNode):
             return (self.width, self.height)
 
         pt = _resolve_font_pt(theme, self.font_size)
-        line_height = pt * 0.03  # slightly more than raw text for bullet spacing
-        num_items = len(self.items)
-        h = num_items * line_height + 0.1
+        font_family = getattr(theme, "font_family", "Calibri") if theme else "Calibri"
+        bullet_text = "\n".join(
+            item if isinstance(item, str) else item[0]
+            for item in self.items
+        )
+        usable_width = max((self.width or available_width) - 0.20, 0.10)
+        h = measure_wrapped_text_height(
+            bullet_text,
+            font_family,
+            pt,
+            usable_width,
+        ) + 0.12
 
         w = self.width if self.width is not None else available_width
         h = self.height if self.height is not None else h

@@ -39,11 +39,13 @@ When a task matches one of these skills, open the relevant `SKILL.md` and follow
 
 ### Skills
 - `/slidecraft` — PPT design philosophy + component API + 4-phase workflow
+- `/slide-review` — Review existing decks via integrated preview/check artifacts and diagnose what to fix next
 - `/plotting` — Academic figure guidelines: information hierarchy, chart type selection, visual rules
 - `/verify` — Project verification workflow: black, isort, flake8, and pytest
 
 ### How To Trigger Skills
 - Say `use .claude/skills/slidecraft for this` when working on PowerPoint or `paperops.slides` tasks
+- Say `use .claude/skills/slide-review for this` when reviewing a generated deck or diagnosing layout issues from previews
 - Say `use .claude/skills/plotting for this` when working on figures, charts, or `paperops.plotting`
 - Say `use .claude/skills/verify` when you want the full repo verification pass
 - If a task clearly falls into one of these areas, apply the matching skill even if the user does not mention it explicitly

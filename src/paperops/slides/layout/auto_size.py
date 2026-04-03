@@ -222,3 +222,34 @@ def measure_text(
 
     total_h = line_height_inches * max(total_lines, 1)
     return (min(max_w, max_width_inches), total_h)
+
+
+def measure_wrapped_text_height(
+    text: str,
+    font_family: str,
+    font_size_pt: float,
+    usable_width_inches: float,
+) -> float:
+    """Return wrapped text height in inches for a given usable width."""
+    _w, h = measure_text(
+        text,
+        font_family,
+        font_size_pt,
+        max_width_inches=max(usable_width_inches, 0.01),
+    )
+    return h
+
+
+def estimate_min_text_width(
+    text: str,
+    font_family: str,
+    font_size_pt: float,
+) -> float:
+    """Estimate the smallest readable width based on the longest token."""
+    if not text:
+        return 0.0
+
+    tokens = [token for token in text.replace("\n", " ").split(" ") if token]
+    sample = max(tokens, key=len) if tokens else text
+    w, _h = measure_text(sample, font_family, font_size_pt)
+    return w
