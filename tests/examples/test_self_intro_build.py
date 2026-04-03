@@ -11,6 +11,8 @@ from examples.self_intro.build import (
     build_presentation,
     make_theme,
 )
+from paperops.slides.layout.auto_size import _load_pil_font
+from paperops.slides.preview import _wrap_preview_text, check_presentation
 
 
 def _slide_text(slide) -> str:
@@ -136,3 +138,32 @@ def test_build_self_intro_preview_when_requested(tmp_path: Path):
     preview_files = sorted(preview_dir.glob("slide_*.png"))
     assert stale_file not in preview_files
     assert len(preview_files) == len(SLIDE_TITLES)
+
+
+def test_first_five_self_intro_slides_do_not_overflow_or_overlap(tmp_path: Path):
+    out_path = tmp_path / OUTPUT_FILE.name
+    build_presentation(output_path=out_path, render_preview=False)
+
+    issues = [
+        issue for issue in check_presentation(str(out_path))
+        if issue["slide"] <= 5 and issue["type"] in {"text_overflow", "overlap"}
+    ]
+
+    assert issues == []
+
+
+def test_preview_wraps_long_text_in_narrow_shapes():
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGB", (400, 200), "white")
+    draw = ImageDraw.Draw(image)
+    font = _load_pil_font("DejaVu Sans", 18)
+
+    lines = _wrap_preview_text(
+        draw,
+        "Verified propagation tells us whether the reasoning path is faithful.",
+        font,
+        180,
+    )
+
+    assert len(lines) >= 2

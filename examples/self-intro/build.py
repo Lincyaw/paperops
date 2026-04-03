@@ -364,6 +364,7 @@ def _build_slide_5(prs: Presentation):
         title="Ground truth anchor",
         body="Verified propagation tells us whether the reasoning path is faithful, not just whether the final answer is lucky.",
         color="positive",
+        height=1.15,
     )
     bridge = TextBlock(
         text="Ground truth closes the learning loop: hypotheses are checked against the incident path, then revised.",

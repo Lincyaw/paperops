@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from paperops.slides.core.constants import Align
 from paperops.slides.layout.containers import LayoutNode
 from paperops.slides.components.shapes import _resolve_font_pt
+from paperops.slides.layout.auto_size import measure_text
 
 
 @dataclass
@@ -31,23 +32,26 @@ class TextBlock(LayoutNode):
             return (self.width, self.height)
 
         pt = _resolve_font_pt(theme, self.font_size)
-        if not self.text:
+        font_family = getattr(theme, "font_family", "Calibri") if theme else "Calibri"
+
+        if self.runs is not None:
+            text = "".join(run_text for run_text, _fmt in self.runs)
+        else:
+            text = self.text
+
+        if not text:
             return (self.width or available_width, self.height or pt * 0.025 + 0.1)
 
-        lines = self.text.split("\n")
-        char_width = pt * 0.012
-        chars_per_line = max(int(available_width / char_width), 1) if char_width > 0 else 40
-
-        # Estimate wrapped line count
-        total_lines = 0
-        for line in lines:
-            if not line:
-                total_lines += 1
-            else:
-                total_lines += max(1, -(-len(line) // chars_per_line))  # ceil div
-
-        line_height = pt * 0.025
-        h = total_lines * line_height + 0.1  # small vertical margin
+        wrap_width = self.width if self.width is not None else available_width
+        # Match the default left/right margins applied by PowerPoint text boxes.
+        usable_width = max(wrap_width - 0.10, 0.10)
+        _text_w, text_h = measure_text(
+            text,
+            font_family,
+            pt,
+            max_width_inches=usable_width,
+        )
+        h = text_h + 0.14
 
         w = self.width if self.width is not None else available_width
         h = self.height if self.height is not None else h

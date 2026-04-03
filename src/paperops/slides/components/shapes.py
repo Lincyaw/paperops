@@ -110,7 +110,7 @@ class Badge(LayoutNode):
         ff = getattr(theme, 'font_family', 'Calibri') if theme else 'Calibri'
         return _estimate_text_size(
             self.text, pt, self.width, self.height,
-            margin_x=0.2, margin_y=0.1, font_family=ff,
+            margin_x=0.2, margin_y=0.16, font_family=ff,
         )
 
 

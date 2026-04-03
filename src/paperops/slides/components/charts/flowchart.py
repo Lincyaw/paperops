@@ -91,6 +91,7 @@ class Flowchart(LayoutNode):
                     to_component=node_boxes[next_nid],
                     label=edge_label,
                     color="primary",
+                    width=0.22,
                     direction=arrow_dir,
                 )
                 children.append(arr)

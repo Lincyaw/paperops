@@ -54,26 +54,25 @@ def _layout_hstack(node: HStack, region: Region, theme) -> None:
     total_gap = node.gap * (len(node.children) - 1)
     available = region.width - total_gap
 
-    # Determine fixed vs flexible children
     fixed_total = 0.0
-    flex_indices: list[int] = []
+    flex_preferred: dict[int, float] = {}
     for i, child in enumerate(node.children):
         if hasattr(child, "width") and child.width is not None:
             fixed_total += child.width
         else:
-            flex_indices.append(i)
+            preferred_w, _preferred_h = child.preferred_size(theme, max(available, 0.0))
+            flex_preferred[i] = preferred_w
 
-    if flex_indices:
-        per_flex = max((available - fixed_total) / len(flex_indices), 0.0)
-    else:
-        per_flex = 0.0
+    remaining = max(available - fixed_total, 0.0)
+    preferred_total = sum(flex_preferred.values())
+    scale = min(1.0, remaining / preferred_total) if preferred_total > 0 else 1.0
 
     x = region.left
     for i, child in enumerate(node.children):
         if hasattr(child, "width") and child.width is not None:
             cw = child.width
         else:
-            cw = per_flex
+            cw = flex_preferred.get(i, 0.0) * scale
         # Respect min_width
         if hasattr(child, "min_width") and child.min_width is not None:
             cw = max(cw, child.min_width)
@@ -97,26 +96,28 @@ def _layout_vstack(node: VStack, region: Region, theme) -> None:
     total_gap = node.gap * (len(node.children) - 1)
     available = region.height - total_gap
 
-    # Determine fixed vs flexible children
     fixed_total = 0.0
-    flex_indices: list[int] = []
+    flex_preferred: dict[int, float] = {}
     for i, child in enumerate(node.children):
         if hasattr(child, "height") and child.height is not None:
             fixed_total += child.height
         else:
-            flex_indices.append(i)
+            child_width = region.width
+            if hasattr(child, "width") and child.width is not None:
+                child_width = min(child.width, region.width)
+            _preferred_w, preferred_h = child.preferred_size(theme, child_width)
+            flex_preferred[i] = preferred_h
 
-    if flex_indices:
-        per_flex = max((available - fixed_total) / len(flex_indices), 0.0)
-    else:
-        per_flex = 0.0
+    remaining = max(available - fixed_total, 0.0)
+    preferred_total = sum(flex_preferred.values())
+    scale = min(1.0, remaining / preferred_total) if preferred_total > 0 else 1.0
 
     y = region.top
     for i, child in enumerate(node.children):
         if hasattr(child, "height") and child.height is not None:
             ch = child.height
         else:
-            ch = per_flex
+            ch = flex_preferred.get(i, 0.0) * scale
         if hasattr(child, "min_height") and child.min_height is not None:
             ch = max(ch, child.min_height)
         # Respect explicit width: use child's width and horizontally center

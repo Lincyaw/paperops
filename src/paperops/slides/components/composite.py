@@ -80,7 +80,14 @@ class Flow(LayoutNode):
 
         boxes: list[RoundedBox] = []
         for label, color in zip(self.labels, box_colors):
-            boxes.append(RoundedBox(text=label, color=color))
+            boxes.append(
+                RoundedBox(
+                    text=label,
+                    color=color,
+                    font_size="caption",
+                    height=0.82,
+                )
+            )
 
         children: list[LayoutNode] = []
         for i, box in enumerate(boxes):
@@ -90,6 +97,7 @@ class Flow(LayoutNode):
                     from_component=boxes[i],
                     to_component=boxes[i + 1],
                     color=self.arrow_color,
+                    width=0.22,
                 ))
 
         Container = HStack if self.direction == "horizontal" else VStack

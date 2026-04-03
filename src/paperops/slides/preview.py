@@ -11,6 +11,32 @@ from paperops.slides.core.constants import SLIDE_WIDTH, SLIDE_HEIGHT
 from paperops.slides.layout.auto_size import _load_pil_font, measure_text
 
 
+def _wrap_preview_text(draw, text: str, font, max_width_px: int) -> list[str]:
+    """Wrap preview text to fit the available width."""
+    if not text:
+        return [""]
+
+    lines: list[str] = []
+    for raw_line in text.splitlines() or [""]:
+        words = raw_line.split()
+        if not words:
+            lines.append("")
+            continue
+
+        current = words[0]
+        for word in words[1:]:
+            candidate = f"{current} {word}"
+            bbox = draw.textbbox((0, 0), candidate, font=font)
+            if bbox[2] - bbox[0] <= max_width_px:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        lines.append(current)
+
+    return lines
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Preview rendering (PIL-based soft render)
 # ──────────────────────────────────────────────────────────────────────
@@ -82,22 +108,34 @@ def render_slide_preview(slide_builder, output_path: str, width_px: int = 1920):
         # Draw text
         text = _get_text(shape)
         if text:
-            # Estimate font size from shape height
             font_size = max(10, min(ph // 3, 32))
             text_font = _load_pil_font("DejaVu Sans", font_size) or font
+            max_text_width = max(pw - 16, 20)
+            max_text_height = max(ph - 12, 12)
 
-            # Truncate long text
-            display_text = text[:100]
-            try:
-                bbox = draw.textbbox((0, 0), display_text, font=text_font)
-                tw = bbox[2] - bbox[0]
-                th = bbox[3] - bbox[1]
-            except Exception:
-                tw, th = len(display_text) * 8, font_size
+            lines = _wrap_preview_text(draw, text, text_font, max_text_width)
+            bbox = draw.textbbox((0, 0), "Ag", font=text_font)
+            line_height = bbox[3] - bbox[1]
+            total_height = max(line_height * len(lines), line_height)
 
-            tx = x + (pw - tw) // 2
-            ty = y + (ph - th) // 2
-            draw.text((tx, ty), display_text, fill=(30, 30, 30), font=text_font)
+            while total_height > max_text_height and font_size > 8:
+                font_size -= 1
+                text_font = _load_pil_font("DejaVu Sans", font_size) or font
+                lines = _wrap_preview_text(draw, text, text_font, max_text_width)
+                bbox = draw.textbbox((0, 0), "Ag", font=text_font)
+                line_height = bbox[3] - bbox[1]
+                total_height = max(line_height * len(lines), line_height)
+
+            widths = []
+            for line in lines:
+                bbox = draw.textbbox((0, 0), line, font=text_font)
+                widths.append(bbox[2] - bbox[0])
+
+            ty = y + max((ph - total_height) // 2, 2)
+            for line, line_width in zip(lines, widths):
+                tx = x + (pw - line_width) // 2
+                draw.text((tx, ty), line, fill=(30, 30, 30), font=text_font)
+                ty += line_height
 
     img.save(output_path)
 
@@ -135,6 +173,8 @@ def _get_all_text(shape) -> str:
 def _get_font_size(shape) -> int:
     if shape.has_text_frame:
         for para in shape.text_frame.paragraphs:
+            if para.font.size:
+                return para.font.size
             for run in para.runs:
                 if run.font.size:
                     return run.font.size
