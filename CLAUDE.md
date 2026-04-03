@@ -35,9 +35,18 @@ paperops is a Python SDK designed for AI agents to programmatically generate aca
 
 Skills in `.claude/skills/` define design guidelines. Agents in `.claude/agents/` handle delegated execution.
 
+When a task matches one of these skills, open the relevant `SKILL.md` and follow it before making code changes or generating output. If the user explicitly names a skill, treat that as a direct instruction to use it.
+
 ### Skills
 - `/slidecraft` — PPT design philosophy + component API + 4-phase workflow
 - `/plotting` — Academic figure guidelines: information hierarchy, chart type selection, visual rules
+- `/verify` — Project verification workflow: black, isort, flake8, and pytest
+
+### How To Trigger Skills
+- Say `use .claude/skills/slidecraft for this` when working on PowerPoint or `paperops.slides` tasks
+- Say `use .claude/skills/plotting for this` when working on figures, charts, or `paperops.plotting`
+- Say `use .claude/skills/verify` when you want the full repo verification pass
+- If a task clearly falls into one of these areas, apply the matching skill even if the user does not mention it explicitly
 
 ### Agents
 - `chart-maker` — Creates publication-quality matplotlib figures; returns file paths
