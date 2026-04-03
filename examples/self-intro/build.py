@@ -23,20 +23,20 @@ def make_theme():
     return themes.professional.override(
         font_family="Liberation Sans",
         colors={
-            "primary": "#163B65",
-            "secondary": "#5B84B1",
-            "accent": "#E67E22",
-            "positive": "#1F8A70",
-            "negative": "#C44900",
-            "highlight": "#2F6B9A",
-            "warning": "#D97706",
-            "text": "#1F2937",
-            "text_mid": "#6B7280",
-            "text_light": "#9CA3AF",
-            "bg": "#F8FAFC",
-            "bg_alt": "#EEF2F7",
-            "bg_accent": "#E8F1F8",
-            "border": "#D7DFE8",
+            "primary": "#5C82AD",
+            "secondary": "#8FAAC8",
+            "accent": "#D69A68",
+            "positive": "#7FA195",
+            "negative": "#C98A78",
+            "highlight": "#7396BE",
+            "warning": "#D8A86A",
+            "text": "#223043",
+            "text_mid": "#647489",
+            "text_light": "#94A3B6",
+            "bg": "#FBFCFE",
+            "bg_alt": "#F1F5FA",
+            "bg_accent": "#EAF0F7",
+            "border": "#D8E0EA",
         },
     )
 
@@ -122,7 +122,7 @@ def _closing_takeaway(number: str, message: str, tone: str = "accent"):
             TextBlock(
                 text=message,
                 font_size="body",
-                color="white",
+                color="text",
                 bold=True,
             ),
         ],
@@ -130,24 +130,24 @@ def _closing_takeaway(number: str, message: str, tone: str = "accent"):
 
 
 def _build_slide_1(prs: Presentation):
-    sb = prs.slide(background="primary")
+    sb = prs.slide(background="bg_accent")
 
     hero_badge = Badge(text="Research Vision", color="accent")
     hero_title = TextBlock(
         text="Building World Models for\nDiagnostic Intelligence",
         font_size=28,
-        color="white",
+        color="primary",
         bold=True,
     )
     hero_subtitle = TextBlock(
         text="From outcome labels to causal process supervision in root cause analysis.",
         font_size="body",
-        color="bg_alt",
+        color="text_mid",
     )
     hero_claim = TextBlock(
         text="Move RCA from point finding to graph building.",
         font_size="body",
-        color="bg_accent",
+        color="accent",
         bold=True,
     )
     hero_stack = VStack(
@@ -160,15 +160,15 @@ def _build_slide_1(prs: Presentation):
         gap=0.24,
         width=3.4,
         children=[
-            _dark_stat_card("Problem", "Oversimplified RCA", tone="negative"),
-            _dark_stat_card("Method", "Forward verification", tone="secondary"),
-            _dark_stat_card("Goal", "Trusted diagnosis", tone="positive"),
+            stat_card("Problem", "Oversimplified RCA", tone="negative"),
+            stat_card("Method", "Forward verification", tone="secondary"),
+            stat_card("Goal", "Trusted diagnosis", tone="positive"),
         ],
     )
     footer = TextBlock(
         text="Trusted diagnosis needs simulatable failures, verifiable reasoning, and explicit propagation structure.",
         font_size="body",
-        color="bg_alt",
+        color="text_mid",
         italic=True,
     )
 
@@ -376,7 +376,7 @@ def _build_slide_5(prs: Presentation):
     sb.notes(
         _speaker_notes(
             "Make the third premise explicit: a diagnosis should earn reward only when the causal path checks out against ground truth.",
-            "Transition by using that requirement to critique how RCA has traditionally been organized and evaluated.",
+            "Transition by saying that once world-model RCA is feasible, the real bottleneck becomes how RCA is defined and evaluated today.",
         )
     )
     sb.animate([[loop], [truth], [bridge]])
@@ -433,7 +433,7 @@ def _build_slide_6(prs: Presentation):
     sb.layout(VStack(gap=0.28, children=[HStack(gap=0.40, children=[old_taxonomy, goal_taxonomy]), conclusion]))
     sb.notes(
         _speaker_notes(
-            "Use the survey to argue that the classical metrics-logs-traces taxonomy mixes together studies with incompatible goals.",
+            "Use the survey to argue that the classical metrics-logs-traces taxonomy is exactly where the field drifts away from the world-model target.",
             "Transition by showing the deeper systems constraint that shapes all practical RCA methods.",
         )
     )
@@ -855,6 +855,7 @@ def _build_slide_14(prs: Presentation):
 def _build_slide_15(prs: Presentation):
     sb = prs.slide(title=SLIDE_TITLES[14], reference="TRIANGLE paper")
 
+    adjacent_badge = Badge(text="Adjacent evidence", color="accent")
     framework = Flowchart(
         nodes={
             "analyzer": ("Analyzer Agent", "secondary"),
@@ -904,14 +905,14 @@ def _build_slide_15(prs: Presentation):
         ],
     )
 
-    sb.layout(VStack(gap=0.24, children=[framework, roles, outcomes]))
+    sb.layout(VStack(gap=0.24, children=[adjacent_badge, framework, roles, outcomes]))
     sb.notes(
         _speaker_notes(
-            "Use TRIANGLE as evidence that multi-agent role separation already works in a neighboring reliability task.",
-            "Transition by turning from paper evidence to the roadmap for how this becomes a diagnostic world model program.",
+            "Frame TRIANGLE as adjacent evidence rather than the main RCA contribution: structured role separation already works in a neighboring reliability task.",
+            "Transition by saying the next step is to turn that structured reliability reasoning into a reusable diagnostic world model.",
         )
     )
-    sb.animate([[framework], [roles], [outcomes]])
+    sb.animate([[adjacent_badge, framework], [roles], [outcomes]])
     return sb
 
 
@@ -939,7 +940,7 @@ def _build_slide_16(prs: Presentation):
     sb.layout(VStack(gap=0.32, children=[badge, loop, training, takeaway]))
     sb.notes(
         _speaker_notes(
-            "Move out of evidence-heavy slides and into the roadmap: stage one is training an agent inside a simulation-hypothesis-verify-reward loop.",
+            "Build on the adjacent evidence from TRIANGLE and move into the main roadmap: stage one is training an agent inside a simulation-hypothesis-verify-reward loop.",
             "Transition by asking what remains after we collect many successful traces from that loop.",
         )
     )
@@ -1075,7 +1076,7 @@ def _build_slide_19(prs: Presentation):
 
 
 def _build_slide_20(prs: Presentation):
-    sb = prs.slide(background="primary")
+    sb = prs.slide(background="bg_accent")
 
     hero = VStack(
         gap=0.12,
@@ -1083,13 +1084,13 @@ def _build_slide_20(prs: Presentation):
             TextBlock(
                 text="Three Takeaways",
                 font_size=30,
-                color="white",
+                color="primary",
                 bold=True,
             ),
             TextBlock(
                 text="What matters is not only finding the right answer, but building a reasoning system we can trust and reuse.",
                 font_size="body",
-                color="bg_alt",
+                color="text_mid",
             ),
         ],
     )
@@ -1097,14 +1098,14 @@ def _build_slide_20(prs: Presentation):
         gap=0.45,
         children=[
             _closing_takeaway("1", "Score the path, not just the answer.", tone="accent"),
-            _closing_takeaway("2", "Train on verification loops, not only labels.", tone="bg_accent"),
+            _closing_takeaway("2", "Train on verification loops, not only labels.", tone="secondary"),
             _closing_takeaway("3", "Build the model once, then reuse it broadly.", tone="positive"),
         ],
     )
     final_line = TextBlock(
         text="Build the model once. Reuse it across diagnosis, prediction, and repair.",
         font_size=22,
-        color="bg_accent",
+        color="primary",
         bold=True,
         align="center",
     )
