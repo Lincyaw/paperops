@@ -241,7 +241,12 @@ def _build_slide_2(prs: Presentation):
         italic=True,
     )
 
-    sb.layout(VStack(gap=0.28, children=[HStack(gap=0.40, children=[left_col, right_col]), bridge]))
+    sb.layout(
+        VStack(
+            gap=0.28,
+            children=[HStack(gap=0.40, children=[left_col, right_col]), bridge],
+        )
+    )
     sb.notes(
         _speaker_notes(
             "Contrast today's black-box symptom-to-label flow with a world-model loop that hypothesizes and verifies propagation.",
@@ -431,7 +436,15 @@ def _build_slide_6(prs: Presentation):
         italic=True,
     )
 
-    sb.layout(VStack(gap=0.28, children=[HStack(gap=0.40, children=[old_taxonomy, goal_taxonomy]), conclusion]))
+    sb.layout(
+        VStack(
+            gap=0.28,
+            children=[
+                HStack(gap=0.40, children=[old_taxonomy, goal_taxonomy]),
+                conclusion,
+            ],
+        )
+    )
     sb.notes(
         _speaker_notes(
             "Use the survey to argue that the classical metrics-logs-traces taxonomy is exactly where the field drifts away from the world-model target.",
@@ -445,7 +458,9 @@ def _build_slide_6(prs: Presentation):
 def _build_slide_7(prs: Presentation):
     sb = prs.slide(title=SLIDE_TITLES[6], reference="Goal-driven RCA survey")
 
-    effectiveness_circle = Circle(text="Effectiveness", color="primary", width=1.85, height=1.85)
+    effectiveness_circle = Circle(
+        text="Effectiveness", color="primary", width=1.85, height=1.85
+    )
     data_circle = Circle(text="Data", color="secondary", width=1.65, height=1.65)
     cost_circle = Circle(text="Cost", color="warning", width=1.65, height=1.65)
 
@@ -599,7 +614,12 @@ def _build_slide_9(prs: Presentation):
         color="negative",
     )
 
-    sb.layout(VStack(gap=0.28, children=[HStack(gap=0.40, children=[simple_baseline, sota]), verdict]))
+    sb.layout(
+        VStack(
+            gap=0.28,
+            children=[HStack(gap=0.40, children=[simple_baseline, sota]), verdict],
+        )
+    )
     sb.notes(
         _speaker_notes(
             "Use the dataset study's headline result: simple heuristics are surprisingly competitive with SOTA on public benchmarks.",
@@ -743,7 +763,12 @@ def _build_slide_12(prs: Presentation):
         italic=True,
     )
 
-    sb.layout(VStack(gap=0.28, children=[HStack(gap=0.40, children=[outcome, process]), gap, conclusion]))
+    sb.layout(
+        VStack(
+            gap=0.28,
+            children=[HStack(gap=0.40, children=[outcome, process]), gap, conclusion],
+        )
+    )
     sb.notes(
         _speaker_notes(
             "Use this slide to separate outcome correctness from process correctness with the 0.76 versus 0.63 comparison.",
@@ -798,7 +823,12 @@ def _build_slide_13(prs: Presentation):
         italic=True,
     )
 
-    sb.layout(VStack(gap=0.28, children=[HStack(gap=0.40, children=[backward, forward]), asymmetry]))
+    sb.layout(
+        VStack(
+            gap=0.28,
+            children=[HStack(gap=0.40, children=[backward, forward]), asymmetry],
+        )
+    )
     sb.notes(
         _speaker_notes(
             "Explain the information asymmetry at the heart of FORGE: the agent reasons backward, while annotation can verify forward from the known intervention.",
@@ -821,7 +851,12 @@ def _build_slide_14(prs: Presentation):
         ],
     )
     dimensions = Flow(
-        labels=["Known intervention", "Verified propagation", "Agent graph", "Process metrics"],
+        labels=[
+            "Known intervention",
+            "Verified propagation",
+            "Agent graph",
+            "Process metrics",
+        ],
         colors=["accent", "secondary", "positive", "primary"],
         arrow_color="text_light",
     )
@@ -977,7 +1012,12 @@ def _build_slide_17(prs: Presentation):
         ],
     )
 
-    sb.layout(VStack(gap=0.24, children=[compression, HStack(gap=0.55, children=[sources, model])]))
+    sb.layout(
+        VStack(
+            gap=0.24,
+            children=[compression, HStack(gap=0.55, children=[sources, model])],
+        )
+    )
     sb.notes(
         _speaker_notes(
             "Stage two is compression: distill many traces into one reusable world model without losing the causal structure we care about.",
@@ -1094,9 +1134,15 @@ def _build_slide_20(prs: Presentation):
     takeaways = HStack(
         gap=0.45,
         children=[
-            _closing_takeaway("1", "Score the path, not just the answer.", tone="accent"),
-            _closing_takeaway("2", "Train on verification loops, not only labels.", tone="secondary"),
-            _closing_takeaway("3", "Build the model once, then reuse it broadly.", tone="positive"),
+            _closing_takeaway(
+                "1", "Score the path, not just the answer.", tone="accent"
+            ),
+            _closing_takeaway(
+                "2", "Train on verification loops, not only labels.", tone="secondary"
+            ),
+            _closing_takeaway(
+                "3", "Build the model once, then reuse it broadly.", tone="positive"
+            ),
         ],
     )
     final_line = TextBlock(
