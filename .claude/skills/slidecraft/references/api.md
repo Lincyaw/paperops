@@ -407,6 +407,49 @@ svg_string = svg.render()
 
 Use SvgCanvas when you need custom visualizations beyond what BarChart/RadarChart provide. Wrap with `SvgImage(svg=canvas)` to embed in a slide.
 
+### SvgCanvas vs Raw SVG Strings
+
+| Situation | Use | Why |
+|-----------|-----|-----|
+| Simple shapes (circles, rects, lines, text) | **SvgCanvas** | Theme-aware colors, type safety, consistent API |
+| Complex paths, gradients, filters | **Raw SVG string** | Full SVG feature access, easier for complex graphics |
+| Icons that need theme color changes | **SvgCanvas** | Semantic colors auto-update when theme changes |
+| Static complex illustrations | **Raw SVG string** | Portability, can use any SVG editor |
+
+**Using raw SVG strings:**
+
+```python
+from paperops.slides import SvgImage
+
+# For complex graphics that SvgCanvas can't express easily
+complex_svg = """
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B6B9D;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4A8B7F;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="80" fill="url(#grad)" filter="url(#glow)"/>
+  <path d="M 60 100 Q 100 60 140 100 Q 100 140 60 100" fill="white"/>
+</svg>
+"""
+
+sb.layout(HStack(gap=0.3, children=[
+    SvgImage(svg=complex_svg, width=1.5, height=1.5),
+    TextBlock(text="Complex visualization", font_size="body"),
+]))
+```
+
+**Trade-off:** SvgCanvas provides theme integration and type safety; raw SVG provides full feature flexibility. Choose based on complexity and whether you need theme-aware colors.
+
 ---
 
 ## Slide Constants

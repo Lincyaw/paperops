@@ -241,10 +241,42 @@ The layout itself should express the relationship between ideas. If you need a s
 | Process / pipeline | `Flowchart` with directed edges | Numbered list of steps |
 | Quantitative comparison | `BarChart`, `Table` | "X is 3x faster than Y" in text |
 | Hierarchy / containment | Nested boxes, `Padding` | Indented bullets |
+| Abstract concept (agent, database, cloud) | **SVG icon** via `SvgImage` | Text label in a box |
 
 **The test**: if you removed all text from a slide and only saw shapes, colors, and arrows, could the audience still grasp the structure of the argument? If not, the visual structure isn't carrying enough weight.
 
 For concrete guidance on when to use native shapes vs SVG icons vs charts, see [references/workflow.md](references/workflow.md) § Visual Vocabulary.
+
+### Icon Design Guidelines
+
+When a concept appears on ≥2 slides, create a consistent SVG icon:
+
+```python
+from paperops.slides.components.svg_canvas import SvgCanvas
+from paperops.slides import SvgImage
+
+def icon_agent(theme, size=80):
+    """Agent icon - consistent across all slides."""
+    s = SvgCanvas(size, size, theme=theme)
+    s.circle(40, 40, 30, fill="primary")
+    s.text(40, 45, "AI", color="white", size=12, bold=True)
+    return s
+
+# Use in slides:
+SvgImage(svg=icon_agent(prs._theme), width=0.8, height=0.8)
+```
+
+**Rules:**
+- Define all icons before building slides (Phase 2 of workflow)
+- Use theme semantic colors so icons adapt to theme changes
+- Keep icons simple — 2-3 shapes maximum
+- Size consistently: 0.8" for inline icons, 1.2" for feature icons
+- For complex graphics beyond SvgCanvas, use raw SVG strings (see [references/api.md](references/api.md) § SvgCanvas vs Raw SVG)
+
+**When to use icons vs text labels:**
+- Use icons when the concept is familiar (agent, database, cloud)
+- Use text labels when precision matters (specific metrics, technical terms)
+- Combine both: icon + short text for clarity
 
 ### 4. Minimize Text, Maximize Signal
 

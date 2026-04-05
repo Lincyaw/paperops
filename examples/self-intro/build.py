@@ -13,10 +13,81 @@ from paperops.slides import (
     Padding,
     Presentation as BasePresentation,
     RoundedBox,
+    SvgImage,
     TextBlock,
     VStack,
     themes,
 )
+
+
+
+def icon_agent(theme, size=80):
+    """Agent icon - AI/robot representation."""
+    primary = theme.resolve_color("primary") if theme else "#5C82AD"
+    white = "#FFFFFF"
+    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect x="25" y="30" width="50" height="45" rx="8" fill="{primary}"/>
+        <line x1="50" y1="30" x2="50" y2="15" stroke="{primary}" stroke-width="3"/>
+        <circle cx="50" cy="12" r="4" fill="{primary}"/>
+        <rect x="35" y="45" width="12" height="10" rx="2" fill="{white}"/>
+        <rect x="53" y="45" width="12" height="10" rx="2" fill="{white}"/>
+        <rect x="40" y="62" width="20" height="4" rx="2" fill="{white}"/>
+    </svg>'''
+
+
+def icon_world_model(theme, size=80):
+    """World Model icon - Globe with network."""
+    primary = theme.resolve_color("primary") if theme else "#5C82AD"
+    secondary = theme.resolve_color("secondary") if theme else "#8FAAC8"
+    accent = theme.resolve_color("accent") if theme else "#D69A68"
+    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="35" fill="none" stroke="{primary}" stroke-width="3"/>
+        <ellipse cx="50" cy="50" rx="35" ry="15" fill="none" stroke="{secondary}" stroke-width="1.5"/>
+        <ellipse cx="50" cy="50" rx="35" ry="25" fill="none" stroke="{secondary}" stroke-width="1.5"/>
+        <ellipse cx="50" cy="50" rx="15" ry="35" fill="none" stroke="{secondary}" stroke-width="1.5"/>
+        <ellipse cx="50" cy="50" rx="25" ry="35" fill="none" stroke="{secondary}" stroke-width="1.5"/>
+        <circle cx="50" cy="50" r="8" fill="{accent}"/>
+    </svg>'''
+
+
+def icon_database(theme, size=80):
+    """Database icon - Cylinder representation."""
+    primary = theme.resolve_color("primary") if theme else "#5C82AD"
+    secondary = theme.resolve_color("secondary") if theme else "#8FAAC8"
+    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 35 L20 70 Q20 80 50 80 Q80 80 80 70 L80 35" fill="{primary}" opacity="0.8"/>
+        <ellipse cx="50" cy="35" rx="30" ry="10" fill="{primary}"/>
+        <path d="M25 50 Q50 55 75 50" stroke="{secondary}" stroke-width="2" fill="none"/>
+        <path d="M25 62 Q50 67 75 62" stroke="{secondary}" stroke-width="2" fill="none"/>
+    </svg>'''
+
+
+def icon_process_flow(theme, size=80):
+    """Process Flow icon - Pipeline with nodes."""
+    secondary = theme.resolve_color("secondary") if theme else "#8FAAC8"
+    accent = theme.resolve_color("accent") if theme else "#D69A68"
+    positive = theme.resolve_color("positive") if theme else "#7FA195"
+    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <line x1="20" y1="50" x2="80" y2="50" stroke="#D8E0EA" stroke-width="4"/>
+        <circle cx="20" cy="50" r="12" fill="{secondary}"/>
+        <circle cx="50" cy="50" r="12" fill="{accent}"/>
+        <circle cx="80" cy="50" r="12" fill="{positive}"/>
+        <polygon points="72,45 82,50 72,55" fill="#D8E0EA"/>
+    </svg>'''
+
+
+def icon_analysis(theme, size=80):
+    """Analysis icon - Bar chart."""
+    primary = theme.resolve_color("primary") if theme else "#5C82AD"
+    secondary = theme.resolve_color("secondary") if theme else "#8FAAC8"
+    accent = theme.resolve_color("accent") if theme else "#D69A68"
+    positive = theme.resolve_color("positive") if theme else "#7FA195"
+    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect x="15" y="60" width="15" height="30" rx="2" fill="{primary}"/>
+        <rect x="35" y="45" width="15" height="45" rx="2" fill="{secondary}"/>
+        <rect x="55" y="30" width="15" height="60" rx="2" fill="{accent}"/>
+        <rect x="75" y="50" width="15" height="40" rx="2" fill="{positive}"/>
+    </svg>'''
 
 
 def make_theme():
@@ -201,6 +272,13 @@ def _build_slide_2(prs: Presentation):
     sb = prs.slide(title=SLIDE_TITLES[1], reference="Goal-driven RCA survey")
 
     left_badge = Badge(text="Black-box RCA", color="negative")
+    left_icons = HStack(
+        gap=0.2,
+        children=[
+            SvgImage(svg=icon_database(prs._theme, size=50), width=0.5, height=0.5),
+            SvgImage(svg=icon_agent(prs._theme, size=50), width=0.5, height=0.5),
+        ],
+    )
     left_flow = Flow(
         labels=["Telemetry", "LLM guess", "Root cause label"],
         colors=["bg_alt", "negative", "bg_alt"],
@@ -214,10 +292,17 @@ def _build_slide_2(prs: Presentation):
     left_col = VStack(
         gap=0.18,
         width=5.5,
-        children=[left_badge, left_flow, left_callout],
+        children=[left_badge, left_icons, left_flow, left_callout],
     )
 
     right_badge = Badge(text="World-model RCA", color="positive")
+    right_icons = HStack(
+        gap=0.2,
+        children=[
+            SvgImage(svg=icon_database(prs._theme, size=50), width=0.5, height=0.5),
+            SvgImage(svg=icon_world_model(prs._theme, size=50), width=0.5, height=0.5),
+        ],
+    )
     right_flow = Flow(
         labels=["Telemetry", "Hypothesis", "Verify", "Graph + diagnosis"],
         colors=["bg_alt", "secondary", "accent", "positive"],
@@ -231,7 +316,7 @@ def _build_slide_2(prs: Presentation):
     right_col = VStack(
         gap=0.18,
         width=5.5,
-        children=[right_badge, right_flow, right_callout],
+        children=[right_badge, right_icons, right_flow, right_callout],
     )
 
     bridge = TextBlock(

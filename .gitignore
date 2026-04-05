@@ -12,3 +12,5 @@ dist
 *.gz
 *.toc
 .DS_Store__pycache__/
+*.png
+*.pptx

@@ -8,7 +8,7 @@ import tempfile
 
 from pptx.util import Inches, Pt, Emu
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR, MSO_AUTO_SIZE
 from pptx.dml.color import RGBColor
 
 from paperops.slides.core.constants import (
@@ -309,12 +309,31 @@ class SlideBuilder:
         text = getattr(node, 'text', '')
         if text:
             tf = shape.text_frame
-            tf.word_wrap = True
+            # Smart word wrap: disable for short text that should fit on one line
+            # This prevents unwanted line breaks like "Telemet ry" instead of "Telemetry"
+            font_size_val = resolve_font_size(self._theme, node.font_size)
+            if font_size_val is None:
+                font_size_pt = 14.0  # Default to 14pt (caption size)
+            elif hasattr(font_size_val, 'pt'):
+                font_size_pt = font_size_val.pt
+            else:
+                font_size_pt = float(font_size_val)
+            # Estimate text width: char width is roughly font_size_pt / 72 * 0.6 for typical fonts
+            char_width_inches = (font_size_pt / 72) * 0.6
+            estimated_text_width = len(text) * char_width_inches
+            # Get box width from the shape we just created
+            box_width = width.inches
+            # Add safety margin for text frame margins (typically 0.1-0.2 inches)
+            usable_width = box_width - 0.25
+            # Disable word wrap if text should fit in one line
+            # Use 1.0x factor since we already accounted for margins in usable_width
+            should_wrap = estimated_text_width > usable_width
+            tf.word_wrap = should_wrap
             align = _ALIGN_MAP.get(getattr(node, 'align', 'center'), PP_ALIGN.CENTER)
             p = tf.paragraphs[0]
             p.text = text
             p.alignment = align
-            p.font.size = resolve_font_size(self._theme, node.font_size)
+            p.font.size = Pt(font_size_pt)
             p.font.color.rgb = resolve_color(self._theme, node.text_color)
             p.font.bold = node.bold
             p.font.name = self._theme.font_family

@@ -62,9 +62,16 @@ class Box(LayoutNode):
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
         pt = _resolve_font_pt(theme, self.font_size)
         ff = getattr(theme, 'font_family', 'Calibri') if theme else 'Calibri'
-        _apply_min_text_width(self, self.text, pt, ff, 0.3)
-        return _estimate_text_size(self.text, pt, self.width, self.height,
-                                   font_family=ff)
+        # Calculate full text width (not just longest word) to prevent unwanted wrapping
+        content_w, content_h = measure_text(self.text, ff, pt)
+        # Add safety margin to ensure text fits without wrapping
+        # The 1.5 factor accounts for PPT rendering differences (font metrics, kerning, margins, etc.)
+        w = self.width if self.width is not None else (content_w * 1.5 + 0.4)
+        h = self.height if self.height is not None else (content_h + 0.2)
+        # Set min_width to ensure the box is wide enough for the full text
+        if self.min_width is None and self.text:
+            self.min_width = w
+        return w, h
 
 
 @dataclass
@@ -114,11 +121,16 @@ class Badge(LayoutNode):
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
         pt = _resolve_font_pt(theme, self.font_size)
         ff = getattr(theme, 'font_family', 'Calibri') if theme else 'Calibri'
-        _apply_min_text_width(self, self.text, pt, ff, 0.2)
-        return _estimate_text_size(
-            self.text, pt, self.width, self.height,
-            margin_x=0.2, margin_y=0.16, font_family=ff,
-        )
+        # Calculate full text width (not just longest word) to prevent unwanted wrapping
+        content_w, content_h = measure_text(self.text, ff, pt)
+        # Add safety margin to ensure text fits without wrapping
+        # The 1.5 factor accounts for PPT rendering differences (font metrics, kerning, margins, etc.)
+        w = self.width if self.width is not None else (content_w * 1.5 + 0.4)
+        h = self.height if self.height is not None else (content_h + 0.16)
+        # Set min_width to ensure the box is wide enough for the full text
+        if self.min_width is None and self.text:
+            self.min_width = w
+        return w, h
 
 
 @dataclass

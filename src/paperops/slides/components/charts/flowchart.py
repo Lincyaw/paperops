@@ -6,8 +6,23 @@ from dataclasses import dataclass, field
 
 from paperops.slides.core.constants import Direction
 from paperops.slides.layout.containers import LayoutNode, HStack, VStack
+from paperops.slides.layout.auto_size import measure_text
 from paperops.slides.components.shapes import RoundedBox, Arrow
 from paperops.slides.components.text import TextBlock
+
+
+def _estimate_full_text_width(text: str, font_size_pt: float, font_family: str = "Calibri") -> float:
+    """Estimate the full width needed for text, accounting for margins.
+
+    Unlike estimate_min_text_width which only measures the longest token,
+    this measures the entire text string.
+    """
+    if not text:
+        return 0.5
+    content_w, _ = measure_text(text, font_family, font_size_pt)
+    # Add horizontal margin padding (0.6 inches total for comfortable fit)
+    # Increased from 0.3 to prevent text wrapping in PowerPoint
+    return content_w + 0.6
 
 
 @dataclass
@@ -27,6 +42,7 @@ class Flowchart(LayoutNode):
     nodes: dict = field(default_factory=dict)
     edges: list = field(default_factory=list)
     direction: Direction | str = "right"
+    node_widths: dict[str, float] = field(default_factory=dict)
 
     def preferred_size(self, theme, available_width):
         layout = self.to_layout()
@@ -39,10 +55,17 @@ class Flowchart(LayoutNode):
 
         node_list = list(self.nodes.keys())
 
-        def _parse_node(val):
+        def _parse_node(val, nid: str):
             if isinstance(val, tuple):
-                return val[0], val[1]
-            return val, "bg_alt"
+                label = val[0]
+                color = val[1]
+                # Check for explicit width in node_widths dict
+                if nid in self.node_widths:
+                    return label, color, self.node_widths[nid]
+                return label, color, None
+            if nid in self.node_widths:
+                return val, "bg_alt", self.node_widths[nid]
+            return val, "bg_alt", None
 
         # Determine box dimensions based on direction and node count
         n = len(node_list)
@@ -51,11 +74,16 @@ class Flowchart(LayoutNode):
         else:
             box_height = 0.9
 
+        # Pre-calculate text widths to ensure boxes fit content
+        caption_pt = 10.0
+        font_family = "Liberation Sans"
+
         # Build RoundedBox for each node
         node_boxes: dict[str, RoundedBox] = {}
         for nid in node_list:
-            label, color = _parse_node(self.nodes[nid])
+            label, color, explicit_width = _parse_node(self.nodes[nid], nid)
             text_clr = "white" if color not in ("bg_alt", "bg", "bg_accent") else "text"
+            box_width = explicit_width if explicit_width is not None else _estimate_full_text_width(label, caption_pt, font_family)
             node_boxes[nid] = RoundedBox(
                 text=label,
                 color=color,
@@ -64,7 +92,7 @@ class Flowchart(LayoutNode):
                 bold=True,
                 font_size="caption",
                 height=box_height,
-                size_mode_x="fit",
+                width=box_width,
             )
 
         # Build edge-ordered sequence following the edges

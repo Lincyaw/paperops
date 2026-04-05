@@ -3,141 +3,106 @@
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
 
 from pptx import Presentation as PptxPresentation
-from pptx.util import Inches, Pt, Emu
+from pptx.util import Inches, Pt
 
-from paperops.slides.core.constants import SLIDE_WIDTH, SLIDE_HEIGHT
-from paperops.slides.layout.auto_size import _load_pil_font, measure_text
-
-
-def _wrap_preview_text(draw, text: str, font, max_width_px: int) -> list[str]:
-    """Wrap preview text to fit the available width."""
-    if not text:
-        return [""]
-
-    lines: list[str] = []
-    for raw_line in text.splitlines() or [""]:
-        words = raw_line.split()
-        if not words:
-            lines.append("")
-            continue
-
-        current = words[0]
-        for word in words[1:]:
-            candidate = f"{current} {word}"
-            bbox = draw.textbbox((0, 0), candidate, font=font)
-            if bbox[2] - bbox[0] <= max_width_px:
-                current = candidate
-            else:
-                lines.append(current)
-                current = word
-        lines.append(current)
-
-    return lines
+from paperops.slides.layout.auto_size import measure_text
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Preview rendering (PIL-based soft render)
+# Preview rendering (LibreOffice + poppler)
 # ──────────────────────────────────────────────────────────────────────
 
-def render_slide_preview(slide_builder, output_path: str, width_px: int = 1920):
-    """Render a slide to PNG using PIL.
+def _find_soffice() -> str:
+    """Locate the LibreOffice soffice binary."""
+    path = shutil.which("soffice") or shutil.which("libreoffice")
+    if path:
+        return path
+    # macOS default location
+    mac_path = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    if os.path.isfile(mac_path):
+        return mac_path
+    raise RuntimeError(
+        "LibreOffice (soffice) not found. Install it:\n"
+        "  macOS:  brew install --cask libreoffice\n"
+        "  Linux:  sudo apt install libreoffice"
+    )
 
-    Draws rectangles, text, and colors based on the pptx slide's shapes.
-    Sufficient for AI to verify layout and proportions, not pixel-perfect.
+
+def _find_pdftoppm() -> str:
+    """Locate the pdftoppm binary (from poppler)."""
+    path = shutil.which("pdftoppm")
+    if path:
+        return path
+    raise RuntimeError(
+        "pdftoppm (poppler) not found. Install it:\n"
+        "  macOS:  brew install poppler\n"
+        "  Linux:  sudo apt install poppler-utils"
+    )
+
+
+def render_slide_preview_powerpoint(
+    pptx_path: str, output_dir: str, dpi: int = 200,
+) -> list[str]:
+    """Render all slides from a pptx file to PNG images.
+
+    Pipeline: PPTX → PDF (via LibreOffice) → PNG per page (via pdftoppm).
+
+    Args:
+        pptx_path: Path to the .pptx file.
+        output_dir: Directory where PNG files will be saved.
+        dpi: Resolution for the exported images (default 200).
+
+    Returns:
+        List of paths to the generated PNG files, ordered by slide number.
     """
-    from PIL import Image, ImageDraw, ImageFont
+    soffice = _find_soffice()
+    pdftoppm = _find_pdftoppm()
 
-    height_px = int(width_px * SLIDE_HEIGHT / SLIDE_WIDTH)
-    scale_x = width_px / (SLIDE_WIDTH * 914400)  # EMU to px
-    scale_y = height_px / (SLIDE_HEIGHT * 914400)
+    abs_pptx = os.path.abspath(pptx_path)
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
 
-    img = Image.new("RGB", (width_px, height_px), "white")
-    draw = ImageDraw.Draw(img)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Step 1: PPTX → PDF
+        result = subprocess.run(
+            [soffice, "--headless", "--convert-to", "pdf",
+             "--outdir", tmpdir, abs_pptx],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"LibreOffice conversion failed: {result.stderr}")
 
-    slide = slide_builder._slide
+        pdf_name = Path(abs_pptx).stem + ".pdf"
+        pdf_path = Path(tmpdir) / pdf_name
+        if not pdf_path.is_file():
+            raise RuntimeError(f"PDF not created: {pdf_path}")
 
-    # Load font via shared utility (handles caching + fallback)
-    font = _load_pil_font("DejaVu Sans", 16) or ImageFont.load_default()
+        # Step 2: PDF → PNG (one per page)
+        prefix = Path(tmpdir) / "slide"
+        result = subprocess.run(
+            [pdftoppm, "-png", "-r", str(dpi), str(pdf_path), str(prefix)],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"pdftoppm failed: {result.stderr}")
 
-    def _emu_to_px(left, top, width, height):
-        x = int((left or 0) * scale_x)
-        y = int((top or 0) * scale_y)
-        w = int((width or 0) * scale_x)
-        h = int((height or 0) * scale_y)
-        return x, y, w, h
+        # Step 3: collect and rename into output_dir
+        png_files = sorted(Path(tmpdir).glob("slide-*.png"))
+        output_paths = []
+        for idx, png_file in enumerate(png_files, 1):
+            dst = output_dir_path / f"slide_{idx:03d}.png"
+            shutil.move(str(png_file), str(dst))
+            output_paths.append(str(dst))
 
-    def _rgb_from_pptx(color_obj):
-        """Try to extract (r, g, b) from a pptx color."""
-        try:
-            rgb = color_obj.rgb
-            return (rgb[0], rgb[1], rgb[2])
-        except Exception:
-            return (200, 200, 200)
+        return output_paths
 
-    def _get_text(shape):
-        try:
-            if shape.has_text_frame:
-                return shape.text_frame.text
-        except Exception:
-            pass
-        return ""
 
-    for shape in slide.shapes:
-        left = shape.left or 0
-        top = shape.top or 0
-        w = shape.width or 0
-        h = shape.height or 0
-        x, y, pw, ph = _emu_to_px(left, top, w, h)
-
-        if pw <= 0 or ph <= 0:
-            continue
-
-        # Determine fill color
-        fill_color = (245, 245, 245)
-        try:
-            if shape.fill and shape.fill.type is not None:
-                fill_color = _rgb_from_pptx(shape.fill.fore_color)
-        except Exception:
-            pass
-
-        # Draw rectangle
-        draw.rectangle([x, y, x + pw, y + ph], fill=fill_color, outline=(180, 180, 180))
-
-        # Draw text
-        text = _get_text(shape)
-        if text:
-            font_size = max(10, min(ph // 3, 32))
-            text_font = _load_pil_font("DejaVu Sans", font_size) or font
-            max_text_width = max(pw - 16, 20)
-            max_text_height = max(ph - 12, 12)
-
-            lines = _wrap_preview_text(draw, text, text_font, max_text_width)
-            bbox = draw.textbbox((0, 0), "Ag", font=text_font)
-            line_height = bbox[3] - bbox[1]
-            total_height = max(line_height * len(lines), line_height)
-
-            while total_height > max_text_height and font_size > 8:
-                font_size -= 1
-                text_font = _load_pil_font("DejaVu Sans", font_size) or font
-                lines = _wrap_preview_text(draw, text, text_font, max_text_width)
-                bbox = draw.textbbox((0, 0), "Ag", font=text_font)
-                line_height = bbox[3] - bbox[1]
-                total_height = max(line_height * len(lines), line_height)
-
-            widths = []
-            for line in lines:
-                bbox = draw.textbbox((0, 0), line, font=text_font)
-                widths.append(bbox[2] - bbox[0])
-
-            ty = y + max((ph - total_height) // 2, 2)
-            for line, line_width in zip(lines, widths):
-                tx = x + (pw - line_width) // 2
-                draw.text((tx, ty), line, fill=(30, 30, 30), font=text_font)
-                ty += line_height
-
-    img.save(output_path)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -153,7 +118,6 @@ def _estimate_text_height(
     font_size_emu: int,
     box_width_emu: int,
     font_family: str = "Calibri",
-    line_spacing: float = 1.2,
 ) -> int:
     """Estimate text height in EMU, delegating to the unified measure_text."""
     font_size_pt = font_size_emu / EMU_PER_PT
@@ -161,6 +125,7 @@ def _estimate_text_height(
     _w, h_inches = measure_text(
         text, font_family, font_size_pt, max_width_inches=box_width_inches,
     )
+    del _w  # Width not used, we only need height
     return int(h_inches * EMU_PER_INCH)
 
 

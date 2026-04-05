@@ -99,7 +99,7 @@ class Presentation:
 
         Returns: list of PNG file paths
         """
-        from paperops.slides.preview import render_slide_preview
+        from paperops.slides.preview import render_slide_preview_powerpoint
         import os
         import tempfile
 
@@ -107,22 +107,24 @@ class Presentation:
             output_dir = tempfile.mkdtemp(prefix="slidecraft_preview_")
         os.makedirs(output_dir, exist_ok=True)
 
-        if slides is None:
-            indices = range(len(self._builders))
-        else:
-            indices = slides
+        # Render all slides to pptx first
+        for sb in self._builders:
+            sb._render()
 
-        paths = []
-        for idx in indices:
-            if idx < 0 or idx >= len(self._builders):
-                continue
-            sb = self._builders[idx]
-            sb._render()  # ensure rendered
-            out_path = os.path.join(output_dir, f"slide_{idx + 1:03d}.png")
-            render_slide_preview(sb, out_path)
-            paths.append(out_path)
+        # Save the presentation
+        pptx_path = os.path.join(output_dir, "_temp_preview.pptx")
+        self.save(pptx_path)
 
-        return paths
+        paths = render_slide_preview_powerpoint(pptx_path, output_dir)
+
+        # Clean up temp pptx
+        os.unlink(pptx_path)
+
+        # Filter to requested slides if specified
+        if slides is not None:
+            paths = [p for p in paths if any(f"slide_{s+1:03d}.png" in p for s in slides)]
+
+        return sorted(paths)
 
 
 # Register template methods onto Presentation
