@@ -130,23 +130,22 @@ def stat_card(label: str, value: str, tone: str = "primary"):
 SLIDE_TITLES = [
     "Building World Models for Diagnostic Intelligence",
     "The Vision",
-    "Premise 1: Atomic Faults",
+    "Premise 1: Fault Injection & Detection",
     "Premise 2: Simulatable",
     "Premise 3: Verifiable",
-    "The Problem with RCA",
-    "Effectiveness-Data-Cost Triangle",
-    "Ideal RCA Formalization",
+    "From Point-Finding to Graph-Building",
+    "The Effectiveness-Data-Cost Trade-off",
     "The Benchmark Crisis",
     "Why Existing Benchmarks Fail",
-    "Our Solution",
+    "Our Solution: A Harder Benchmark",
     "The Process Gap",
     "FORGE: Forward Verification",
     "OpenRCA 2.0",
-    "Triangle: Multi-Agent Triage",
-    "Stage 1: Train the Agent",
+    "Validation: Structured Reasoning Works",
+    "Stage 1: Train on Closed Loops",
     "Stage 2: Distill World Model",
-    "Stage 3: Universal Expert",
-    "My Research Philosophy",
+    "Stage 3: Maximize Leverage",
+    "Research Philosophy: Simulate, Compress, Generalize",
     "Three Takeaways",
 ]
 IMPLEMENTED_SLIDE_COUNT = len(SLIDE_TITLES)
@@ -273,10 +272,10 @@ def _build_slide_2(prs: Presentation):
 
     left_badge = Badge(text="Black-box RCA", color="negative")
     left_icons = HStack(
-        gap=0.2,
+        gap=0.15,
         children=[
-            SvgImage(svg=icon_database(prs._theme, size=50), width=0.5, height=0.5),
-            SvgImage(svg=icon_agent(prs._theme, size=50), width=0.5, height=0.5),
+            SvgImage(svg=icon_database(prs._theme, size=40), width=0.35, height=0.35),
+            SvgImage(svg=icon_agent(prs._theme, size=40), width=0.35, height=0.35),
         ],
     )
     left_flow = Flow(
@@ -290,21 +289,21 @@ def _build_slide_2(prs: Presentation):
         color="negative",
     )
     left_col = VStack(
-        gap=0.18,
-        width=5.5,
+        gap=0.15,
+        width=5.0,
         children=[left_badge, left_icons, left_flow, left_callout],
     )
 
     right_badge = Badge(text="World-model RCA", color="positive")
     right_icons = HStack(
-        gap=0.2,
+        gap=0.15,
         children=[
-            SvgImage(svg=icon_database(prs._theme, size=50), width=0.5, height=0.5),
-            SvgImage(svg=icon_world_model(prs._theme, size=50), width=0.5, height=0.5),
+            SvgImage(svg=icon_database(prs._theme, size=40), width=0.35, height=0.35),
+            SvgImage(svg=icon_world_model(prs._theme, size=40), width=0.35, height=0.35),
         ],
     )
     right_flow = Flow(
-        labels=["Telemetry", "Hypothesis", "Verify", "Graph + diagnosis"],
+        labels=["Telemetry", "Hypothesis", "Verify", "Graph"],
         colors=["bg_alt", "secondary", "accent", "positive"],
         arrow_color="text_light",
     )
@@ -314,8 +313,8 @@ def _build_slide_2(prs: Presentation):
         color="positive",
     )
     right_col = VStack(
-        gap=0.18,
-        width=5.5,
+        gap=0.15,
+        width=5.0,
         children=[right_badge, right_icons, right_flow, right_callout],
     )
 
@@ -343,15 +342,15 @@ def _build_slide_2(prs: Presentation):
 
 
 def _build_slide_3(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[2], reference="OpenRCA 2.0 / FORGE")
+    sb = prs.slide(title=SLIDE_TITLES[2], reference="OpenRCA 2.0 / FORGE / GDB")
 
     premise = Callout(
-        title="Atomic premise",
-        body="Reason in terms of finite atomic fault types, then study how they compose into larger incidents.",
+        title="Fault detection precedes diagnosis",
+        body="Before RCA can begin, we need to know a fault exists. Our work on GDB testing shows systematic fault injection via equivalent query rewriting.",
         color="secondary",
     )
     structure = Flow(
-        labels=["Finite", "Bounded", "Composable"],
+        labels=["Finite faults", "Controlled injection", "Observable effects"],
         colors=["secondary", "bg_alt", "accent"],
         arrow_color="text_light",
     )
@@ -368,7 +367,7 @@ def _build_slide_3(prs: Presentation):
         ],
     )
     conclusion = TextBlock(
-        text="Large incidents are combinations of local faults, not an unbounded alphabet of new failure modes.",
+        text="Large incidents are combinations of local faults. The key is bounded atomic faults that can be injected, replayed, and verified.",
         font_size="body",
         color="text_mid",
         italic=True,
@@ -378,6 +377,7 @@ def _build_slide_3(prs: Presentation):
     sb.notes(
         _speaker_notes(
             "State the first premise: the intervention space is broad but still bounded enough to model.",
+            "Briefly mention GDB work on equivalent query rewriting as an example of systematic fault detection.",
             "Transition by noting that bounded atomic faults only help if we can replay them inside a system.",
         )
     )
@@ -477,45 +477,49 @@ def _build_slide_5(prs: Presentation):
 def _build_slide_6(prs: Presentation):
     sb = prs.slide(title=SLIDE_TITLES[5], reference="Goal-driven RCA survey")
 
-    old_taxonomy = VStack(
+    old_paradigm = VStack(
         gap=0.16,
         width=5.5,
         children=[
-            Badge(text="Old taxonomy", color="negative"),
-            RoundedBox(text="Metrics / logs / traces", color="bg_alt", height=0.86),
+            Badge(text="Point-finding paradigm", color="negative"),
+            Flow(
+                labels=["Telemetry", "Inference", "Root cause node"],
+                colors=["bg_alt", "negative", "bg_alt"],
+                arrow_color="text_light",
+            ),
             TextBlock(
-                text="Groups papers by input modality, even when their operational goals differ.",
+                text="Current methods optimize for identifying the faulty component, ignoring the propagation path.",
                 font_size="body",
                 color="text",
             ),
             TextBlock(
-                text="This obscures progress because the same data can support very different RCA objectives.",
+                text="This is insufficient: engineers need to understand why this component caused the symptoms.",
                 font_size="caption",
                 color="text_mid",
             ),
         ],
     )
 
-    goal_taxonomy = VStack(
+    new_paradigm = VStack(
         gap=0.16,
         width=5.5,
         children=[
-            Badge(text="Goal-driven taxonomy", color="positive"),
+            Badge(text="Graph-building paradigm", color="positive"),
             Flow(
-                labels=["Triage", "Mitigation", "Resolution"],
-                colors=["secondary", "accent", "positive"],
+                labels=["Telemetry", "Inference", "Propagation graph"],
+                colors=["bg_alt", "accent", "positive"],
                 arrow_color="text_light",
             ),
             Callout(
-                title="Why it fits practice",
-                body="Incident management cares about speed, actionability, interpretability, and granularity, not only data modality.",
+                title="What changes",
+                body="The output is not just a node, but the causal graph explaining how the fault propagated to symptoms.",
                 color="positive",
             ),
         ],
     )
 
     conclusion = TextBlock(
-        text="Survey lens: organize RCA by the job it needs to do in incident management, not only by the telemetry it consumes.",
+        text="Ideal RCA builds an interpretable causal graph, not just a ranked root-cause label.",
         font_size="body",
         color="text_mid",
         italic=True,
@@ -525,18 +529,19 @@ def _build_slide_6(prs: Presentation):
         VStack(
             gap=0.28,
             children=[
-                HStack(gap=0.40, children=[old_taxonomy, goal_taxonomy]),
+                HStack(gap=0.40, children=[old_paradigm, new_paradigm]),
                 conclusion,
             ],
         )
     )
     sb.notes(
         _speaker_notes(
-            "Use the survey to argue that the classical metrics-logs-traces taxonomy is exactly where the field drifts away from the world-model target.",
-            "Transition by showing the deeper systems constraint that shapes all practical RCA methods.",
+            "Frame the survey's core insight: RCA should output a propagation graph, not just a root-cause node.",
+            "This is the north star that exposes why current benchmarks are insufficient.",
+            "Transition to the benchmark crisis: if we measure only point accuracy, we miss the real challenge.",
         )
     )
-    sb.animate([[old_taxonomy], [goal_taxonomy], [conclusion]])
+    sb.animate([[old_paradigm], [new_paradigm], [conclusion]])
     return sb
 
 
@@ -580,7 +585,7 @@ def _build_slide_7(prs: Presentation):
         ],
     )
     tension = TextBlock(
-        text="Better RCA needs richer data, and richer data raises cost.",
+        text="Better RCA needs richer data, and richer data raises cost. The key is measuring the right thing.",
         font_size="small",
         color="text_mid",
         italic=True,
@@ -595,7 +600,8 @@ def _build_slide_7(prs: Presentation):
     sb.notes(
         _speaker_notes(
             "Explain the survey's Effectiveness-Data-Cost triangle as the governing trade-off behind practical RCA systems.",
-            "Transition by saying that once the trade-off is clear, we can define the ideal north-star formulation explicitly.",
+            "The crucial point: we must measure graph-building quality, not just point accuracy, to make this trade-off worthwhile.",
+            "Transition to the benchmark crisis: current benchmarks measure the wrong thing.",
         )
     )
     sb.animate(
@@ -609,50 +615,62 @@ def _build_slide_7(prs: Presentation):
 
 
 def _build_slide_8(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[7], reference="Goal-driven RCA survey")
+    sb = prs.slide(title=SLIDE_TITLES[7], reference="FSE RCA benchmark study")
 
-    formula = TextBlock(
-        text="F: O -> G",
-        font_size=30,
-        color="primary",
-        bold=True,
-        align="center",
-    )
-    framing = Flow(
-        labels=["Observation", "Inference", "Propagation graph"],
-        colors=["bg_alt", "secondary", "positive"],
-        arrow_color="text_light",
-    )
-    spaces = HStack(
-        gap=0.28,
+    simple_baseline = VStack(
+        gap=0.16,
+        width=5.5,
         children=[
-            Callout(
-                title="O: observation data",
-                body="Logs, metrics, traces, events, and supplementary context from the system.",
-                color="secondary",
+            Badge(text="Simple baseline", color="accent"),
+            RoundedBox(
+                text="Alerts + thresholds\nrule-based ranking",
+                color="bg_alt",
+                height=1.10,
             ),
-            Callout(
-                title="G: incident propagation graph",
-                body="Root causes, triggers, symptoms, and the causal edges that connect them.",
-                color="positive",
+            TextBlock(
+                text="Can match or beat sophisticated models on several public RCA benchmarks.",
+                font_size="body",
+                color="text",
             ),
         ],
     )
-    conclusion = TextBlock(
-        text="Ideal RCA is graph-building: the output is not only a root-cause node, but the propagation graph that explains why it is correct.",
-        font_size="body",
-        color="text_mid",
-        italic=True,
+    sota = VStack(
+        gap=0.16,
+        width=5.5,
+        children=[
+            Badge(text="Published SOTA", color="primary"),
+            RoundedBox(
+                text="Graph models\nmulti-modal reasoning\ncausal inference",
+                color="bg_alt",
+                height=1.28,
+            ),
+            TextBlock(
+                text="Looks strong on paper, but the benchmark may be testing easy correlations instead of hard causality.",
+                font_size="body",
+                color="text",
+            ),
+        ],
+    )
+    verdict = Callout(
+        title="Benchmark crisis",
+        body="If a simple baseline rivals SOTA, the benchmark is oversimplifying real RCA difficulty.",
+        color="negative",
     )
 
-    sb.layout(VStack(gap=0.28, children=[formula, framing, spaces, conclusion]))
-    sb.notes(
-        _speaker_notes(
-            "Present the survey's formalization F: O -> G and stress that G is an incident propagation graph, not merely a ranked root-cause label.",
-            "Transition by using that north star to diagnose why existing benchmarks create a misleading sense of progress.",
+    sb.layout(
+        VStack(
+            gap=0.28,
+            children=[HStack(gap=0.40, children=[simple_baseline, sota]), verdict],
         )
     )
-    sb.animate([[formula], [framing, spaces], [conclusion]])
+    sb.notes(
+        _speaker_notes(
+            "Use the dataset study's headline result: simple heuristics are surprisingly competitive with SOTA on public benchmarks.",
+            "This exposes a fundamental problem: current benchmarks measure point accuracy, not graph-building ability.",
+            "Transition by asking what structural defects make those benchmarks so forgiving.",
+        )
+    )
+    sb.animate([[simple_baseline], [sota], [verdict]])
     return sb
 
 
@@ -718,52 +736,6 @@ def _build_slide_9(prs: Presentation):
 def _build_slide_10(prs: Presentation):
     sb = prs.slide(title=SLIDE_TITLES[9], reference="FSE RCA benchmark study")
 
-    banner = Badge(text="Public benchmarks are oversimplified", color="negative")
-    defect_one = Callout(
-        title="Fault injection strategies",
-        body="Too few faults, too localized, and too easy to detect through direct symptom prominence.",
-        color="negative",
-    )
-    defect_two = Callout(
-        title="Call graph structures",
-        body="Shallow request paths and limited service coverage shrink the search space.",
-        color="warning",
-    )
-    defect_three = Callout(
-        title="Telemetry signal patterns",
-        body="Signals are clean and obvious instead of partial, noisy, and operationally messy.",
-        color="secondary",
-    )
-    conclusion = TextBlock(
-        text="When fault symptoms are obvious and structure is shallow, correlation can masquerade as causality.",
-        font_size="body",
-        color="text_mid",
-        italic=True,
-    )
-
-    sb.layout(
-        VStack(
-            gap=0.26,
-            children=[
-                banner,
-                Grid(cols=3, gap=0.20, children=[defect_one, defect_two, defect_three]),
-                conclusion,
-            ],
-        )
-    )
-    sb.notes(
-        _speaker_notes(
-            "Summarize the three defects from the benchmark study: fault injection, dependency structure, and telemetry patterns.",
-            "Transition by showing the concrete benchmark pipeline built to fix these weaknesses.",
-        )
-    )
-    sb.animate([[banner, defect_one], [defect_two], [defect_three, conclusion]])
-    return sb
-
-
-def _build_slide_11(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[10], reference="FSE RCA benchmark study")
-
     pipeline = Flowchart(
         nodes={
             "inject": ("9,152 injections", "accent"),
@@ -807,73 +779,94 @@ def _build_slide_11(prs: Presentation):
     return sb
 
 
-def _build_slide_12(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[11], reference="OpenRCA 2.0 / FORGE")
+def _build_slide_11(prs: Presentation):
+    sb = prs.slide(title=SLIDE_TITLES[10], reference="OpenRCA 2.0 / FORGE")
 
     outcome = VStack(
-        gap=0.18,
-        width=5.45,
+        gap=0.12,
+        width=4.8,
         children=[
             Badge(text="Outcome correctness", color="secondary"),
-            stat_card("Pass@1", "0.76", tone="secondary"),
-            Callout(
-                title="What it means",
-                body="The best model often names the right root cause when judged only by the final answer.",
+            TextBlock(
+                text="0.76",
+                font_size=36,
                 color="secondary",
+                bold=True,
+                align="center",
+            ),
+            TextBlock(
+                text="Pass@1",
+                font_size="caption",
+                color="text_mid",
+                align="center",
+            ),
+            TextBlock(
+                text="Right answer, but not necessarily right reasoning.",
+                font_size="caption",
+                color="text",
+                align="center",
             ),
         ],
     )
     process = VStack(
-        gap=0.18,
-        width=5.45,
+        gap=0.12,
+        width=4.8,
         children=[
             Badge(text="Process correctness", color="warning"),
-            stat_card("Path Reachability", "0.63", tone="warning"),
-            Callout(
-                title="What it means",
-                body="A sizable slice of those correct answers still cannot trace a valid path from cause to symptom.",
+            TextBlock(
+                text="0.63",
+                font_size=36,
                 color="warning",
+                bold=True,
+                align="center",
+            ),
+            TextBlock(
+                text="Path Reachability",
+                font_size="caption",
+                color="text_mid",
+                align="center",
+            ),
+            TextBlock(
+                text="Valid causal path from root cause to symptom.",
+                font_size="caption",
+                color="text",
+                align="center",
             ),
         ],
     )
     gap = Callout(
-        title="Process-level reasoning gap",
-        body="0.76 Pass@1 versus 0.63 Path Reachability exposes the core failure mode: correct outcome, broken process.",
+        title="The gap: 13% of correct answers have broken reasoning",
+        body="Outcome correctness flatters the agent. Process correctness tells us whether the diagnosis can be trusted.",
         color="negative",
-    )
-    conclusion = TextBlock(
-        text="Outcome correctness flatters the agent. Process correctness tells us whether the diagnosis can be trusted.",
-        font_size="body",
-        color="text_mid",
-        italic=True,
     )
 
     sb.layout(
         VStack(
-            gap=0.28,
-            children=[HStack(gap=0.40, children=[outcome, process]), gap, conclusion],
+            gap=0.32,
+            children=[HStack(gap=0.60, children=[outcome, process]), gap],
         )
     )
     sb.notes(
         _speaker_notes(
             "Use this slide to separate outcome correctness from process correctness with the 0.76 versus 0.63 comparison.",
+            "The key insight: 13% of answers are 'lucky guesses' with invalid reasoning paths.",
             "Transition by asking how to turn an ill-posed backward RCA task into something verifiable enough to supervise.",
         )
     )
-    sb.animate([[outcome], [process], [gap, conclusion]])
+    sb.animate([[outcome], [process], [gap]])
     return sb
 
 
-def _build_slide_13(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[12], reference="OpenRCA 2.0 / FORGE")
+def _build_slide_12(prs: Presentation):
+    sb = prs.slide(title=SLIDE_TITLES[11], reference="OpenRCA 2.0 / FORGE")
 
     backward = VStack(
         gap=0.18,
-        width=5.35,
+        width=5.0,
         children=[
             Badge(text="Backward diagnosis", color="negative"),
             Flow(
-                labels=["Symptoms", "Unknown cause", "Ill-posed search"],
+                labels=["Symptoms", "Unknown cause", "Ill-posed"],
                 colors=["bg_alt", "negative", "bg_alt"],
                 arrow_color="text_light",
             ),
@@ -886,11 +879,11 @@ def _build_slide_13(prs: Presentation):
     )
     forward = VStack(
         gap=0.18,
-        width=5.35,
+        width=5.0,
         children=[
             Badge(text="Forward verification", color="positive"),
             Flow(
-                labels=["Known intervention", "Expected signatures", "Verified path"],
+                labels=["Known intervention", "Expected signatures", "Verified"],
                 colors=["accent", "secondary", "positive"],
                 arrow_color="text_light",
             ),
@@ -924,8 +917,8 @@ def _build_slide_13(prs: Presentation):
     return sb
 
 
-def _build_slide_14(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[13], reference="OpenRCA 2.0 / FORGE")
+def _build_slide_13(prs: Presentation):
+    sb = prs.slide(title=SLIDE_TITLES[12], reference="OpenRCA 2.0 / FORGE")
 
     summary = HStack(
         gap=0.28,
@@ -968,10 +961,14 @@ def _build_slide_14(prs: Presentation):
     return sb
 
 
-def _build_slide_15(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[14], reference="TRIANGLE paper")
+def _build_slide_14(prs: Presentation):
+    sb = prs.slide(title=SLIDE_TITLES[13], reference="TRIANGLE paper / Incident triage")
 
-    adjacent_badge = Badge(text="Adjacent evidence", color="accent")
+    context = Callout(
+        title="From diagnosis to triage",
+        body="FORGE shows process supervision works for RCA. TRIANGLE validates structured reasoning in incident triage—the upstream step in incident management.",
+        color="secondary",
+    )
     framework = Flowchart(
         nodes={
             "analyzer": ("Analyzer Agent", "secondary"),
@@ -986,27 +983,7 @@ def _build_slide_15(prs: Presentation):
             ("decider", "assignment"),
         ],
         direction="right",
-        height=1.10,
-    )
-    roles = HStack(
-        gap=0.24,
-        children=[
-            Callout(
-                title="Analyzer Agent",
-                body="Semantically distills noisy incident text into the core location, symptom, and capability signals.",
-                color="secondary",
-            ),
-            Callout(
-                title="Decider Agent",
-                body="Ranks candidate teams and orchestrates the negotiation over who should own the incident.",
-                color="accent",
-            ),
-            Callout(
-                title="Team Manager Agent",
-                body="Contributes team-specific knowledge, retrieves context, and votes during collaboration.",
-                color="positive",
-            ),
-        ],
+        height=1.00,
     )
     outcomes = HStack(
         gap=0.32,
@@ -1014,83 +991,114 @@ def _build_slide_15(prs: Presentation):
             stat_card("Triage accuracy", "97%", tone="positive"),
             stat_card("TTE reduction", "91%", tone="accent"),
             Callout(
-                title="Lesson",
-                body="Role separation plus negotiation can outperform one monolithic prompt on high-stakes routing.",
+                title="Production validated",
+                body="Deployed at Microsoft, serving tens of millions of users. Structured multi-agent reasoning outperforms monolithic approaches.",
                 color="primary",
                 height=1.34,
             ),
         ],
     )
 
-    sb.layout(VStack(gap=0.24, children=[adjacent_badge, framework, roles, outcomes]))
+    sb.layout(VStack(gap=0.24, children=[context, framework, outcomes]))
     sb.notes(
         _speaker_notes(
-            "Frame TRIANGLE as adjacent evidence rather than the main RCA contribution: structured role separation already works in a neighboring reliability task.",
-            "Transition by saying the next step is to turn that structured reliability reasoning into a reusable diagnostic world model.",
+            "Connect FORGE's process supervision to TRIANGLE's structured reasoning in a related task.",
+            "Both show that explicit reasoning structures beat black-box approaches in real operational settings.",
+            "Transition: if structured reasoning works for triage and RCA evaluation, can we train agents to build reusable world models?",
         )
     )
-    sb.animate([[adjacent_badge, framework], [roles], [outcomes]])
+    sb.animate([[context], [framework], [outcomes]])
     return sb
 
 
-def _build_slide_16(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[15])
+def _build_slide_15(prs: Presentation):
+    sb = prs.slide(title=SLIDE_TITLES[14])
 
-    badge = Badge(text="Roadmap part 1", color="accent")
+    bridge = Callout(
+        title="From evaluation to training",
+        body="OpenRCA 2.0 gives us process supervision for evaluation. But where does the training data come from? Manual annotation is too expensive.",
+        color="secondary",
+    )
     loop = Flow(
         labels=["Simulation", "Hypothesis", "Verify", "Reward"],
         colors=["accent", "secondary", "positive", "warning"],
         arrow_color="text_light",
     )
     training = Callout(
-        title="Train on closed loops",
-        body="Start with interventions and telemetry so the agent repeatedly proposes a hypothesis, checks it, and gets feedback on the full loop.",
+        title="Stage 1: Train on closed loops",
+        body="Use fault injection to generate unlimited training cases. The agent proposes hypotheses, verifies against ground truth, and learns from the full loop—not just answer labels.",
         color="primary",
     )
-    takeaway = TextBlock(
-        text="The first milestone is an agent that learns from repeated simulation to verification cycles, not from answer labels alone.",
-        font_size="body",
-        color="text_mid",
-        italic=True,
-    )
 
-    sb.layout(VStack(gap=0.32, children=[badge, loop, training, takeaway]))
+    sb.layout(VStack(gap=0.28, children=[bridge, loop, training]))
     sb.notes(
         _speaker_notes(
-            "Build on the adjacent evidence from TRIANGLE and move into the main roadmap: stage one is training an agent inside a simulation-hypothesis-verify-reward loop.",
-            "Transition by asking what remains after we collect many successful traces from that loop.",
+            "Bridge from OpenRCA 2.0's evaluation to the training challenge: we need automated training data generation.",
+            "The solution is closed-loop training with fault injection simulation—leveraging the same verification mechanism as FORGE.",
+            "Transition: after collecting many successful traces, what can we do with them?",
         )
     )
-    sb.animate([[badge, loop], [training], [takeaway]])
+    sb.animate([[bridge], [loop], [training]])
+    return sb
+
+
+def _build_slide_16(prs: Presentation):
+    sb = prs.slide(title=SLIDE_TITLES[15])
+
+    bridge = Callout(
+        title="From evaluation to training",
+        body="OpenRCA 2.0 gives us process supervision for evaluation. But where does the training data come from? Manual annotation is too expensive.",
+        color="secondary",
+    )
+    loop = Flow(
+        labels=["Simulation", "Hypothesis", "Verify", "Reward"],
+        colors=["accent", "secondary", "positive", "warning"],
+        arrow_color="text_light",
+    )
+    training = Callout(
+        title="Stage 1: Train on closed loops",
+        body="Use fault injection to generate unlimited training cases. The agent proposes hypotheses, verifies against ground truth, and learns from the full loop—not just answer labels.",
+        color="primary",
+    )
+
+    sb.layout(VStack(gap=0.28, children=[bridge, loop, training]))
+    sb.notes(
+        _speaker_notes(
+            "Bridge from OpenRCA 2.0's evaluation to the training challenge: we need automated training data generation.",
+            "The solution is closed-loop training with fault injection simulation—leveraging the same verification mechanism as FORGE.",
+            "Transition: after collecting many successful traces, what can we do with them?",
+        )
+    )
+    sb.animate([[bridge], [loop], [training]])
     return sb
 
 
 def _build_slide_17(prs: Presentation):
     sb = prs.slide(title=SLIDE_TITLES[16])
 
+    compression = Flow(
+        labels=["Many traces", "Distill", "World model"],
+        colors=["secondary", "accent", "primary"],
+        arrow_color="text_light",
+    )
     sources = VStack(
         gap=0.14,
         width=3.4,
         children=[
-            Badge(text="Many traces", color="secondary"),
-            RoundedBox(text="Incident trace A", color="bg_alt", height=0.60),
-            RoundedBox(text="Incident trace B", color="bg_alt", height=0.60),
-            RoundedBox(text="Incident trace C", color="bg_alt", height=0.60),
+            Badge(text="Training traces", color="secondary"),
+            RoundedBox(text="Trace A: CPU → Latency", color="bg_alt", height=0.60),
+            RoundedBox(text="Trace B: Memory → OOM", color="bg_alt", height=0.60),
+            RoundedBox(text="Trace C: Network → Timeout", color="bg_alt", height=0.60),
         ],
-    )
-    compression = Flow(
-        labels=["Many traces", "Compress", "world model"],
-        colors=["secondary", "accent", "primary"],
-        arrow_color="text_light",
     )
     model = VStack(
         gap=0.16,
         width=4.2,
         children=[
-            Badge(text="Reusable core", color="primary"),
+            Badge(text="Stage 2: Reusable world model", color="primary"),
             Circle(text="world\nmodel", color="primary", width=2.15, height=2.15),
             TextBlock(
-                text="A compact causal representation that preserves propagation structure while dropping repetitive incident detail.",
+                text="Compress many traces into a compact causal representation. Preserve propagation structure, drop incident-specific noise.",
                 font_size="body",
                 color="text",
             ),
@@ -1105,8 +1113,9 @@ def _build_slide_17(prs: Presentation):
     )
     sb.notes(
         _speaker_notes(
-            "Stage two is compression: distill many traces into one reusable world model without losing the causal structure we care about.",
-            "Transition by showing that once the world model exists, the same core should branch into multiple operational tasks.",
+            "Stage two is distillation: compress many training traces into one reusable world model.",
+            "The key challenge: preserve causal structure while generalizing across different incidents.",
+            "Transition: once we have the world model, how do we maximize its value?",
         )
     )
     sb.animate([[compression], [sources], [model]])
@@ -1116,6 +1125,11 @@ def _build_slide_17(prs: Presentation):
 def _build_slide_18(prs: Presentation):
     sb = prs.slide(title=SLIDE_TITLES[17])
 
+    leverage = Callout(
+        title="Stage 3: Maximize leverage",
+        body="Build the world model once, then apply it across the entire incident management lifecycle.",
+        color="primary",
+    )
     framework = Flowchart(
         nodes={
             "model": ("World model", "primary"),
@@ -1131,26 +1145,22 @@ def _build_slide_18(prs: Presentation):
         direction="right",
         height=1.10,
     )
-    bridge = Callout(
-        title="One reasoning core, many tasks",
-        body="The end state is a universal expert that reuses the same causal world model for localization, forecasting, and actionable support.",
-        color="primary",
-    )
     conclusion = TextBlock(
-        text="The value of the world model is leverage: one internal representation fans out to multiple reliability workflows.",
+        text="The world model's value is reuse: one causal representation supports diagnosis, prediction, and repair across different operational contexts.",
         font_size="body",
         color="text_mid",
         italic=True,
     )
 
-    sb.layout(VStack(gap=0.32, children=[framework, bridge, conclusion]))
+    sb.layout(VStack(gap=0.28, children=[leverage, framework, conclusion]))
     sb.notes(
         _speaker_notes(
-            "Stage three is where the roadmap cashes out: one world model should support root-cause localization, fault prediction, and repair suggestion.",
-            "Transition by summarizing the research philosophy that connects these stages.",
+            "Stage three is about leverage: the same world model enables multiple downstream tasks.",
+            "This is the payoff of the three-stage roadmap: simulate, compress, then generalize.",
+            "Transition to summarizing the research philosophy.",
         )
     )
-    sb.animate([[framework], [bridge], [conclusion]])
+    sb.animate([[leverage], [framework], [conclusion]])
     return sb
 
 
