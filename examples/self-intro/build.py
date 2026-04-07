@@ -11,7 +11,9 @@ from paperops.slides import (
     Grid,
     HStack,
     Padding,
-    Presentation as BasePresentation,
+)
+from paperops.slides import Presentation as BasePresentation
+from paperops.slides import (
     RoundedBox,
     SvgImage,
     TextBlock,
@@ -20,19 +22,18 @@ from paperops.slides import (
 )
 
 
-
 def icon_agent(theme, size=80):
     """Agent icon - AI/robot representation."""
     primary = theme.resolve_color("primary") if theme else "#5C82AD"
     white = "#FFFFFF"
-    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    return f"""<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <rect x="25" y="30" width="50" height="45" rx="8" fill="{primary}"/>
         <line x1="50" y1="30" x2="50" y2="15" stroke="{primary}" stroke-width="3"/>
         <circle cx="50" cy="12" r="4" fill="{primary}"/>
         <rect x="35" y="45" width="12" height="10" rx="2" fill="{white}"/>
         <rect x="53" y="45" width="12" height="10" rx="2" fill="{white}"/>
         <rect x="40" y="62" width="20" height="4" rx="2" fill="{white}"/>
-    </svg>'''
+    </svg>"""
 
 
 def icon_world_model(theme, size=80):
@@ -40,26 +41,26 @@ def icon_world_model(theme, size=80):
     primary = theme.resolve_color("primary") if theme else "#5C82AD"
     secondary = theme.resolve_color("secondary") if theme else "#8FAAC8"
     accent = theme.resolve_color("accent") if theme else "#D69A68"
-    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    return f"""<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <circle cx="50" cy="50" r="35" fill="none" stroke="{primary}" stroke-width="3"/>
         <ellipse cx="50" cy="50" rx="35" ry="15" fill="none" stroke="{secondary}" stroke-width="1.5"/>
         <ellipse cx="50" cy="50" rx="35" ry="25" fill="none" stroke="{secondary}" stroke-width="1.5"/>
         <ellipse cx="50" cy="50" rx="15" ry="35" fill="none" stroke="{secondary}" stroke-width="1.5"/>
         <ellipse cx="50" cy="50" rx="25" ry="35" fill="none" stroke="{secondary}" stroke-width="1.5"/>
         <circle cx="50" cy="50" r="8" fill="{accent}"/>
-    </svg>'''
+    </svg>"""
 
 
 def icon_database(theme, size=80):
     """Database icon - Cylinder representation."""
     primary = theme.resolve_color("primary") if theme else "#5C82AD"
     secondary = theme.resolve_color("secondary") if theme else "#8FAAC8"
-    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    return f"""<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <path d="M20 35 L20 70 Q20 80 50 80 Q80 80 80 70 L80 35" fill="{primary}" opacity="0.8"/>
         <ellipse cx="50" cy="35" rx="30" ry="10" fill="{primary}"/>
         <path d="M25 50 Q50 55 75 50" stroke="{secondary}" stroke-width="2" fill="none"/>
         <path d="M25 62 Q50 67 75 62" stroke="{secondary}" stroke-width="2" fill="none"/>
-    </svg>'''
+    </svg>"""
 
 
 def icon_process_flow(theme, size=80):
@@ -67,13 +68,13 @@ def icon_process_flow(theme, size=80):
     secondary = theme.resolve_color("secondary") if theme else "#8FAAC8"
     accent = theme.resolve_color("accent") if theme else "#D69A68"
     positive = theme.resolve_color("positive") if theme else "#7FA195"
-    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    return f"""<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <line x1="20" y1="50" x2="80" y2="50" stroke="#D8E0EA" stroke-width="4"/>
         <circle cx="20" cy="50" r="12" fill="{secondary}"/>
         <circle cx="50" cy="50" r="12" fill="{accent}"/>
         <circle cx="80" cy="50" r="12" fill="{positive}"/>
         <polygon points="72,45 82,50 72,55" fill="#D8E0EA"/>
-    </svg>'''
+    </svg>"""
 
 
 def icon_analysis(theme, size=80):
@@ -82,12 +83,12 @@ def icon_analysis(theme, size=80):
     secondary = theme.resolve_color("secondary") if theme else "#8FAAC8"
     accent = theme.resolve_color("accent") if theme else "#D69A68"
     positive = theme.resolve_color("positive") if theme else "#7FA195"
-    return f'''<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    return f"""<svg width="{size}" height="{size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <rect x="15" y="60" width="15" height="30" rx="2" fill="{primary}"/>
         <rect x="35" y="45" width="15" height="45" rx="2" fill="{secondary}"/>
         <rect x="55" y="30" width="15" height="60" rx="2" fill="{accent}"/>
         <rect x="75" y="50" width="15" height="40" rx="2" fill="{positive}"/>
-    </svg>'''
+    </svg>"""
 
 
 def make_theme():
@@ -134,10 +135,10 @@ SLIDE_TITLES = [
     "Premise 2: Simulatable",
     "Premise 3: Verifiable",
     "From Point-Finding to Graph-Building",
-    "The Effectiveness-Data-Cost Trade-off",
     "The Benchmark Crisis",
     "Why Existing Benchmarks Fail",
     "Our Solution: A Harder Benchmark",
+    "The Effectiveness-Data-Cost Trade-off",
     "The Process Gap",
     "FORGE: Forward Verification",
     "OpenRCA 2.0",
@@ -145,7 +146,6 @@ SLIDE_TITLES = [
     "Stage 1: Train on Closed Loops",
     "Stage 2: Distill World Model",
     "Stage 3: Maximize Leverage",
-    "Research Philosophy: Simulate, Compress, Generalize",
     "Three Takeaways",
 ]
 IMPLEMENTED_SLIDE_COUNT = len(SLIDE_TITLES)
@@ -279,7 +279,7 @@ def _build_slide_2(prs: Presentation):
         ],
     )
     left_flow = Flow(
-        labels=["Telemetry", "LLM guess", "Root cause label"],
+        labels=["Data", "LLM guess", "Label"],
         colors=["bg_alt", "negative", "bg_alt"],
         arrow_color="text_light",
     )
@@ -290,7 +290,7 @@ def _build_slide_2(prs: Presentation):
     )
     left_col = VStack(
         gap=0.15,
-        width=5.0,
+        width=4.8,
         children=[left_badge, left_icons, left_flow, left_callout],
     )
 
@@ -299,12 +299,14 @@ def _build_slide_2(prs: Presentation):
         gap=0.15,
         children=[
             SvgImage(svg=icon_database(prs._theme, size=40), width=0.35, height=0.35),
-            SvgImage(svg=icon_world_model(prs._theme, size=40), width=0.35, height=0.35),
+            SvgImage(
+                svg=icon_world_model(prs._theme, size=40), width=0.35, height=0.35
+            ),
         ],
     )
     right_flow = Flow(
-        labels=["Telemetry", "Hypothesis", "Verify", "Graph"],
-        colors=["bg_alt", "secondary", "accent", "positive"],
+        labels=["Data", "Verify", "Graph"],
+        colors=["bg_alt", "accent", "positive"],
         arrow_color="text_light",
     )
     right_callout = Callout(
@@ -314,7 +316,7 @@ def _build_slide_2(prs: Presentation):
     )
     right_col = VStack(
         gap=0.15,
-        width=5.0,
+        width=4.8,
         children=[right_badge, right_icons, right_flow, right_callout],
     )
 
@@ -342,11 +344,11 @@ def _build_slide_2(prs: Presentation):
 
 
 def _build_slide_3(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[2], reference="OpenRCA 2.0 / FORGE / GDB")
+    sb = prs.slide(title=SLIDE_TITLES[2], reference="OpenRCA 2.0 / FORGE")
 
     premise = Callout(
         title="Fault detection precedes diagnosis",
-        body="Before RCA can begin, we need to know a fault exists. Our work on GDB testing shows systematic fault injection via equivalent query rewriting.",
+        body="Before RCA can begin, we need to know a fault exists. OpenRCA and FORGE show that a bounded set of atomic faults can be systematically injected and observed.",
         color="secondary",
     )
     structure = Flow(
@@ -377,7 +379,7 @@ def _build_slide_3(prs: Presentation):
     sb.notes(
         _speaker_notes(
             "State the first premise: the intervention space is broad but still bounded enough to model.",
-            "Briefly mention GDB work on equivalent query rewriting as an example of systematic fault detection.",
+            "OpenRCA and FORGE demonstrate this with 25 fault types across 6 categories.",
             "Transition by noting that bounded atomic faults only help if we can replay them inside a system.",
         )
     )
@@ -483,7 +485,7 @@ def _build_slide_6(prs: Presentation):
         children=[
             Badge(text="Point-finding paradigm", color="negative"),
             Flow(
-                labels=["Telemetry", "Inference", "Root cause node"],
+                labels=["Telemetry", "Inference", "Root cause"],
                 colors=["bg_alt", "negative", "bg_alt"],
                 arrow_color="text_light",
             ),
@@ -506,7 +508,7 @@ def _build_slide_6(prs: Presentation):
         children=[
             Badge(text="Graph-building paradigm", color="positive"),
             Flow(
-                labels=["Telemetry", "Inference", "Propagation graph"],
+                labels=["Telemetry", "Inference", "Causal graph"],
                 colors=["bg_alt", "accent", "positive"],
                 arrow_color="text_light",
             ),
@@ -546,7 +548,7 @@ def _build_slide_6(prs: Presentation):
 
 
 def _build_slide_7(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[6], reference="Goal-driven RCA survey")
+    sb = prs.slide(title=SLIDE_TITLES[9], reference="Goal-driven RCA survey")
 
     effectiveness_circle = Circle(
         text="Effectiveness", color="primary", width=1.85, height=1.85
@@ -615,7 +617,7 @@ def _build_slide_7(prs: Presentation):
 
 
 def _build_slide_8(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[7], reference="FSE RCA benchmark study")
+    sb = prs.slide(title=SLIDE_TITLES[6], reference="FSE RCA benchmark study")
 
     simple_baseline = VStack(
         gap=0.16,
@@ -675,66 +677,59 @@ def _build_slide_8(prs: Presentation):
 
 
 def _build_slide_9(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[8], reference="FSE RCA benchmark study")
+    sb = prs.slide(title=SLIDE_TITLES[7], reference="FSE RCA benchmark study")
 
-    simple_baseline = VStack(
-        gap=0.16,
-        width=5.5,
+    header = TextBlock(
+        text="Three structural defects make public benchmarks too forgiving:",
+        font_size="body",
+        color="text",
+    )
+    defects = Grid(
+        cols=3,
+        gap=0.20,
         children=[
-            Badge(text="Simple baseline", color="accent"),
-            RoundedBox(
-                text="Alerts + thresholds\nrule-based ranking",
-                color="bg_alt",
-                height=1.10,
+            Callout(
+                title="Shallow ground truth",
+                body="Labels only reach service level. No code-level or propagation-level annotation.",
+                color="negative",
             ),
-            TextBlock(
-                text="Can match or beat sophisticated models on several public RCA benchmarks.",
-                font_size="body",
-                color="text",
+            Callout(
+                title="Static workloads",
+                body="Fixed request patterns hide concurrency and load-dependent fault propagation.",
+                color="negative",
+            ),
+            Callout(
+                title="Point-only metrics",
+                body="Top@K accuracy rewards lucky guesses. No evaluation of causal paths.",
+                color="negative",
             ),
         ],
     )
-    sota = VStack(
-        gap=0.16,
-        width=5.5,
-        children=[
-            Badge(text="Published SOTA", color="primary"),
-            RoundedBox(
-                text="Graph models\nmulti-modal reasoning\ncausal inference",
-                color="bg_alt",
-                height=1.28,
-            ),
-            TextBlock(
-                text="Looks strong on paper, but the benchmark may be testing easy correlations instead of hard causality.",
-                font_size="body",
-                color="text",
-            ),
-        ],
+    consequence = Callout(
+        title="Consequence",
+        body="Simple heuristics exploit these shortcuts. Reported SOTA progress is inflated by benchmark design, not real diagnostic capability.",
+        color="warning",
     )
-    verdict = Callout(
-        title="Benchmark crisis",
-        body="If a simple baseline rivals SOTA, the benchmark is oversimplifying real RCA difficulty.",
-        color="negative",
+    bridge = TextBlock(
+        text="A harder benchmark must fix all three: deeper labels, dynamic workloads, and propagation-aware evaluation.",
+        font_size="body",
+        color="text_mid",
+        italic=True,
     )
 
-    sb.layout(
-        VStack(
-            gap=0.28,
-            children=[HStack(gap=0.40, children=[simple_baseline, sota]), verdict],
-        )
-    )
+    sb.layout(VStack(gap=0.24, children=[header, defects, consequence, bridge]))
     sb.notes(
         _speaker_notes(
-            "Use the dataset study's headline result: simple heuristics are surprisingly competitive with SOTA on public benchmarks.",
-            "Transition by asking what structural defects make those benchmarks so forgiving.",
+            "Drill into the three structural defects behind the benchmark crisis: shallow labels, static workloads, and point-only metrics.",
+            "Transition by previewing what a harder benchmark looks like.",
         )
     )
-    sb.animate([[simple_baseline], [sota], [verdict]])
+    sb.animate([[header], [defects], [consequence, bridge]])
     return sb
 
 
 def _build_slide_10(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[9], reference="FSE RCA benchmark study")
+    sb = prs.slide(title=SLIDE_TITLES[8], reference="FSE RCA benchmark study")
 
     pipeline = Flowchart(
         nodes={
@@ -862,11 +857,11 @@ def _build_slide_12(prs: Presentation):
 
     backward = VStack(
         gap=0.18,
-        width=5.0,
+        width=4.8,
         children=[
             Badge(text="Backward diagnosis", color="negative"),
             Flow(
-                labels=["Symptoms", "Unknown cause", "Ill-posed"],
+                labels=["Symptoms", "??? ", "Ill-posed"],
                 colors=["bg_alt", "negative", "bg_alt"],
                 arrow_color="text_light",
             ),
@@ -879,17 +874,17 @@ def _build_slide_12(prs: Presentation):
     )
     forward = VStack(
         gap=0.18,
-        width=5.0,
+        width=4.8,
         children=[
             Badge(text="Forward verification", color="positive"),
             Flow(
-                labels=["Known intervention", "Expected signatures", "Verified"],
+                labels=["Known fault", "Propagate", "Verified"],
                 colors=["accent", "secondary", "positive"],
                 arrow_color="text_light",
             ),
             Callout(
                 title="Why FORGE works",
-                body="Knowing the intervention turns diagnosis into a well-posed verification task from cause to effect.",
+                body="Known intervention makes verification tractable: trace cause to effect.",
                 color="positive",
             ),
         ],
@@ -904,7 +899,7 @@ def _build_slide_12(prs: Presentation):
     sb.layout(
         VStack(
             gap=0.28,
-            children=[HStack(gap=0.40, children=[backward, forward]), asymmetry],
+            children=[HStack(gap=0.50, children=[backward, forward]), asymmetry],
         )
     )
     sb.notes(
@@ -966,7 +961,7 @@ def _build_slide_14(prs: Presentation):
 
     context = Callout(
         title="From diagnosis to triage",
-        body="FORGE shows process supervision works for RCA. TRIANGLE validates structured reasoning in incident triage—the upstream step in incident management.",
+        body="RCA diagnosis is one step in the incident lifecycle. TRIANGLE tackles the upstream step—triage—and shows that structured multi-agent reasoning outperforms monolithic approaches in production.",
         color="secondary",
     )
     framework = Flowchart(
@@ -985,25 +980,28 @@ def _build_slide_14(prs: Presentation):
         direction="right",
         height=1.00,
     )
-    outcomes = HStack(
-        gap=0.32,
+    stats = HStack(
+        gap=0.40,
         children=[
             stat_card("Triage accuracy", "97%", tone="positive"),
             stat_card("TTE reduction", "91%", tone="accent"),
-            Callout(
-                title="Production validated",
-                body="Deployed at Microsoft, serving tens of millions of users. Structured multi-agent reasoning outperforms monolithic approaches.",
-                color="primary",
-                height=1.34,
-            ),
         ],
+    )
+    production = Callout(
+        title="Production validated",
+        body="Deployed at Microsoft, serving tens of millions of users.",
+        color="primary",
+    )
+    outcomes = HStack(
+        gap=0.32,
+        children=[stats, production],
     )
 
     sb.layout(VStack(gap=0.24, children=[context, framework, outcomes]))
     sb.notes(
         _speaker_notes(
-            "Connect FORGE's process supervision to TRIANGLE's structured reasoning in a related task.",
-            "Both show that explicit reasoning structures beat black-box approaches in real operational settings.",
+            "Position TRIANGLE as independent validation of the same research belief: explicit reasoning structures beat black-box approaches.",
+            "The key evidence is production deployment at scale—structured multi-agent triage works in practice.",
             "Transition: if structured reasoning works for triage and RCA evaluation, can we train agents to build reusable world models?",
         )
     )
@@ -1044,37 +1042,6 @@ def _build_slide_15(prs: Presentation):
 
 def _build_slide_16(prs: Presentation):
     sb = prs.slide(title=SLIDE_TITLES[15])
-
-    bridge = Callout(
-        title="From evaluation to training",
-        body="OpenRCA 2.0 gives us process supervision for evaluation. But where does the training data come from? Manual annotation is too expensive.",
-        color="secondary",
-    )
-    loop = Flow(
-        labels=["Simulation", "Hypothesis", "Verify", "Reward"],
-        colors=["accent", "secondary", "positive", "warning"],
-        arrow_color="text_light",
-    )
-    training = Callout(
-        title="Stage 1: Train on closed loops",
-        body="Use fault injection to generate unlimited training cases. The agent proposes hypotheses, verifies against ground truth, and learns from the full loop—not just answer labels.",
-        color="primary",
-    )
-
-    sb.layout(VStack(gap=0.28, children=[bridge, loop, training]))
-    sb.notes(
-        _speaker_notes(
-            "Bridge from OpenRCA 2.0's evaluation to the training challenge: we need automated training data generation.",
-            "The solution is closed-loop training with fault injection simulation—leveraging the same verification mechanism as FORGE.",
-            "Transition: after collecting many successful traces, what can we do with them?",
-        )
-    )
-    sb.animate([[bridge], [loop], [training]])
-    return sb
-
-
-def _build_slide_17(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[16])
 
     compression = Flow(
         labels=["Many traces", "Distill", "World model"],
@@ -1122,8 +1089,8 @@ def _build_slide_17(prs: Presentation):
     return sb
 
 
-def _build_slide_18(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[17])
+def _build_slide_17(prs: Presentation):
+    sb = prs.slide(title=SLIDE_TITLES[16])
 
     leverage = Callout(
         title="Stage 3: Maximize leverage",
@@ -1157,57 +1124,14 @@ def _build_slide_18(prs: Presentation):
         _speaker_notes(
             "Stage three is about leverage: the same world model enables multiple downstream tasks.",
             "This is the payoff of the three-stage roadmap: simulate, compress, then generalize.",
-            "Transition to summarizing the research philosophy.",
+            "Transition to the closing takeaways.",
         )
     )
     sb.animate([[leverage], [framework], [conclusion]])
     return sb
 
 
-def _build_slide_19(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[18])
-
-    header = Badge(text="Three research capabilities", color="primary")
-    pillars = Grid(
-        cols=3,
-        gap=0.20,
-        children=[
-            Callout(
-                title="Simulate",
-                body="Create controllable failures so the agent can learn from interventions and propagation, not only historical anecdotes.",
-                color="secondary",
-            ),
-            Callout(
-                title="Compress",
-                body="Turn many incident traces into a compact world model that remains inspectable and reusable.",
-                color="accent",
-            ),
-            Callout(
-                title="Generalize",
-                body="Reuse one reasoning core across triage, diagnosis, prediction, and repair support.",
-                color="positive",
-            ),
-        ],
-    )
-    philosophy = TextBlock(
-        text="My philosophy is to build diagnostic systems that can simulate reality, compress it into structure, and generalize that structure across tasks.",
-        font_size="body",
-        color="text_mid",
-        italic=True,
-    )
-
-    sb.layout(VStack(gap=0.30, children=[header, pillars, philosophy]))
-    sb.notes(
-        _speaker_notes(
-            "Condense the roadmap into three research capabilities: simulate, compress, and generalize.",
-            "Transition by turning those capabilities into the three closing takeaways for the audience.",
-        )
-    )
-    sb.animate([[header], [pillars], [philosophy]])
-    return sb
-
-
-def _build_slide_20(prs: Presentation):
+def _build_slide_18(prs: Presentation):
     sb = prs.slide(background="bg_accent")
 
     hero = VStack(
@@ -1268,10 +1192,10 @@ def build_presentation(output_path: Path | None = None, render_preview: bool = F
         _build_slide_4,
         _build_slide_5,
         _build_slide_6,
-        _build_slide_7,
         _build_slide_8,
         _build_slide_9,
         _build_slide_10,
+        _build_slide_7,
         _build_slide_11,
         _build_slide_12,
         _build_slide_13,
@@ -1280,8 +1204,6 @@ def build_presentation(output_path: Path | None = None, render_preview: bool = F
         _build_slide_16,
         _build_slide_17,
         _build_slide_18,
-        _build_slide_19,
-        _build_slide_20,
     )
     for builder in implemented_slide_builders[:IMPLEMENTED_SLIDE_COUNT]:
         builder(prs)
