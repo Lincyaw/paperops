@@ -529,12 +529,37 @@ workflow_visual = VStack(gap=0.15, children=[
     TextBlock(text="Pipeline design principle: traceable transitions across stages", font_size="small", color="text_mid"),
 ])
 
-sb.layout(VStack(gap=0.3, children=[
+framework_cards = Grid(cols=3, gap=0.25, children=[
+    VStack(gap=0.14, children=[
+        SvgImage(svg=svg_server(color="#8B4513"), width=0.6, height=0.6),
+        TextBlock(text="1. Realistic System Scope", font_size="body", bold=True, color="primary"),
+        TextBlock(text="50 services, 36 workloads, and 31 injected fault types prevent shortcut solutions.", font_size="caption", color="text_mid"),
+    ]),
+    VStack(gap=0.14, children=[
+        SvgImage(svg=svg_trace(color="#2E6B4F"), width=0.6, height=0.6),
+        TextBlock(text="2. Multi-Modal Evidence", font_size="body", bold=True, color="secondary"),
+        TextBlock(text="Metrics, logs, and traces are collected together so RCA methods must reconcile conflicting signals.", font_size="caption", color="text_mid"),
+    ]),
+    VStack(gap=0.14, children=[
+        SvgImage(svg=svg_warning(color="#4A6FA5"), width=0.6, height=0.6),
+        TextBlock(text="3. Impact-Driven Filtering", font_size="body", bold=True, color="accent"),
+        TextBlock(text="Only cases with observable SLI impact survive, making the benchmark operationally meaningful.", font_size="caption", color="text_mid"),
+    ]),
+])
+
+framework_takeaway = Callout(
+    title="Why the framework matters",
+    body="The benchmark is not just larger; it closes the loop from realistic faults to validated user-facing impact.",
+    color="primary",
+)
+
+sb.layout(VStack(gap=0.26, children=[
     Padding(child=pipeline, left=0.25, right=0.25),
-    Padding(child=workflow_visual, left=0.25, right=0.25),
+    Padding(child=framework_cards, left=0.25, right=0.25),
+    Padding(child=framework_takeaway, left=0.35, right=0.35),
 ]))
 
-sb.animate([[pipeline], [workflow_visual]])
+sb.animate([[pipeline], [framework_cards], [framework_takeaway]])
 sb.notes("Show the six-stage pipeline.")
 
 # ============================================================================
@@ -561,7 +586,7 @@ chart = BarChart(
 )
 
 # Key findings
-findings = VStack(gap=0.3, children=[
+findings = VStack(gap=0.18, children=[
     Callout(
         title="Performance Drop",
         body="Top@1: 0.75 → 0.21\nBest model: only 0.37",
@@ -571,15 +596,41 @@ findings = VStack(gap=0.3, children=[
         SvgImage(svg=svg_speed(), width=0.5, height=0.5),
         TextBlock(text="Execution time: seconds → hours", font_size="body"),
     ]),
-    Image(path=asset("operations-team.jpg"), width=4.3, height=2.1),
+    TextBlock(
+        text="Harder benchmark, slower inference.",
+        font_size="small",
+        color="text_mid",
+    ),
 ])
 
-sb.layout(HStack(gap=0.4, children=[
-    Padding(child=chart, left=0.2),
-    Padding(child=findings, right=0.2),
+reeval_stats = Grid(cols=2, gap=0.22, children=[
+    VStack(gap=0.1, children=[
+        RoundedBox(text="72%", color="negative", text_color="white", bold=True, width=1.2, height=0.45),
+        TextBlock(text="average Top@1 drop", font_size="caption"),
+    ]),
+    VStack(gap=0.1, children=[
+        RoundedBox(text="0.37", color="warning", text_color="white", bold=True, width=1.2, height=0.45),
+        TextBlock(text="best model on new benchmark", font_size="caption"),
+    ]),
+    VStack(gap=0.1, children=[
+        RoundedBox(text="hrs", color="primary", text_color="white", bold=True, width=1.2, height=0.45),
+        TextBlock(text="execution shifts from seconds", font_size="caption"),
+    ]),
+    VStack(gap=0.1, children=[
+        RoundedBox(text="0.28", color="accent", text_color="white", bold=True, width=1.2, height=0.45),
+        TextBlock(text="SimpleRCA still competitive", font_size="caption"),
+    ]),
+])
+
+sb.layout(HStack(gap=0.32, children=[
+    Padding(child=VStack(gap=0.16, width=7.05, children=[
+        TextBlock(text="Reported SOTA gains shrink sharply once the benchmark reflects realistic propagation.", font_size="caption", color="text_mid"),
+        chart,
+    ]), left=0.0, right=0.0, width=7.05),
+    VStack(gap=0.14, width=3.75, children=[findings, reeval_stats]),
 ]))
 
-sb.animate([[chart], [findings]])
+sb.animate([[chart], [findings], [reeval_stats]])
 sb.notes("Show the dramatic performance drop on new benchmark.")
 
 # ============================================================================
@@ -588,28 +639,38 @@ sb.notes("Show the dramatic performance drop on new benchmark.")
 
 sb = prs.slide(title="Three Critical Failure Patterns")
 
-patterns = VStack(gap=0.4, children=[
-    HStack(gap=0.3, children=[
-        VStack(gap=0.2, children=[
-            SvgImage(svg=svg_speed(), width=0.7, height=0.7),
-            TextBlock(text="1. Scalability (39.8%)", font_size="body", bold=True, color="negative"),
-            TextBlock(text="Linear time growth\n8min data → 10min process", font_size="caption", color="text_mid"),
+patterns = HStack(gap=0.26, children=[
+    VStack(gap=0.16, width=3.5, children=[
+        HStack(gap=0.18, children=[
+            SvgImage(svg=svg_speed(), width=0.65, height=0.65),
+            RoundedBox(text="39.8%", color="negative", text_color="white", bold=True, width=1.2, height=0.42),
         ]),
-        VStack(gap=0.2, children=[
-            SvgImage(svg=svg_eye(), width=0.7, height=0.7),
-            TextBlock(text="2. Blind Spots (47.4%)", font_size="body", bold=True, color="warning"),
-            TextBlock(text="Signal loss, unmonitored\ncomponents, contradictions", font_size="caption", color="text_mid"),
+        TextBlock(text="1. Scalability Breakdowns", font_size="body", bold=True, color="negative"),
+        TextBlock(text="Longer telemetry windows and larger graphs cause near-linear time growth.", font_size="caption", color="text_mid"),
+        TextBlock(text="Example: 8 min data -> 10 min processing", font_size="caption", color="text"),
+    ]),
+    VStack(gap=0.16, width=3.5, children=[
+        HStack(gap=0.18, children=[
+            SvgImage(svg=svg_eye(), width=0.65, height=0.65),
+            RoundedBox(text="47.4%", color="warning", text_color="white", bold=True, width=1.2, height=0.42),
         ]),
-        VStack(gap=0.2, children=[
-            SvgImage(svg=svg_puzzle(), width=0.7, height=0.7),
-            TextBlock(text="3. Modeling Bottlenecks", font_size="body", bold=True, color="accent"),
-            TextBlock(text="Core assumptions fail\nunder complex scenarios", font_size="caption", color="text_mid"),
+        TextBlock(text="2. Observability Blind Spots", font_size="body", bold=True, color="warning"),
+        TextBlock(text="RCA models miss weak or conflicting signals across unmonitored components.", font_size="caption", color="text_mid"),
+        TextBlock(text="Typical symptoms: signal loss, hidden hops, contradictory evidence", font_size="caption", color="text"),
+    ]),
+    VStack(gap=0.16, width=3.5, children=[
+        HStack(gap=0.18, children=[
+            SvgImage(svg=svg_puzzle(), width=0.65, height=0.65),
+            RoundedBox(text="conceptual", color="accent", text_color="white", bold=True, width=1.75, height=0.42),
         ]),
+        TextBlock(text="3. Modeling Bottlenecks", font_size="body", bold=True, color="accent"),
+        TextBlock(text="Built-in assumptions about locality and causality fail in dense propagation scenarios.", font_size="caption", color="text_mid"),
+        TextBlock(text="The failure is conceptual, not only numerical", font_size="caption", color="text"),
     ]),
 ])
 
 warning_visual = HStack(gap=0.25, children=[
-    Image(path=asset("wm-warning-icon.png"), width=1.1, height=1.1),
+    SvgImage(svg=svg_warning(color="#4A6FA5"), width=0.8, height=0.8),
     TextBlock(
         text="Failure is multi-dimensional: speed, observability, and model assumptions collapse together.",
         font_size="body",
@@ -617,16 +678,24 @@ warning_visual = HStack(gap=0.25, children=[
     ),
 ])
 
-sb.layout(VStack(gap=0.28, children=[
+failure_takeaway = Callout(
+    title="What these patterns imply",
+    body="Better RCA needs scalable inference, coverage-aware observability, and models that tolerate long propagation chains.",
+    color="accent",
+)
+
+sb.layout(VStack(gap=0.24, children=[
     Padding(child=patterns, all=0.25),
     Padding(child=warning_visual, left=0.6, right=0.6),
+    Padding(child=failure_takeaway, left=0.35, right=0.35),
 ]))
 
 sb.animate([
-    [patterns.children[0].children[0]],
-    [patterns.children[0].children[1]],
-    [patterns.children[0].children[2]],
+    [patterns.children[0]],
+    [patterns.children[1]],
+    [patterns.children[2]],
     [warning_visual],
+    [failure_takeaway],
 ])
 sb.notes("Explain the three failure patterns found in analysis.")
 
@@ -636,14 +705,11 @@ sb.notes("Explain the three failure patterns found in analysis.")
 
 sb = prs.slide(title="Conclusion & Contributions")
 
-# Key messages
-messages = VStack(gap=0.3, children=[
-    Callout(
-        title="Key Messages",
-        body="Benchmarks must evolve with models\nSimple baselines should be first gate\nNeed realistic, challenging evaluation",
-        color="primary"
-    ),
-])
+core_message = Callout(
+    title="Core message",
+    body="Benchmarks must reject trivial heuristics, reflect propagation depth, and remain operationally meaningful.",
+    color="primary",
+)
 
 # Contributions
 contributions = VStack(gap=0.3, children=[
@@ -651,30 +717,52 @@ contributions = VStack(gap=0.3, children=[
     Grid(cols=2, gap=0.3, children=[
         VStack(gap=0.1, children=[
             SvgImage(svg=svg_search(), width=0.5, height=0.5),
-            TextBlock(text="Revealed benchmark oversimplification", font_size="caption"),
+            TextBlock(text="Revealed benchmark oversimplification", font_size="caption", bold=True),
+            TextBlock(text="Simple baselines can match or beat many reported SOTA methods.", font_size="small", color="text_mid"),
         ]),
         VStack(gap=0.1, children=[
             SvgImage(svg=svg_tools(), width=0.5, height=0.5),
-            TextBlock(text="Built propagation-aware benchmark", font_size="caption"),
+            TextBlock(text="Built propagation-aware benchmark", font_size="caption", bold=True),
+            TextBlock(text="The benchmark scales system size, fault diversity, and call depth together.", font_size="small", color="text_mid"),
         ]),
         VStack(gap=0.1, children=[
             SvgImage(svg=svg_warning(), width=0.5, height=0.5),
-            TextBlock(text="Identified three failure patterns", font_size="caption"),
+            TextBlock(text="Identified three failure patterns", font_size="caption", bold=True),
+            TextBlock(text="The analysis surfaces bottlenecks in scalability, visibility, and modeling assumptions.", font_size="small", color="text_mid"),
         ]),
         VStack(gap=0.1, children=[
             SvgImage(svg=svg_github(), width=0.5, height=0.5),
-            TextBlock(text="Open-sourced all artifacts", font_size="caption"),
+            TextBlock(text="Open-sourced all artifacts", font_size="caption", bold=True),
+            TextBlock(text="Code, data, labels, and evaluation scripts are released for reproducibility.", font_size="small", color="text_mid"),
         ]),
     ]),
 ])
 
-sb.layout(VStack(gap=0.4, children=[
-    Padding(child=messages, left=0.3, right=0.3),
-    Padding(child=Image(path=asset("monitoring.jpg"), height=1.25), left=0.3, right=0.3),
-    Padding(child=contributions, left=0.3, right=0.3),
+closing_points = VStack(gap=0.16, width=4.2, children=[
+    TextBlock(text="Bottom line", font_size="heading", bold=True, color="primary"),
+    HStack(gap=0.16, children=[
+        RoundedBox(text="1", color="primary", text_color="white", bold=True, width=0.42, height=0.42),
+        TextBlock(text="A benchmark should reject trivial heuristics before claiming progress.", font_size="caption"),
+    ]),
+    HStack(gap=0.16, children=[
+        RoundedBox(text="2", color="secondary", text_color="white", bold=True, width=0.42, height=0.42),
+        TextBlock(text="Realistic RCA evaluation must include propagation depth and user impact.", font_size="caption"),
+    ]),
+    HStack(gap=0.16, children=[
+        RoundedBox(text="3", color="accent", text_color="white", bold=True, width=0.42, height=0.42),
+        TextBlock(text="Current methods still have substantial headroom on realistic benchmarks.", font_size="caption"),
+    ]),
+])
+
+sb.layout(VStack(gap=0.24, children=[
+    Padding(child=core_message, left=0.3, right=0.3),
+    Padding(child=HStack(gap=0.35, children=[
+        VStack(gap=0.22, width=6.7, children=[contributions]),
+        VStack(gap=0.22, width=3.8, children=[closing_points]),
+    ]), left=0.25, right=0.25),
 ]))
 
-sb.animate([[messages], [contributions]])
+sb.animate([[core_message], [contributions], [closing_points]])
 sb.notes("Summarize key messages and contributions.")
 
 # ============================================================================
