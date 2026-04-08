@@ -213,7 +213,12 @@ hero = HStack(gap=0.35, children=[
 
 sb.layout(Padding(child=hero, all=0.25))
 sb.animate([[hero.children[0]], [hero.children[1]]])
-sb.notes("Use a dark keynote-like opening with a concrete data center visual.")
+sb.notes(
+    "大家好，今天我要汇报的工作是重新思考微服务 RCA，也就是根因分析任务的评测方式。\n"
+    "这篇工作的核心观点很简单：如果 benchmark 设计得过于简单，那么模型表现再好，也不一定代表它真的具备了处理复杂故障传播的能力。\n"
+    "我们提出了一个 fault propagation-aware 的 benchmark，用来更真实地评估 RCA 方法在复杂微服务系统中的表现。\n"
+    "接下来我会先讲问题背景，再讲我们发现了什么，最后讲我们如何重新构建评测基准。"
+)
 
 # ============================================================================
 # SLIDE 2: MOTIVATION
@@ -279,7 +284,12 @@ sb.layout(VStack(gap=0.35, children=[
 ]))
 
 sb.animate([[cases], [rca_def], [incident_visual]])
-sb.notes("Start with real incidents to show importance. Then define RCA task and three data modalities.")
+sb.notes(
+    "先从动机开始。现实里的系统故障代价非常高，比如 CrowdStrike 事件、云服务中断、以及企业级停机成本，都说明 RCA 是一个非常重要的问题。\n"
+    "RCA 任务本身可以理解为：系统出问题之后，我们拿到 telemetry 数据，最后输出一个按可疑程度排序的服务列表。\n"
+    "评测时通常会看 Top@K，也就是根因服务是否出现在前 K 个预测里。\n"
+    "这里的数据通常来自三类模态：metrics、logs 和 traces。后面你会看到，很多方法宣称做了多模态融合，但 benchmark 本身未必足够有挑战。"
+)
 
 # ============================================================================
 # SLIDE 3: EXISTING APPROACHES
@@ -326,7 +336,12 @@ sb.layout(VStack(gap=0.4, children=[
 ]))
 
 sb.animate([[evolution], [trend_visual], [performance], [question]])
-sb.notes("Show the progression of methods and reported high performance. Then raise the question about reliability.")
+sb.notes(
+    "过去 RCA 方法的发展路径大致是从单模态走向多模态，从规则方法走向图模型、因果推断和深度学习。\n"
+    "从论文结果看，很多工作都报告了非常高的 Top@1 和 MRR，表面上看这个问题似乎已经被做得很好了。\n"
+    "但这里有一个关键问题：这些数字真的可靠吗？\n"
+    "因为不同论文通常使用不同数据集、不同故障注入方式、不同系统规模，所以我们怀疑这些高分有可能来自 benchmark 过于简单，而不是真正的能力提升。"
+)
 
 # ============================================================================
 # SLIDE 4: SIMPLERCA
@@ -369,7 +384,13 @@ sb.layout(VStack(gap=0.38, children=[
 ]))
 
 sb.animate([[core_q], [simplerca], [baseline_visual]])
-sb.notes("Introduce the core question and SimpleRCA design.")
+sb.notes(
+    "所以我们提出的核心问题是：所谓 SOTA 进展，到底是真实能力，还是 benchmark artifact？\n"
+    "为了回答这个问题，我们先设计了一个非常简单的 baseline，叫 SimpleRCA。\n"
+    "它完全不用机器学习，只做三件事：在 metrics 里看异常阈值，在 traces 里看延迟偏移，在 logs 里统计错误关键词。\n"
+    "最后谁的异常信号最多，就把谁排到前面。\n"
+    "如果这样一个简单规则都能和复杂模型打平甚至超过它们，就说明现有 benchmark 很可能没有真正区分简单相关性和复杂推理能力。"
+)
 
 # ============================================================================
 # SLIDE 5: SHOCKING DISCOVERY
@@ -410,7 +431,12 @@ sb.layout(VStack(gap=0.42, children=[
 ]))
 
 sb.animate([[results_table], [results_visual], [conclusion]])
-sb.notes("Present the comparison results. Highlight that SimpleRCA matches or beats SOTA.")
+sb.notes(
+    "结果非常直接，也有些出人意料。\n"
+    "在多个已有 benchmark 上，SimpleRCA 不仅没有明显落后，反而经常能够追平甚至超过复杂方法。\n"
+    "这说明一个严重问题：这些 benchmark 不能有效区分简单启发式和复杂 AI 模型。\n"
+    "也就是说，模型高分不一定是因为理解了故障传播，而可能只是抓住了很容易的表面相关性。"
+)
 
 # ============================================================================
 # SLIDE 6: ROOT CAUSE ANALYSIS
@@ -456,7 +482,13 @@ sb.layout(VStack(gap=0.4, children=[
 ]))
 
 sb.animate([[limitations.children[0]], [limitations.children[1]], [complexity_visual], [pattern]])
-sb.notes("Explain why existing benchmarks are problematic.")
+sb.notes(
+    "接下来我们分析为什么会这样。\n"
+    "现有 benchmark 主要有三类问题：第一，样本量太小，容易过拟合；第二，系统结构过浅，调用深度不够；第三，故障谱过窄，覆盖不了真实复杂场景。\n"
+    "更关键的是，很多故障注入模式其实属于一种非常简单的情况：症状主要出现在被注入的那个服务本身。\n"
+    "在这种设定下，只要做局部相关性匹配就够了，不需要真正理解跨服务的故障传播。\n"
+    "这正是我们认为 benchmark 失真的根本原因。"
+)
 
 # ============================================================================
 # SLIDE 7: OUR SOLUTION
@@ -503,7 +535,13 @@ sb.layout(VStack(gap=0.5, children=[
 ]))
 
 sb.animate([[benchmark_visual], [numbers], [innovation]])
-sb.notes("Present the new benchmark statistics and core innovation.")
+sb.notes(
+    "所以我们的解决方案不是继续调模型，而是先把 benchmark 做对。\n"
+    "这个新 benchmark 在规模和复杂度上都显著提升：更多 case、更多 fault type、更大的服务数和更深的调用链。\n"
+    "但更重要的创新其实不是更大，而是 impact-driven validation。\n"
+    "我们发现很多注入进去的 fault 实际上对用户没有可观测影响，这种 case 对运维场景并不关键。\n"
+    "因此我们用 SLI 去过滤，只保留那些真正会造成用户侧影响的 case，让评测更贴近真实运维。"
+)
 
 # ============================================================================
 # SLIDE 8: SIX-STAGE FRAMEWORK
@@ -560,7 +598,13 @@ sb.layout(VStack(gap=0.26, children=[
 ]))
 
 sb.animate([[pipeline], [framework_cards], [framework_takeaway]])
-sb.notes("Show the six-stage pipeline.")
+sb.notes(
+    "这页展示的是我们构建 benchmark 的整体流程。\n"
+    "从左到右，先是系统本身和 workload 设计，然后进行 fault injection，接着收集多模态数据，再做层次化标注，最后进行基于 SLI 的验证。\n"
+    "下面三张卡片可以帮助理解这个流程为什么重要。\n"
+    "第一，它覆盖了足够真实的系统规模和故障复杂度；第二，它保留了 metrics、logs、traces 之间的联合证据；第三，它不是只看有没有注入 fault，而是看这个 fault 是否真的造成了用户可感知的影响。\n"
+    "所以这个 framework 的价值在于，把 realistic fault 和 validated user impact 真正闭环起来了。"
+)
 
 # ============================================================================
 # SLIDE 9: RE-EVALUATION RESULTS
@@ -631,7 +675,13 @@ sb.layout(HStack(gap=0.32, children=[
 ]))
 
 sb.animate([[chart], [findings], [reeval_stats]])
-sb.notes("Show the dramatic performance drop on new benchmark.")
+sb.notes(
+    "接下来是最关键的一页：把已有方法重新放到我们的 benchmark 上评估。\n"
+    "可以看到，在旧 benchmark 上看起来很强的方法，到了新 benchmark 上性能大幅下降。\n"
+    "平均 Top@1 从大约 0.75 掉到 0.21，最好的模型也只有 0.37。\n"
+    "而且问题不只是精度下降，执行时间也从秒级上升到小时级，这对实际运维来说是非常关键的。\n"
+    "所以这页想传达的结论是：旧 benchmark 很大程度上奖励的是 shortcut correlation，而不是可扩展、可落地的 RCA 能力。"
+)
 
 # ============================================================================
 # SLIDE 10: THREE FAILURE PATTERNS
@@ -697,7 +747,13 @@ sb.animate([
     [warning_visual],
     [failure_takeaway],
 ])
-sb.notes("Explain the three failure patterns found in analysis.")
+sb.notes(
+    "我们进一步分析了这些方法失败的原因，主要归纳成三类。\n"
+    "第一类是 scalability breakdown，也就是随着时间窗口和图规模增长，推理代价快速上升。\n"
+    "第二类是 observability blind spot，模型面对弱信号、缺失监控或者相互矛盾的证据时容易失效。\n"
+    "第三类是 modeling bottleneck，也就是方法本身对 locality、causality 等假设在复杂传播场景下不再成立。\n"
+    "这三类问题一起说明，未来做 RCA 不能只看 accuracy，还要同时考虑可扩展性、观测覆盖和模型假设的鲁棒性。"
+)
 
 # ============================================================================
 # SLIDE 11: CONCLUSION
@@ -763,7 +819,12 @@ sb.layout(VStack(gap=0.24, children=[
 ]))
 
 sb.animate([[core_message], [contributions], [closing_points]])
-sb.notes("Summarize key messages and contributions.")
+sb.notes(
+    "最后总结一下。\n"
+    "这项工作的核心 message 是：benchmark 本身必须 evolve with models，不能让简单启发式轻易通过，然后再宣称模型有巨大进步。\n"
+    "我们的贡献主要有四点：揭示了现有 benchmark 的过度简化；构建了 propagation-aware 的新 benchmark；系统分析了三类 failure pattern；并把代码、数据和评测脚本开源出来。\n"
+    "从更大的角度看，这项工作想强调的是，benchmark design 本身就是 RCA 研究中的一等问题，而不只是辅助工作。"
+)
 
 # ============================================================================
 # SLIDE 12: THANK YOU
@@ -796,7 +857,11 @@ thanks_layout = HStack(gap=0.4, children=[
 
 sb.layout(Padding(child=thanks_layout, all=0.3))
 sb.animate([[thanks_layout.children[0]], [thanks_layout.children[1]]])
-sb.notes("Close with links to artifacts and invite questions.")
+sb.notes(
+    "我的汇报就到这里。\n"
+    "如果大家感兴趣，我们很愿意进一步讨论 benchmark 设计、failure pattern 分析，或者这个 benchmark 对未来 RCA 模型研究意味着什么。\n"
+    "也欢迎大家关注我们的开源数据和代码。谢谢大家。"
+)
 
 # ============================================================================
 # SAVE AND VALIDATE
