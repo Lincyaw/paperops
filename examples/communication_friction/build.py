@@ -883,7 +883,7 @@ desc = VStack(
     children=[
         Callout(
             title="层间穿梭",
-            body="正向：从探索中提炼结构化理解\n" "逆向：从呈现中还原决策过程",
+            body="正向：从探索中提炼结构化理解\n逆向：从呈现中还原决策过程",
             color="primary",
         ),
         TextBlock(
