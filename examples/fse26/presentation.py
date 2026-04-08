@@ -6,6 +6,8 @@ Target audience: Cross-domain researchers (not necessarily SE/ops experts)
 Duration: ~10 minutes
 """
 
+from pathlib import Path
+
 from paperops.slides import (
     Presentation, themes,
     HStack, VStack, Grid, Padding,
@@ -13,11 +15,17 @@ from paperops.slides import (
     TextBlock, BulletList, Table,
     Callout, Flowchart,
     BarChart,
-    SvgImage,
+    Image, SvgImage,
 )
 
 # Create presentation with academic theme
 prs = Presentation(theme=themes.academic)
+ASSET_DIR = Path(__file__).parent / "assets"
+
+
+def asset(filename: str) -> str:
+    """Resolve local image assets for this deck."""
+    return str(ASSET_DIR / filename)
 
 # ============================================================================
 # SVG ICONS (raw SVG strings)
@@ -156,13 +164,56 @@ def svg_trace(color="#4CAF50"):
 # SLIDE 1: TITLE
 # ============================================================================
 
-prs.cover(
-    "Rethinking the Evaluation of Microservice RCA\nwith a Fault Propagation-Aware Benchmark",
-    subtitle="FSE 2026",
-    author="Aoyang Fang, Songhan Zhang, Yifan Yang, Haotong Wu, Junjielong Xu,\n"
-            "Xuyang Wang, Rui Wang, Manyi Wang, Qisheng Lu, Pinjia He\n"
-            "The Chinese University of Hong Kong, Shenzhen"
-)
+sb = prs.slide(background="#0B1220")
+
+hero = HStack(gap=0.35, children=[
+    VStack(gap=0.28, width=6.5, children=[
+        RoundedBox(
+            text="FSE 2026",
+            color="#1F3B63",
+            border="#2D5B94",
+            text_color="#E5EDF8",
+            font_size="caption",
+            bold=True,
+            width=1.45,
+            height=0.42,
+        ),
+        TextBlock(
+            text="Rethinking the Evaluation\nof Microservice RCA",
+            font_size=37,
+            bold=True,
+            color="#F4F7FB",
+            height=1.85,
+        ),
+        TextBlock(
+            text="with a Fault Propagation-Aware Benchmark",
+            font_size=22,
+            bold=False,
+            color="#B7C7DD",
+            height=0.55,
+        ),
+        TextBlock(
+            text="Aoyang Fang, Songhan Zhang, Yifan Yang, Haotong Wu, Junjielong Xu,\n"
+                 "Xuyang Wang, Rui Wang, Manyi Wang, Qisheng Lu, Pinjia He",
+            font_size="caption",
+            color="#D0DBEA",
+            height=0.75,
+        ),
+        TextBlock(
+            text="The Chinese University of Hong Kong, Shenzhen",
+            font_size="caption",
+            color="#8EA2BE",
+        ),
+    ]),
+    VStack(gap=0.2, width=4.1, children=[
+        Image(path=asset("wm-data-center-unc.jpg"), width=4.1, height=4.9),
+        TextBlock(text="Fault propagation in large-scale service systems", font_size="small", color="#8EA2BE"),
+    ]),
+])
+
+sb.layout(Padding(child=hero, all=0.25))
+sb.animate([[hero.children[0]], [hero.children[1]]])
+sb.notes("Use a dark keynote-like opening with a concrete data center visual.")
 
 # ============================================================================
 # SLIDE 2: MOTIVATION
@@ -210,13 +261,24 @@ modalities = VStack(gap=0.2, children=[
     ]),
 ])
 
-sb.layout(VStack(gap=0.4, children=[
-    Padding(child=cases, left=0.2, right=0.2),
-    Padding(child=rca_def, left=0.2, right=0.2),
-    Padding(child=modalities, left=0.2, right=0.2),
+incident_visual = VStack(gap=0.2, width=4.4, children=[
+    Image(path=asset("server-room.jpg"), width=4.4, height=2.3),
+    TextBlock(
+        text="Operational context: distributed cloud services under failure pressure",
+        font_size="small",
+        color="text_mid",
+    ),
+    modalities,
+])
+
+sb.layout(VStack(gap=0.35, children=[
+    Padding(child=HStack(gap=0.4, children=[
+        VStack(gap=0.35, width=6.2, children=[cases, rca_def]),
+        incident_visual,
+    ]), left=0.2, right=0.2),
 ]))
 
-sb.animate([[cases], [rca_def], [modalities]])
+sb.animate([[cases], [rca_def], [incident_visual]])
 sb.notes("Start with real incidents to show importance. Then define RCA task and three data modalities.")
 
 # ============================================================================
@@ -247,6 +309,8 @@ performance = VStack(gap=0.3, children=[
     ]),
 ])
 
+trend_visual = Image(path=asset("wm-control-room.jpg"), height=0.95)
+
 # The question
 question = Callout(
     title="But...",
@@ -256,11 +320,12 @@ question = Callout(
 
 sb.layout(VStack(gap=0.4, children=[
     Padding(child=evolution, left=0.2, right=0.2),
+    Padding(child=trend_visual, left=0.2, right=0.2),
     Padding(child=performance, left=0.2, right=0.2),
     Padding(child=question, left=0.3, right=0.3),
 ]))
 
-sb.animate([[evolution], [performance], [question]])
+sb.animate([[evolution], [trend_visual], [performance], [question]])
 sb.notes("Show the progression of methods and reported high performance. Then raise the question about reliability.")
 
 # ============================================================================
@@ -290,12 +355,20 @@ simplerca = VStack(gap=0.3, children=[
     TextBlock(text="Root cause = service with most alerts", font_size="body", italic=True, color="text_mid"),
 ])
 
-sb.layout(VStack(gap=0.4, children=[
+baseline_visual = VStack(gap=0.18, width=4.6, children=[
+    Image(path=asset("wm-load-balancing.png"), width=4.6, height=2.4),
+    TextBlock(text="Simple dependency-aware heuristics can already localize many failures", font_size="small", color="text_mid"),
+])
+
+sb.layout(VStack(gap=0.38, children=[
     Padding(child=core_q, left=0.3, right=0.3),
-    Padding(child=simplerca, left=0.2, right=0.2),
+    Padding(child=HStack(gap=0.35, children=[
+        VStack(gap=0.25, width=6.15, children=[simplerca]),
+        baseline_visual,
+    ]), left=0.2, right=0.2),
 ]))
 
-sb.animate([[core_q], [simplerca]])
+sb.animate([[core_q], [simplerca], [baseline_visual]])
 sb.notes("Introduce the core question and SimpleRCA design.")
 
 # ============================================================================
@@ -323,12 +396,20 @@ conclusion = Callout(
     color="negative"
 )
 
-sb.layout(VStack(gap=0.5, children=[
-    Padding(child=results_table, left=0.8, right=0.8),
+results_visual = VStack(gap=0.18, width=3.9, children=[
+    Image(path=asset("wm-analytics-dashboard.jpg"), width=3.9, height=2.25),
+    TextBlock(text="Reported dashboards can hide benchmark bias", font_size="small", color="text_mid"),
+])
+
+sb.layout(VStack(gap=0.42, children=[
+    Padding(child=HStack(gap=0.38, children=[
+        Padding(child=results_table, left=0.0, right=0.0, width=6.85),
+        results_visual,
+    ]), left=0.3, right=0.3),
     Padding(child=conclusion, left=0.3, right=0.3),
 ]))
 
-sb.animate([[results_table], [conclusion]])
+sb.animate([[results_table], [results_visual], [conclusion]])
 sb.notes("Present the comparison results. Highlight that SimpleRCA matches or beats SOTA.")
 
 # ============================================================================
@@ -366,12 +447,15 @@ pattern = VStack(gap=0.2, children=[
     TextBlock(text="Simple correlation works → no need for complex causal reasoning", font_size="body", italic=True, color="text_mid"),
 ])
 
+complexity_visual = Image(path=asset("network-cables.jpg"), height=1.15)
+
 sb.layout(VStack(gap=0.4, children=[
     Padding(child=limitations, left=0.2, right=0.2),
+    Padding(child=complexity_visual, left=0.2, right=0.2),
     Padding(child=pattern, left=0.2, right=0.2),
 ]))
 
-sb.animate([[limitations.children[0]], [limitations.children[1]], [pattern]])
+sb.animate([[limitations.children[0]], [limitations.children[1]], [complexity_visual], [pattern]])
 sb.notes("Explain why existing benchmarks are problematic.")
 
 # ============================================================================
@@ -407,12 +491,18 @@ innovation = Callout(
     color="accent"
 )
 
+benchmark_visual = VStack(gap=0.2, children=[
+    Image(path=asset("data-center-wide.jpg"), height=1.8),
+    TextBlock(text="Larger and noisier environments demand stronger RCA reasoning", font_size="small", color="text_mid"),
+])
+
 sb.layout(VStack(gap=0.5, children=[
+    Padding(child=benchmark_visual, left=0.3, right=0.3),
     Padding(child=numbers, left=0.3, right=0.3),
     Padding(child=innovation, left=0.3, right=0.3),
 ]))
 
-sb.animate([[numbers], [innovation]])
+sb.animate([[benchmark_visual], [numbers], [innovation]])
 sb.notes("Present the new benchmark statistics and core innovation.")
 
 # ============================================================================
@@ -434,9 +524,17 @@ pipeline = Flowchart(
     direction="right"
 )
 
-sb.layout(Padding(child=pipeline, all=0.3))
+workflow_visual = VStack(gap=0.15, children=[
+    Image(path=asset("wm-workflow-summary.png"), height=1.75),
+    TextBlock(text="Pipeline design principle: traceable transitions across stages", font_size="small", color="text_mid"),
+])
 
-sb.animate([[pipeline]])
+sb.layout(VStack(gap=0.3, children=[
+    Padding(child=pipeline, left=0.25, right=0.25),
+    Padding(child=workflow_visual, left=0.25, right=0.25),
+]))
+
+sb.animate([[pipeline], [workflow_visual]])
 sb.notes("Show the six-stage pipeline.")
 
 # ============================================================================
@@ -473,6 +571,7 @@ findings = VStack(gap=0.3, children=[
         SvgImage(svg=svg_speed(), width=0.5, height=0.5),
         TextBlock(text="Execution time: seconds → hours", font_size="body"),
     ]),
+    Image(path=asset("operations-team.jpg"), width=4.3, height=2.1),
 ])
 
 sb.layout(HStack(gap=0.4, children=[
@@ -509,12 +608,25 @@ patterns = VStack(gap=0.4, children=[
     ]),
 ])
 
-sb.layout(Padding(child=patterns, all=0.3))
+warning_visual = HStack(gap=0.25, children=[
+    Image(path=asset("wm-warning-icon.png"), width=1.1, height=1.1),
+    TextBlock(
+        text="Failure is multi-dimensional: speed, observability, and model assumptions collapse together.",
+        font_size="body",
+        color="text_mid",
+    ),
+])
+
+sb.layout(VStack(gap=0.28, children=[
+    Padding(child=patterns, all=0.25),
+    Padding(child=warning_visual, left=0.6, right=0.6),
+]))
 
 sb.animate([
     [patterns.children[0].children[0]],
     [patterns.children[0].children[1]],
     [patterns.children[0].children[2]],
+    [warning_visual],
 ])
 sb.notes("Explain the three failure patterns found in analysis.")
 
@@ -558,6 +670,7 @@ contributions = VStack(gap=0.3, children=[
 
 sb.layout(VStack(gap=0.4, children=[
     Padding(child=messages, left=0.3, right=0.3),
+    Padding(child=Image(path=asset("monitoring.jpg"), height=1.25), left=0.3, right=0.3),
     Padding(child=contributions, left=0.3, right=0.3),
 ]))
 
@@ -568,14 +681,41 @@ sb.notes("Summarize key messages and contributions.")
 # SLIDE 12: THANK YOU
 # ============================================================================
 
-prs.end("Thank You", subtitle="Questions?")
+sb = prs.slide(background="#0A101B")
+
+thanks_layout = HStack(gap=0.4, children=[
+    VStack(gap=0.25, width=5.0, children=[
+        RoundedBox(
+            text="THANK YOU",
+            color="#1E3A5F",
+            border="#2D5B94",
+            text_color="#EAF2FC",
+            font_size="caption",
+            bold=True,
+            width=1.8,
+            height=0.42,
+        ),
+        TextBlock(text="Questions?", font_size=42, bold=True, color="#F2F6FC", height=0.95),
+        TextBlock(text="Code, data, and benchmark artifacts are open-sourced.", font_size="body", color="#D5E0EE"),
+        TextBlock(text="Contact: Aoyang Fang et al. (CUHK-Shenzhen)", font_size="caption", color="#B1C1D6"),
+        TextBlock(text="Image credits in assets/IMAGE_CREDITS.md", font_size="small", color="#8EA2BE"),
+    ]),
+    VStack(gap=0.18, width=5.4, children=[
+        Image(path=asset("wm-data-center-unc.jpg"), width=5.4, height=3.0),
+        TextBlock(text="Toward realistic and reliable RCA evaluation", font_size="small", color="#8EA2BE"),
+    ]),
+])
+
+sb.layout(Padding(child=thanks_layout, all=0.3))
+sb.animate([[thanks_layout.children[0]], [thanks_layout.children[1]]])
+sb.notes("Close with links to artifacts and invite questions.")
 
 # ============================================================================
 # SAVE AND VALIDATE
 # ============================================================================
 
-output_path = "/Users/lincyaw/workspace/paperops/examples/fse26/rca_benchmark_presentation.pptx"
-prs.save(output_path)
+output_path = Path(__file__).with_name("rca_benchmark_presentation.pptx")
+prs.save(str(output_path))
 
 print(f"Presentation saved to: {output_path}")
 print("\nRunning validation...")
