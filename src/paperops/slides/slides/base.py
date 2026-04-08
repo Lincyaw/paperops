@@ -578,10 +578,36 @@ class SlideBuilder:
         self._track(node, connector)
 
     def _render_image(self, node: Image):
+        from PIL import Image as PILImage
+
         r = node._region
+        if not getattr(node, "preserve_aspect", True):
+            pic = self._slide.shapes.add_picture(
+                node.path,
+                Inches(r.left), Inches(r.top), Inches(r.width), Inches(r.height),
+            )
+            self._track(node, pic)
+            return
+
+        with PILImage.open(node.path) as img:
+            img_w, img_h = img.size
+
+        img_aspect = img_w / img_h if img_h > 0 else 1.0
+        region_aspect = r.width / r.height if r.height > 0 else 1.0
+
+        if img_aspect > region_aspect:
+            fit_w = r.width
+            fit_h = r.width / img_aspect
+        else:
+            fit_h = r.height
+            fit_w = r.height * img_aspect
+
+        fit_left = r.left + (r.width - fit_w) / 2
+        fit_top = r.top + (r.height - fit_h) / 2
+
         pic = self._slide.shapes.add_picture(
             node.path,
-            Inches(r.left), Inches(r.top), Inches(r.width), Inches(r.height),
+            Inches(fit_left), Inches(fit_top), Inches(fit_w), Inches(fit_h),
         )
         self._track(node, pic)
 

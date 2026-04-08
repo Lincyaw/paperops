@@ -12,6 +12,7 @@ class Image(LayoutNode):
     """Static image from file."""
 
     path: str = ""
+    preserve_aspect: bool = True
 
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
         # Images use explicitly set dimensions or fall back to defaults
