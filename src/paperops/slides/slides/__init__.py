@@ -1,4 +1,3 @@
-"""Slides layer: base slide and high-level templates."""
+"""Slides layer: base slide builder."""
 
 from paperops.slides.slides.base import SlideBuilder
-from paperops.slides.slides.templates import register_templates

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from paperops.slides.core.constants import CONTENT_REGION, Region, SLIDE_HEIGHT, SLIDE_WIDTH
-from paperops.slides.layout.containers import Flex, Grid, GridItem, HStack, LayoutNode, Padding
+from paperops.slides.layout.containers import Absolute, AbsoluteItem, Flex, Grid, GridItem, HStack, Layer, LayoutNode, Padding
 from paperops.slides.layout.types import Constraints, IntrinsicSize, LayoutIssue, TrackSpec
 
 
@@ -35,6 +35,12 @@ def _layout(
     if isinstance(node, Padding):
         _layout_padding(node, region, theme, issues, node_path, slide)
         return
+    if isinstance(node, Absolute):
+        _layout_absolute(node, region, theme, issues, node_path, slide)
+        return
+    if isinstance(node, Layer):
+        _layout_layer(node, region, theme, issues, node_path, slide)
+        return
     if isinstance(node, Grid):
         _layout_grid(node, region, theme, issues, node_path, slide)
         return
@@ -56,6 +62,37 @@ def _layout_padding(node: Padding, region: Region, theme, issues: list[LayoutIss
         height=max(region.height - node._top - node._bottom, 0.0),
     )
     _layout(node.child, inner, theme, issues, f"{node_path}.child", slide)
+
+
+def _layout_layer(node: Layer, region: Region, theme, issues: list[LayoutIssue], node_path: str, slide: int | None) -> None:
+    _validate_region(node, issues, node_path, slide)
+    for index, child in enumerate(node.children):
+        _layout(child, region, theme, issues, f"{node_path}.children[{index}]", slide)
+
+
+def _layout_absolute(node: Absolute, region: Region, theme, issues: list[LayoutIssue], node_path: str, slide: int | None) -> None:
+    _validate_region(node, issues, node_path, slide)
+    for index, item in enumerate(node.children):
+        child_path = f"{node_path}.children[{index}]"
+        item._region = Region(left=region.left + item.left, top=region.top + item.top, width=0.0, height=0.0)
+        item._node_path = child_path
+        if item.child is None:
+            _validate_region(item, issues, child_path, slide)
+            continue
+        intrinsic = item.child.measure(
+            Constraints(
+                max_width=item.width if item.width is not None else max(region.width - item.left, 0.0),
+                max_height=item.height if item.height is not None else max(region.height - item.top, 0.0),
+            ),
+            theme,
+        )
+        child_region = Region(
+            left=region.left + item.left,
+            top=region.top + item.top,
+            width=item.width if item.width is not None else intrinsic.preferred_width,
+            height=item.height if item.height is not None else intrinsic.preferred_height,
+        )
+        _layout(item.child, child_region, theme, issues, f"{child_path}.child", slide)
 
 
 def _layout_flex(node: Flex, region: Region, theme, issues: list[LayoutIssue], node_path: str, slide: int | None) -> None:

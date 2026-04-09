@@ -13,7 +13,6 @@ from paperops.slides.core.constants import SLIDE_HEIGHT, SLIDE_WIDTH
 from paperops.slides.core.theme import Theme, themes
 from paperops.slides.preview import review_deck_artifacts
 from paperops.slides.slides.base import SlideBuilder
-from paperops.slides.slides.templates import register_templates
 
 
 class Presentation:
@@ -134,6 +133,3 @@ def _normalize_issue(issue: dict, slide_number: int) -> dict:
     normalized.setdefault("detail", normalized["message"])
     normalized.setdefault("severity", "warning")
     return normalized
-
-
-register_templates(Presentation)

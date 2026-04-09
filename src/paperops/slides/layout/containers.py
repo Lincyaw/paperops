@@ -294,6 +294,105 @@ class Grid(LayoutNode):
 
 
 @dataclass
+class AbsoluteItem(LayoutNode):
+    """Child placed at an explicit offset inside an absolute container."""
+
+    child: LayoutNode | None = None
+    left: float = 0.0
+    top: float = 0.0
+
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        if self.child is None:
+            return IntrinsicSize(0.0, 0.0, 0.0, 0.0)
+        child_constraints = Constraints(
+            max_width=self.width if self.width is not None else constraints.max_width,
+            max_height=self.height if self.height is not None else constraints.max_height,
+        )
+        intrinsic = self.child.measure(child_constraints, theme)
+        width = self.width if self.width is not None else intrinsic.preferred_width
+        height = self.height if self.height is not None else intrinsic.preferred_height
+        return IntrinsicSize(width, width, height, height).clamp(constraints)
+
+
+@dataclass
+class Absolute(LayoutNode):
+    """Container whose children use explicit offsets relative to its region."""
+
+    children: list[AbsoluteItem] = field(default_factory=list)
+
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        if not self.children:
+            width = self.width or constraints.max_width or 0.0
+            height = self.height or constraints.max_height or 0.0
+            return IntrinsicSize(width, width, height, height).clamp(constraints)
+
+        max_right = 0.0
+        max_bottom = 0.0
+        for item in self.children:
+            intrinsic = item.measure(constraints, theme)
+            max_right = max(max_right, item.left + intrinsic.preferred_width)
+            max_bottom = max(max_bottom, item.top + intrinsic.preferred_height)
+
+        preferred_width = self.width if self.width is not None else max_right
+        preferred_height = self.height if self.height is not None else max_bottom
+        min_width = self.min_width if self.min_width is not None else preferred_width
+        min_height = self.min_height if self.min_height is not None else preferred_height
+        intrinsic = IntrinsicSize(
+            min_width=min_width,
+            preferred_width=preferred_width,
+            min_height=min_height,
+            preferred_height=preferred_height,
+        )
+        return intrinsic.clamp(constraints)
+
+    def __iter__(self):
+        return iter(self.children)
+
+
+@dataclass
+class Layer(LayoutNode):
+    """Overlay children in the same resolved region."""
+
+    children: list[LayoutNode] = field(default_factory=list)
+
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        if not self.children:
+            width = self.width or constraints.max_width or 0.0
+            height = self.height or constraints.max_height or 0.0
+            return IntrinsicSize(width, width, height, height).clamp(constraints)
+
+        child_sizes = [child.measure(constraints, theme) for child in self.children]
+        preferred_width = max((size.preferred_width for size in child_sizes), default=0.0)
+        preferred_height = max((size.preferred_height for size in child_sizes), default=0.0)
+        min_width = max((size.min_width for size in child_sizes), default=0.0)
+        min_height = max((size.min_height for size in child_sizes), default=0.0)
+
+        if self.width is not None:
+            preferred_width = min_width = self.width
+        if self.height is not None:
+            preferred_height = min_height = self.height
+        if self.min_width is not None:
+            min_width = max(min_width, self.min_width)
+        if self.min_height is not None:
+            min_height = max(min_height, self.min_height)
+        if self.max_width is not None:
+            preferred_width = min(preferred_width, self.max_width)
+        if self.max_height is not None:
+            preferred_height = min(preferred_height, self.max_height)
+
+        intrinsic = IntrinsicSize(
+            min_width=min_width,
+            preferred_width=max(preferred_width, min_width),
+            min_height=min_height,
+            preferred_height=max(preferred_height, min_height),
+        )
+        return intrinsic.clamp(constraints)
+
+    def __iter__(self):
+        return iter(self.children)
+
+
+@dataclass
 class Padding(LayoutNode):
     """Single-child padding wrapper."""
 
@@ -339,6 +438,24 @@ class Padding(LayoutNode):
             preferred_height=intrinsic.preferred_height + pad_v,
         )
         return result.clamp(constraints)
+
+
+@dataclass
+class Spacer(LayoutNode):
+    """Flexible empty node used to distribute space inside containers."""
+
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        width = self.width if self.width is not None else 0.0
+        height = self.height if self.height is not None else 0.0
+        min_width = self.min_width if self.min_width is not None else width
+        min_height = self.min_height if self.min_height is not None else height
+        intrinsic = IntrinsicSize(
+            min_width=min_width,
+            preferred_width=width,
+            min_height=min_height,
+            preferred_height=height,
+        )
+        return intrinsic.clamp(constraints)
 
 
 def _estimate_wrapped_row_height(children: Iterable[LayoutNode], width: float, theme, gap: float) -> float:

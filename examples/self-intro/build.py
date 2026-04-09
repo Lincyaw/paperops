@@ -3,11 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from paperops.slides import (
+    Arrow,
     Badge,
-    Callout,
     Circle,
-    Flow,
-    Flowchart,
     Grid,
     HStack,
     Padding,
@@ -92,35 +90,159 @@ def icon_analysis(theme, size=80):
 
 
 def make_theme():
-    return themes.professional.override(
-        font_family="Liberation Sans",
-        colors={
-            "primary": "#5C82AD",
-            "secondary": "#8FAAC8",
-            "accent": "#D69A68",
-            "positive": "#7FA195",
-            "negative": "#C98A78",
-            "highlight": "#7396BE",
-            "warning": "#D8A86A",
-            "text": "#223043",
-            "text_mid": "#647489",
-            "text_light": "#94A3B6",
-            "bg": "#FBFCFE",
-            "bg_alt": "#F1F5FA",
-            "bg_accent": "#EAF0F7",
-            "border": "#D8E0EA",
-        },
+    return themes.academic_seminar
+
+
+def Callout(title: str, body: str, color: str = "primary", width: float | None = None, height: float | None = None):
+    return VStack(
+        gap=0.08,
+        width=width,
+        height=height,
+        children=[
+            TextBlock(text=title, font_size="body", color=color, bold=True),
+            TextBlock(text=body, font_size="caption", color="text"),
+        ],
     )
 
 
-def stat_card(label: str, value: str, tone: str = "primary"):
+def Flow(
+    labels: list[str],
+    colors: list[str] | None = None,
+    arrow_color: str = "primary",
+    direction: str = "horizontal",
+    width: float | None = None,
+    height: float | None = None,
+):
+    box_colors = list(colors or ["bg_alt"] * len(labels))
+    while len(box_colors) < len(labels):
+        box_colors.append("bg_alt")
+    boxes = [
+        RoundedBox(
+            text=label,
+            color=color,
+            border="border" if color in {"bg_alt", "bg", "bg_accent"} else color,
+            text_color="white" if color not in {"bg_alt", "bg", "bg_accent"} else "text",
+            font_size="caption",
+            bold=True,
+            height=0.82,
+            size_mode_x="fit",
+        )
+        for label, color in zip(labels, box_colors)
+    ]
+    children = []
+    arrow_direction = "vertical" if direction in {"vertical", "down"} else "horizontal"
+    for index, box in enumerate(boxes):
+        children.append(box)
+        if index < len(boxes) - 1:
+            children.append(
+                Arrow(
+                    from_component=box,
+                    to_component=boxes[index + 1],
+                    color=arrow_color,
+                    direction=arrow_direction,
+                )
+            )
+    container_cls = VStack if arrow_direction == "vertical" else HStack
+    return container_cls(gap=0.15, width=width, height=height, children=children)
+
+
+def Flowchart(
+    nodes: dict,
+    edges: list,
+    direction: str = "right",
+    node_widths: dict[str, float] | None = None,
+    height: float | None = None,
+    width: float | None = None,
+):
+    node_widths = node_widths or {}
+    order = list(nodes.keys())
+    outgoing: dict[str, list[str]] = {}
+    incoming: dict[str, int] = {}
+    for edge in edges:
+        src, dst = edge[0], edge[1]
+        outgoing.setdefault(src, []).append(dst)
+        incoming[dst] = incoming.get(dst, 0) + 1
+    is_chain = all(len(targets) <= 1 for targets in outgoing.values()) and all(count <= 1 for count in incoming.values())
+    if is_chain and edges:
+        starts = [node_id for node_id in order if incoming.get(node_id, 0) == 0]
+        if starts:
+            ordered = []
+            current = starts[0]
+            seen = set()
+            while current not in seen:
+                seen.add(current)
+                ordered.append(current)
+                next_nodes = outgoing.get(current, [])
+                if not next_nodes:
+                    break
+                current = next_nodes[0]
+            ordered.extend(node_id for node_id in order if node_id not in seen)
+            order = ordered
+        labels = []
+        colors = []
+        for node_id in order:
+            value = nodes[node_id]
+            if isinstance(value, tuple):
+                label, color = value[0], value[1]
+            else:
+                label, color = value, "bg_alt"
+            labels.append(label)
+            colors.append(color)
+        return Flow(
+            labels=labels,
+            colors=colors,
+            arrow_color="text_light",
+            direction="vertical" if direction in {"down", "vertical"} else "horizontal",
+            width=width,
+            height=height,
+        )
+
+    cards = []
+    for node_id, value in nodes.items():
+        if isinstance(value, tuple):
+            label, color = value[0], value[1]
+        else:
+            label, color = value, "bg_alt"
+        cards.append(
+            RoundedBox(
+                text=label,
+                color=color,
+                border="border" if color in {"bg_alt", "bg", "bg_accent"} else color,
+                text_color="white" if color not in {"bg_alt", "bg", "bg_accent"} else "text",
+                bold=True,
+                font_size="caption",
+                width=node_widths.get(node_id),
+                height=height if height is not None else 0.92,
+                size_mode_x="fit" if node_widths.get(node_id) is None else "fixed",
+            )
+        )
+    cols = min(max(len(cards), 1), 3)
+    return Grid(cols=cols, gap=0.2, width=width, children=cards)
+
+
+def stat_card(
+    label: str,
+    value: str,
+    tone: str = "primary",
+    *,
+    width: float | None = None,
+    value_font_size: str | float = "heading",
+):
     return VStack(
-        gap=0.10,
+        gap=0.04,
+        width=width,
         children=[
-            Badge(text=label, color=tone),
+            TextBlock(
+                text=label.upper(),
+                font_size=9,
+                color=tone,
+                bold=True,
+                line_spacing=1.0,
+                height=0.38,
+            ),
             TextBlock(
                 text=value,
-                font_size="heading",
+                font_size=value_font_size,
                 color="text",
                 bold=True,
             ),
@@ -129,24 +251,24 @@ def stat_card(label: str, value: str, tone: str = "primary"):
 
 
 SLIDE_TITLES = [
-    "Building World Models for Diagnostic Intelligence",
-    "The Vision",
-    "Premise 1: Fault Injection & Detection",
-    "Premise 2: Simulatable",
-    "Premise 3: Verifiable",
-    "From Point-Finding to Graph-Building",
-    "The Benchmark Crisis",
-    "Why Existing Benchmarks Fail",
-    "Our Solution: A Harder Benchmark",
-    "The Effectiveness-Data-Cost Trade-off",
-    "The Process Gap",
-    "FORGE: Forward Verification",
-    "OpenRCA 2.0",
-    "Validation: Structured Reasoning Works",
-    "Stage 1: Train on Closed Loops",
-    "Stage 2: Distill World Model",
-    "Stage 3: Maximize Leverage",
-    "Three Takeaways",
+    "Diagnostic intelligence should be trained around world models",
+    "World-model RCA should verify causal loops, not predict labels",
+    "Fault injection makes RCA learnable",
+    "Simulation turns RCA data into controlled experiments",
+    "Verified propagation makes reasoning scoreable",
+    "RCA should produce graphs, not isolated answers",
+    "Public RCA benchmarks reward shortcuts",
+    "Existing benchmarks are shallow, static, and point-based",
+    "A harder benchmark exposes real performance collapse",
+    "Better RCA is constrained by the effectiveness-data-cost trade-off",
+    "Process supervision is the missing training signal",
+    "Forward verification makes process supervision tractable",
+    "OpenRCA 2.0 aligns benchmark quality with training signal",
+    "Structured reasoning already works in production",
+    "Closed-loop simulation can generate RCA training data",
+    "Many verified traces can be distilled into a reusable world model",
+    "World models create leverage across the diagnostic workflow",
+    "The opportunity is to train around causal structure",
 ]
 IMPLEMENTED_SLIDE_COUNT = len(SLIDE_TITLES)
 
@@ -158,6 +280,68 @@ class Presentation(BasePresentation):
     def slides(self):
         return self._pptx.slides
 
+    def evidence_comparison(
+        self,
+        title: str,
+        left_title: str,
+        left_visual,
+        right_title: str,
+        right_visual,
+        conclusion: str,
+        reference: str | None = None,
+    ):
+        sb = self.slide(title=title, reference=reference)
+        left = VStack(
+            gap=0.12,
+            width=5.1,
+            children=[
+                TextBlock(text=left_title, font_size="heading", color="primary", bold=True),
+                left_visual,
+            ],
+        )
+        right = VStack(
+            gap=0.12,
+            width=5.1,
+            children=[
+                TextBlock(text=right_title, font_size="heading", color="secondary", bold=True),
+                right_visual,
+            ],
+        )
+        sb.layout(
+            VStack(
+                gap=0.18,
+                children=[
+                    HStack(gap=0.32, children=[left, right]),
+                    TextBlock(text=conclusion, font_size="body", color="text", bold=True),
+                ],
+            )
+        )
+        return sb
+
+    def seminar_takeaway(
+        self,
+        title: str,
+        message: str,
+        evidence: list[str] | None = None,
+        reference: str | None = None,
+    ):
+        sb = self.slide(title=title, reference=reference)
+        children = [
+            TextBlock(text=message, font_size="heading", color="primary", bold=True),
+        ]
+        if evidence:
+            children.append(
+                VStack(
+                    gap=0.12,
+                    children=[
+                        TextBlock(text=item, font_size="body", color="text")
+                        for item in evidence
+                    ],
+                )
+            )
+        sb.layout(VStack(gap=0.22, children=children))
+        return sb
+
 
 def _speaker_notes(*segments: str) -> str:
     return " ".join(segment.strip() for segment in segments if segment.strip())
@@ -165,9 +349,16 @@ def _speaker_notes(*segments: str) -> str:
 
 def _dark_stat_card(label: str, value: str, tone: str = "secondary"):
     return VStack(
-        gap=0.10,
+        gap=0.04,
         children=[
-            Badge(text=label, color=tone),
+            TextBlock(
+                text=label.upper(),
+                font_size=9,
+                color=tone,
+                bold=True,
+                line_spacing=1.0,
+                height=0.38,
+            ),
             TextBlock(
                 text=value,
                 font_size="heading",
@@ -268,70 +459,48 @@ def _build_slide_1(prs: Presentation):
 
 
 def _build_slide_2(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[1], reference="Goal-driven RCA survey")
-
-    left_badge = Badge(text="Black-box RCA", color="negative")
-    left_icons = HStack(
-        gap=0.15,
+    left_visual = VStack(
+        gap=0.16,
         children=[
-            SvgImage(svg=icon_database(prs._theme, size=40), width=0.35, height=0.35),
-            SvgImage(svg=icon_agent(prs._theme, size=40), width=0.35, height=0.35),
-        ],
-    )
-    left_flow = Flow(
-        labels=["Data", "LLM guess", "Label"],
-        colors=["bg_alt", "negative", "bg_alt"],
-        arrow_color="text_light",
-    )
-    left_callout = Callout(
-        title="Current pattern",
-        body="Optimize for a correct answer, even if the causal path is hidden or hallucinated.",
-        color="negative",
-    )
-    left_col = VStack(
-        gap=0.15,
-        width=4.8,
-        children=[left_badge, left_icons, left_flow, left_callout],
-    )
-
-    right_badge = Badge(text="World-model RCA", color="positive")
-    right_icons = HStack(
-        gap=0.15,
-        children=[
-            SvgImage(svg=icon_database(prs._theme, size=40), width=0.35, height=0.35),
-            SvgImage(
-                svg=icon_world_model(prs._theme, size=40), width=0.35, height=0.35
+            TextBlock(text="Black-box RCA", font_size="heading", color="negative", bold=True),
+            Flow(
+                labels=["Data", "LLM guess", "Label"],
+                colors=["bg_alt", "negative", "bg_alt"],
+                arrow_color="text_light",
+            ),
+            Callout(
+                title="What the benchmark rewards",
+                body="Optimize for a correct answer even if the causal path is hidden or hallucinated.",
+                color="negative",
             ),
         ],
     )
-    right_flow = Flow(
-        labels=["Data", "Verify", "Graph"],
-        colors=["bg_alt", "accent", "positive"],
-        arrow_color="text_light",
-    )
-    right_callout = Callout(
-        title="Target behavior",
-        body="Build and check a causal loop so the answer and the reasoning are both inspectable.",
-        color="positive",
-    )
-    right_col = VStack(
-        gap=0.15,
-        width=4.8,
-        children=[right_badge, right_icons, right_flow, right_callout],
+
+    right_visual = VStack(
+        gap=0.16,
+        children=[
+            TextBlock(text="World-model RCA", font_size="heading", color="positive", bold=True),
+            Flow(
+                labels=["Data", "Verify", "Graph"],
+                colors=["bg_alt", "accent", "positive"],
+                arrow_color="text_light",
+            ),
+            Callout(
+                title="What we actually want",
+                body="Build and verify a causal loop so the answer and the reasoning are both inspectable.",
+                color="positive",
+            ),
+        ],
     )
 
-    bridge = TextBlock(
-        text="Black-box RCA predicts an answer. World-model RCA closes a causal loop.",
-        font_size="body",
-        color="text_mid",
-        italic=True,
-    )
-
-    sb.layout(
-        VStack(
-            gap=0.28,
-            children=[HStack(gap=0.40, children=[left_col, right_col]), bridge],
-        )
+    sb = prs.evidence_comparison(
+        title=SLIDE_TITLES[1],
+        left_title="Prediction-oriented framing",
+        left_visual=left_visual,
+        right_title="Verification-oriented framing",
+        right_visual=right_visual,
+        conclusion="Black-box RCA predicts an answer; world-model RCA verifies a causal explanation.",
+        reference="Goal-driven RCA survey",
     )
     sb.notes(
         _speaker_notes(
@@ -339,7 +508,6 @@ def _build_slide_2(prs: Presentation):
             "Transition by asking what assumptions must be true for that loop to be feasible.",
         )
     )
-    sb.animate([[left_col], [right_col], [bridge]])
     return sb
 
 
@@ -617,8 +785,6 @@ def _build_slide_7(prs: Presentation):
 
 
 def _build_slide_8(prs: Presentation):
-    sb = prs.slide(title=SLIDE_TITLES[6], reference="FSE RCA benchmark study")
-
     simple_baseline = VStack(
         gap=0.16,
         width=5.5,
@@ -658,12 +824,14 @@ def _build_slide_8(prs: Presentation):
         body="If a simple baseline rivals SOTA, the benchmark is oversimplifying real RCA difficulty.",
         color="negative",
     )
-
-    sb.layout(
-        VStack(
-            gap=0.28,
-            children=[HStack(gap=0.40, children=[simple_baseline, sota]), verdict],
-        )
+    sb = prs.evidence_comparison(
+        title=SLIDE_TITLES[6],
+        left_title="Simple baseline",
+        left_visual=simple_baseline,
+        right_title="Published SOTA",
+        right_visual=sota,
+        conclusion="If a simple baseline rivals SOTA, the benchmark is not measuring the hardest part of diagnosis.",
+        reference="FSE RCA benchmark study",
     )
     sb.notes(
         _speaker_notes(
@@ -672,7 +840,6 @@ def _build_slide_8(prs: Presentation):
             "Transition by asking what structural defects make those benchmarks so forgiving.",
         )
     )
-    sb.animate([[simple_baseline], [sota], [verdict]])
     return sb
 
 
@@ -747,12 +914,13 @@ def _build_slide_10(prs: Presentation):
     scores = HStack(
         gap=0.36,
         children=[
-            stat_card("Average Top@1", "0.21", tone="negative"),
-            stat_card("Best model", "0.37", tone="warning"),
+            stat_card("Average Top@1", "0.21", tone="negative", width=1.55, value_font_size=18),
+            stat_card("Best model", "0.37", tone="warning", width=1.55, value_font_size=18),
             Callout(
                 title="What changed",
-                body="A harder benchmark preserves complex propagation and exposes a real performance collapse.",
+                body="A harder benchmark preserves propagation and exposes a real performance collapse.",
                 color="primary",
+                width=7.9,
             ),
         ],
     )
@@ -916,11 +1084,11 @@ def _build_slide_13(prs: Presentation):
     sb = prs.slide(title=SLIDE_TITLES[12], reference="OpenRCA 2.0 / FORGE")
 
     summary = HStack(
-        gap=0.28,
+        gap=0.24,
         children=[
-            stat_card("Benchmark", "500 instances", tone="primary"),
-            stat_card("Labels", "step-wise causal annotations", tone="accent"),
-            stat_card("Supervision", "process supervision", tone="positive"),
+            stat_card("Benchmark", "500 cases", tone="primary", width=3.1, value_font_size=18),
+            stat_card("Labels", "Step-wise annotations", tone="accent", width=3.75, value_font_size=18),
+            stat_card("Supervision", "Process supervision", tone="positive", width=3.6, value_font_size=18),
         ],
     )
     dimensions = Flow(
@@ -982,15 +1150,17 @@ def _build_slide_14(prs: Presentation):
     )
     stats = HStack(
         gap=0.40,
+        width=3.9,
         children=[
-            stat_card("Triage accuracy", "97%", tone="positive"),
-            stat_card("TTE reduction", "91%", tone="accent"),
+            stat_card("Accuracy", "97%", tone="positive"),
+            stat_card("TTE drop", "91%", tone="accent"),
         ],
     )
     production = Callout(
         title="Production validated",
-        body="Deployed at Microsoft, serving tens of millions of users.",
+        body="Deployed at Microsoft for large-scale production triage.",
         color="primary",
+        width=7.4,
     )
     outcomes = HStack(
         gap=0.32,
@@ -1132,54 +1302,21 @@ def _build_slide_17(prs: Presentation):
 
 
 def _build_slide_18(prs: Presentation):
-    sb = prs.slide(background="bg_accent")
-
-    hero = VStack(
-        gap=0.12,
-        children=[
-            TextBlock(
-                text="Three Takeaways",
-                font_size=30,
-                color="primary",
-                bold=True,
-            ),
-            TextBlock(
-                text="What matters is not only finding the right answer, but building a reasoning system we can trust and reuse.",
-                font_size="body",
-                color="text_mid",
-            ),
+    sb = prs.seminar_takeaway(
+        title=SLIDE_TITLES[17],
+        message="What matters is not only finding the right answer, but building a reasoning system we can trust and reuse.",
+        evidence=[
+            "Score the reasoning path, not only the final answer.",
+            "Train on verification loops instead of answer labels alone.",
+            "Distill reusable world models from many verified traces.",
         ],
     )
-    takeaways = HStack(
-        gap=0.45,
-        children=[
-            _closing_takeaway(
-                "1", "Score the path, not just the answer.", tone="accent"
-            ),
-            _closing_takeaway(
-                "2", "Train on verification loops, not only labels.", tone="secondary"
-            ),
-            _closing_takeaway(
-                "3", "Build the model once, then reuse it broadly.", tone="positive"
-            ),
-        ],
-    )
-    final_line = TextBlock(
-        text="Build the model once. Reuse it across diagnosis, prediction, and repair.",
-        font_size=22,
-        color="primary",
-        bold=True,
-        align="center",
-    )
-
-    sb.layout(VStack(gap=0.42, children=[hero, takeaways, final_line]))
     sb.notes(
         _speaker_notes(
             "Close with three short takeaways rather than a dense recap, keeping the typography strong and the message memorable.",
             "End on the final line as the thesis statement for the whole talk.",
         )
     )
-    sb.animate([[hero], [takeaways], [final_line]])
     return sb
 
 

@@ -3,34 +3,25 @@
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 
-from pptx.util import Inches, Pt, Emu
+from pptx.util import Inches, Pt
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR, MSO_AUTO_SIZE
+from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
 
 from paperops.slides.core.constants import (
     Region, SLIDE_WIDTH, SLIDE_HEIGHT,
     CONTENT_REGION, TITLE_REGION, REFERENCE_REGION, ACCENT_LINE_TOP,
-    Direction, Align,
 )
 from paperops.slides.core.types import resolve_color as _resolve_color_raw
-from paperops.slides.core.types import resolve_font_size, resolve_size
+from paperops.slides.core.types import resolve_font_size
 from paperops.slides.layout.engine import compute_layout
-from paperops.slides.layout.containers import Flex, Grid, HStack, LayoutNode, Padding, VStack
+from paperops.slides.layout.containers import Absolute, AbsoluteItem, Flex, Grid, GridItem, HStack, Layer, LayoutNode, Padding, Spacer, VStack
 from paperops.slides.components.shapes import Box, RoundedBox, Circle, Badge, Arrow, Line
 from paperops.slides.components.text import TextBlock, BulletList
 from paperops.slides.components.table import Table
 from paperops.slides.components.image import Image, SvgImage
-from paperops.slides.components.composite import Callout, Flow
-from paperops.slides.components.charts.bar import BarChart
-from paperops.slides.components.charts.radar import RadarChart
-from paperops.slides.components.charts.flowchart import Flowchart
-from paperops.slides.components.charts.line import LineChart
-from paperops.slides.components.charts.pie import PieChart
-from paperops.slides.components.charts.horizontal_bar import HorizontalBarChart
 from paperops.slides.animation import inject_appear_animations
 
 # Color literals that components use but aren't in themes
@@ -75,6 +66,7 @@ class SlideBuilder:
 
     def layout(self, component):
         """Set the content layout. Component can be any LayoutNode or container."""
+        self._invalidate_render()
         self._component = component
         return self
 
@@ -90,14 +82,31 @@ class SlideBuilder:
 
         click_groups: list of lists of component objects.
         """
+        self._invalidate_render()
         self._click_groups = click_groups
         return self
 
     def background(self, color=None, image_path=None):
         """Set slide background color or image."""
+        self._invalidate_render()
         self._bg_color = color
         self._bg_image = image_path
         return self
+
+    def _invalidate_render(self):
+        if self._rendered:
+            self._clear_shapes()
+        self._component_to_shape_ids.clear()
+        self._issues = []
+        self._resolved_regions = {}
+        self._rendered = False
+
+    def _clear_shapes(self):
+        for shape in list(self._slide.shapes):
+            element = shape._element
+            parent = element.getparent()
+            if parent is not None:
+                parent.remove(element)
 
     # ------------------------------------------------------------------
     # Rendering
@@ -291,30 +300,37 @@ class SlideBuilder:
     def _render_node(self, node: LayoutNode):
         """Recursively render a positioned node."""
         # Containers: recurse into children
-        if isinstance(node, (Flex, HStack, VStack, Grid)):
+        if isinstance(node, Grid):
+            if any(isinstance(child, GridItem) for child in node.children):
+                for item in node.children:
+                    if item.child is not None:
+                        self._render_node(item.child)
+            else:
+                for child in node.children:
+                    self._render_node(child)
+            return
+        if isinstance(node, (Flex, HStack, VStack, Layer)):
             for child in node.children:
                 self._render_node(child)
+            return
+        if isinstance(node, Absolute):
+            for item in node.children:
+                if item.child is not None:
+                    self._render_node(item.child)
+            return
+        if isinstance(node, GridItem):
+            if node.child is not None:
+                self._render_node(node.child)
+            return
+        if isinstance(node, AbsoluteItem):
+            if node.child is not None:
+                self._render_node(node.child)
             return
         if isinstance(node, Padding):
             if node.child is not None:
                 self._render_node(node.child)
             return
-
-        # Composites: expand then render, track child shapes for parent
-        if isinstance(node, (Callout, Flow, Flowchart)):
-            expanded = node.to_layout()
-            # Re-layout the expanded tree within the node's region
-            if node._region is not None:
-                _layout_meta, nested_issues = self._resolve_layout(expanded, node._region)
-                self._issues.extend(nested_issues)
-                self._render_node(expanded)
-                self._track_composite(node, expanded)
-            return
-
-        # Charts: render to SVG then as image
-        if isinstance(node, (BarChart, RadarChart, LineChart, PieChart, HorizontalBarChart)):
-            svg_str = node.to_svg(self._theme)
-            self._render_svg_image(node, svg_str)
+        if isinstance(node, Spacer):
             return
 
         # Leaf components
@@ -362,21 +378,31 @@ class SlideBuilder:
         spid = shape.shape_id
         self._component_to_shape_ids.setdefault(id(node), []).append(spid)
 
-    def _track_composite(self, composite_node, expanded_node):
-        """After rendering a composite, copy all child shape IDs to the composite."""
-        child_ids = self._collect_shape_ids(expanded_node)
-        if child_ids:
-            self._component_to_shape_ids.setdefault(id(composite_node), []).extend(child_ids)
-
     def _collect_shape_ids(self, node) -> list[int]:
         """Collect all shape IDs from a rendered subtree."""
         ids = []
         cid = id(node)
         if cid in self._component_to_shape_ids:
             ids.extend(self._component_to_shape_ids[cid])
-        if isinstance(node, (Flex, HStack, VStack, Grid)):
+        if isinstance(node, Grid):
+            if any(isinstance(child, GridItem) for child in node.children):
+                for item in node.children:
+                    if item.child is not None:
+                        ids.extend(self._collect_shape_ids(item.child))
+            else:
+                for child in node.children:
+                    ids.extend(self._collect_shape_ids(child))
+        elif isinstance(node, (Flex, HStack, VStack, Layer)):
             for child in node.children:
                 ids.extend(self._collect_shape_ids(child))
+        elif isinstance(node, Absolute):
+            for item in node.children:
+                if item.child is not None:
+                    ids.extend(self._collect_shape_ids(item.child))
+        elif isinstance(node, GridItem) and node.child is not None:
+            ids.extend(self._collect_shape_ids(node.child))
+        elif isinstance(node, AbsoluteItem) and node.child is not None:
+            ids.extend(self._collect_shape_ids(node.child))
         elif isinstance(node, Padding) and node.child is not None:
             ids.extend(self._collect_shape_ids(node.child))
         return ids

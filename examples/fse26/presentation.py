@@ -9,12 +9,11 @@ Duration: ~10 minutes
 from pathlib import Path
 
 from paperops.slides import (
+    Arrow,
     Presentation, themes,
     HStack, VStack, Grid, Padding,
     RoundedBox, Circle,
     TextBlock, BulletList, Table,
-    Callout, Flowchart,
-    BarChart,
     Image, SvgImage,
 )
 
@@ -26,6 +25,120 @@ ASSET_DIR = Path(__file__).parent / "assets"
 def asset(filename: str) -> str:
     """Resolve local image assets for this deck."""
     return str(ASSET_DIR / filename)
+
+
+def Callout(title: str, body: str, color: str = "primary", width: float | None = None, height: float | None = None):
+    return VStack(
+        gap=0.08,
+        width=width,
+        height=height,
+        children=[
+            TextBlock(text=title, font_size="body", color=color, bold=True),
+            TextBlock(text=body, font_size="caption", color="text"),
+        ],
+    )
+
+
+def Flowchart(nodes: dict, edges: list, direction: str = "right", node_widths: dict[str, float] | None = None, height: float | None = None):
+    node_widths = node_widths or {}
+    order = list(nodes.keys())
+    boxes = {}
+    for node_id in order:
+        value = nodes[node_id]
+        if isinstance(value, tuple):
+            label, color = value[0], value[1]
+        else:
+            label, color = value, "bg_alt"
+        boxes[node_id] = RoundedBox(
+            text=label,
+            color=color,
+            border="border" if color in {"bg_alt", "bg", "bg_accent"} else color,
+            text_color="white" if color not in {"bg_alt", "bg", "bg_accent"} else "text",
+            font_size="caption",
+            bold=True,
+            width=node_widths.get(node_id),
+            height=height if height is not None else 0.9,
+            size_mode_x="fit" if node_widths.get(node_id) is None else "fixed",
+        )
+    out_edges = {}
+    in_degree = {}
+    for edge in edges:
+        out_edges.setdefault(edge[0], []).append(edge[1])
+        in_degree[edge[1]] = in_degree.get(edge[1], 0) + 1
+    is_chain = all(len(targets) <= 1 for targets in out_edges.values()) and all(count <= 1 for count in in_degree.values())
+    if not is_chain:
+        return Grid(cols=min(max(len(order), 1), 3), gap=0.18, children=[boxes[node_id] for node_id in order])
+    starts = [node_id for node_id in order if in_degree.get(node_id, 0) == 0]
+    if starts:
+        ordered = []
+        current = starts[0]
+        seen = set()
+        while current not in seen:
+            seen.add(current)
+            ordered.append(current)
+            next_nodes = out_edges.get(current, [])
+            if not next_nodes:
+                break
+            current = next_nodes[0]
+        ordered.extend(node_id for node_id in order if node_id not in seen)
+        order = ordered
+    children = []
+    arrow_direction = "vertical" if direction in {"down", "vertical"} else "horizontal"
+    for index, node_id in enumerate(order):
+        box = boxes[node_id]
+        children.append(box)
+        if index < len(order) - 1:
+            children.append(
+                Arrow(
+                    from_component=box,
+                    to_component=boxes[order[index + 1]],
+                    color="primary",
+                    direction=arrow_direction,
+                )
+            )
+    container_cls = VStack if arrow_direction == "vertical" else HStack
+    return container_cls(gap=0.15, children=children)
+
+
+def BarChart(groups: list, y_label: str = "", show_values: bool = True):
+    width = 700
+    height = 360
+    margin_left = 70
+    margin_bottom = 60
+    chart_height = 220
+    chart_top = 30
+    colors = {
+        "primary": "#8B4513",
+        "accent": "#4A6FA5",
+        "negative": "#A0522D",
+        "warning": "#B8860B",
+    }
+    flat_values = [item[1] for _group, items in groups for item in items]
+    max_value = max(flat_values) if flat_values else 1.0
+    group_width = 180
+    bar_width = 34
+    gap = 14
+    svg = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}">',
+        '<rect width="100%" height="100%" fill="#FFFEF8"/>',
+        f'<text x="22" y="{chart_top + chart_height / 2}" font-size="16" fill="#5A5A5A" transform="rotate(-90 22 {chart_top + chart_height / 2})">{y_label}</text>',
+        f'<line x1="{margin_left}" y1="{chart_top + chart_height}" x2="{width - 20}" y2="{chart_top + chart_height}" stroke="#C8C0B0" stroke-width="2"/>',
+    ]
+    for group_index, (group_label, items) in enumerate(groups):
+        group_x = margin_left + 30 + group_index * group_width
+        for item_index, (label, value, tone) in enumerate(items):
+            bar_h = 0 if max_value <= 0 else (value / max_value) * chart_height
+            x = group_x + item_index * (bar_width + gap)
+            y = chart_top + chart_height - bar_h
+            fill = colors.get(tone, "#8B4513")
+            svg.append(f'<rect x="{x}" y="{y}" width="{bar_width}" height="{bar_h}" rx="4" fill="{fill}" opacity="0.85"/>')
+            if show_values:
+                svg.append(f'<text x="{x + bar_width / 2}" y="{y - 8}" font-size="13" text-anchor="middle" fill="#2C2C2C">{value:.2f}</text>')
+            svg.append(f'<text x="{x + bar_width / 2}" y="{chart_top + chart_height + 18}" font-size="12" text-anchor="middle" fill="#5A5A5A">{label}</text>')
+        center_x = group_x + ((len(items) - 1) * (bar_width + gap) + bar_width) / 2
+        svg.append(f'<text x="{center_x}" y="{height - 16}" font-size="14" text-anchor="middle" fill="#2C2C2C">{group_label}</text>')
+    svg.append("</svg>")
+    return SvgImage(svg="".join(svg), width=6.7, height=3.2)
 
 # ============================================================================
 # SVG ICONS (raw SVG strings)
@@ -870,15 +983,18 @@ sb.notes(
 # ============================================================================
 
 output_path = Path(__file__).with_name("rca_benchmark_presentation.pptx")
-prs.save(str(output_path))
 
-print(f"Presentation saved to: {output_path}")
-print("\nRunning validation...")
-report = prs.review()
-print(f"Total slides: {report['total_slides']}")
-print(f"Issues found: {report['total_issues']}")
-if report['issues']:
-    for issue in report['issues']:
-        print(f"  - [{issue['type']}] {issue['detail']}")
-else:
-    print("No issues found!")
+
+if __name__ == "__main__":
+    prs.save(str(output_path))
+
+    print(f"Presentation saved to: {output_path}")
+    print("\nRunning validation...")
+    report = prs.review()
+    print(f"Total slides: {report['total_slides']}")
+    print(f"Issues found: {report['total_issues']}")
+    if report['issues']:
+        for issue in report['issues']:
+            print(f"  - [{issue['type']}] {issue['detail']}")
+    else:
+        print("No issues found!")

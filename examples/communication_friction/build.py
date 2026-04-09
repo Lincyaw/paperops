@@ -9,22 +9,19 @@ from paperops.slides import (
     Arrow,
     Badge,
     BulletList,
-    Callout,
-    Flow,
-    Flowchart,
     Grid,
     HStack,
     Line,
     Padding,
-    Presentation,
+    Presentation as BasePresentation,
     RoundedBox,
-    SvgCanvas,
     SvgImage,
     Table,
     TextBlock,
     VStack,
     themes,
 )
+from paperops.slides.components.svg_canvas import SvgCanvas
 
 # ============================================================
 # 主题：晨雾蓝 + 仿宋
@@ -48,7 +45,190 @@ theme = themes.professional.override(
         "border": "#E2E8F0",  # 分隔线
     },
 )
+
+
+class Presentation(BasePresentation):
+    def cover(self, title: str, subtitle: str = ""):
+        sb = self.slide(background="bg")
+        sb.layout(
+            VStack(
+                gap=0.28,
+                children=[
+                    TextBlock(text=title, font_size=30, color="primary", bold=True, align="center"),
+                    TextBlock(text=subtitle, font_size="body", color="text_mid", align="center"),
+                ],
+            )
+        )
+        return sb
+
+    def transition(self, text: str, sub_text: str = ""):
+        sb = self.slide(background="bg_alt")
+        sb.layout(
+            VStack(
+                gap=0.18,
+                children=[
+                    TextBlock(text=text, font_size=26, color="primary", bold=True, align="center"),
+                    TextBlock(text=sub_text, font_size="body", color="text_mid", align="center"),
+                ],
+            )
+        )
+        return sb
+
+    def comparison(self, title: str, left: tuple[str, list[str]], right: tuple[str, list[str]], reference: str | None = None):
+        sb = self.slide(title=title, reference=reference)
+        left_title, left_items = left
+        right_title, right_items = right
+        sb.layout(
+            HStack(
+                gap=0.32,
+                children=[
+                    VStack(
+                        gap=0.16,
+                        width=5.0,
+                        children=[
+                            TextBlock(text=left_title, font_size="heading", color="primary", bold=True),
+                            BulletList(items=left_items, font_size="body"),
+                        ],
+                    ),
+                    VStack(
+                        gap=0.16,
+                        width=5.0,
+                        children=[
+                            TextBlock(text=right_title, font_size="heading", color="secondary", bold=True),
+                            BulletList(items=right_items, font_size="body"),
+                        ],
+                    ),
+                ],
+            )
+        )
+        return sb
+
+    def end(self, title: str, subtitle: str = ""):
+        return self.cover(title=title, subtitle=subtitle)
+
+
 prs = Presentation(theme=theme)
+
+
+def Callout(title: str, body: str, color: str = "primary", width: float | None = None, height: float | None = None):
+    return VStack(
+        gap=0.08,
+        width=width,
+        height=height,
+        children=[
+            TextBlock(text=title, font_size="body", color=color, bold=True),
+            TextBlock(text=body, font_size="caption", color="text"),
+        ],
+    )
+
+
+def Flow(
+    labels: list[str],
+    colors: list[str] | None = None,
+    arrow_color: str = "primary",
+    direction: str = "horizontal",
+    width: float | None = None,
+    height: float | None = None,
+):
+    box_colors = list(colors or ["bg_alt"] * len(labels))
+    while len(box_colors) < len(labels):
+        box_colors.append("bg_alt")
+    boxes = [
+        RoundedBox(
+            text=label,
+            color=color,
+            border="border" if color in {"bg_alt", "bg", "bg_accent"} else color,
+            text_color="white" if color not in {"bg_alt", "bg", "bg_accent"} else "text",
+            font_size="caption",
+            bold=True,
+            height=0.82,
+            size_mode_x="fit",
+        )
+        for label, color in zip(labels, box_colors)
+    ]
+    children = []
+    arrow_direction = "vertical" if direction in {"vertical", "down"} else "horizontal"
+    for index, box in enumerate(boxes):
+        children.append(box)
+        if index < len(boxes) - 1:
+            children.append(
+                Arrow(
+                    from_component=box,
+                    to_component=boxes[index + 1],
+                    color=arrow_color,
+                    direction=arrow_direction,
+                )
+            )
+    container_cls = VStack if arrow_direction == "vertical" else HStack
+    return container_cls(gap=0.15, width=width, height=height, children=children)
+
+
+def Flowchart(
+    nodes: dict,
+    edges: list,
+    direction: str = "right",
+    node_widths: dict[str, float] | None = None,
+    height: float | None = None,
+    width: float | None = None,
+):
+    node_widths = node_widths or {}
+    order = list(nodes.keys())
+    boxes = {}
+    out_edges = {}
+    in_degree = {}
+    for node_id in order:
+        value = nodes[node_id]
+        if isinstance(value, tuple):
+            label, color = value[0], value[1]
+        else:
+            label, color = value, "bg_alt"
+        boxes[node_id] = RoundedBox(
+            text=label,
+            color=color,
+            border="border" if color in {"bg_alt", "bg", "bg_accent"} else color,
+            text_color="white" if color not in {"bg_alt", "bg", "bg_accent"} else "text",
+            font_size="caption",
+            bold=True,
+            width=node_widths.get(node_id),
+            height=height if height is not None else 0.9,
+            size_mode_x="fit" if node_widths.get(node_id) is None else "fixed",
+        )
+    for edge in edges:
+        out_edges.setdefault(edge[0], []).append(edge[1])
+        in_degree[edge[1]] = in_degree.get(edge[1], 0) + 1
+    is_chain = all(len(targets) <= 1 for targets in out_edges.values()) and all(count <= 1 for count in in_degree.values())
+    if not is_chain:
+        return Grid(cols=min(max(len(order), 1), 3), gap=0.18, width=width, children=[boxes[node_id] for node_id in order])
+    starts = [node_id for node_id in order if in_degree.get(node_id, 0) == 0]
+    if starts:
+        ordered = []
+        current = starts[0]
+        seen = set()
+        while current not in seen:
+            seen.add(current)
+            ordered.append(current)
+            next_nodes = out_edges.get(current, [])
+            if not next_nodes:
+                break
+            current = next_nodes[0]
+        ordered.extend(node_id for node_id in order if node_id not in seen)
+        order = ordered
+    children = []
+    arrow_direction = "vertical" if direction in {"down", "vertical"} else "horizontal"
+    for index, node_id in enumerate(order):
+        box = boxes[node_id]
+        children.append(box)
+        if index < len(order) - 1:
+            children.append(
+                Arrow(
+                    from_component=box,
+                    to_component=boxes[order[index + 1]],
+                    color="primary",
+                    direction=arrow_direction,
+                )
+            )
+    container_cls = VStack if arrow_direction == "vertical" else HStack
+    return container_cls(gap=0.15, width=width, height=height, children=children)
 
 
 # ============================================================
@@ -993,17 +1173,20 @@ prs.end(
 # ============================================================
 output_dir = os.path.dirname(os.path.abspath(__file__))
 output_path = os.path.join(output_dir, "communication_friction.pptx")
-prs.save(output_path)
-print(f"Saved to {output_path}")
 
-report = prs.review()
-print(f"Slides: {report['total_slides']}, Issues: {report['total_issues']}")
-for iss in report["issues"]:
-    print(f"  [{iss['type']}] {iss['detail']}")
 
-preview_dir = os.path.join(output_dir, "preview")
-os.makedirs(preview_dir, exist_ok=True)
-paths = prs.preview(output_dir=preview_dir)
-print(f"Preview: {len(paths)} slides rendered")
-for p in paths:
-    print(f"  {p}")
+if __name__ == "__main__":
+    prs.save(output_path)
+    print(f"Saved to {output_path}")
+
+    report = prs.review()
+    print(f"Slides: {report['total_slides']}, Issues: {report['total_issues']}")
+    for iss in report["issues"]:
+        print(f"  [{iss['type']}] {iss['detail']}")
+
+    preview_dir = os.path.join(output_dir, "preview")
+    os.makedirs(preview_dir, exist_ok=True)
+    paths = prs.preview(output_dir=preview_dir)
+    print(f"Preview: {len(paths)} slides rendered")
+    for p in paths:
+        print(f"  {p}")

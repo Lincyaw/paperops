@@ -89,6 +89,70 @@ class _Themes:
     """Namespace for built-in themes. Instances are cached."""
 
     @functools.cached_property
+    def executive(self) -> Theme:
+        return Theme(
+            name="executive",
+            colors={
+                "primary":    "#16324F",
+                "secondary":  "#356B6F",
+                "accent":     "#C8792A",
+                "positive":   "#2E6B57",
+                "negative":   "#B44D3E",
+                "highlight":  "#4768A8",
+                "warning":    "#B6923E",
+                "text":       "#16212B",
+                "text_mid":   "#51606F",
+                "text_light": "#7C8A98",
+                "bg":         "#F7F6F2",
+                "bg_alt":     "#ECEAE3",
+                "bg_accent":  "#E2E8EE",
+                "border":     "#C5CBD3",
+            },
+            fonts={
+                "title": 30,
+                "subtitle": 20,
+                "heading": 22,
+                "body": 16,
+                "caption": 12,
+                "small": 10,
+            },
+            font_family="Liberation Sans",
+            font_mono="Liberation Mono",
+        )
+
+    @functools.cached_property
+    def academic_seminar(self) -> Theme:
+        return Theme(
+            name="academic_seminar",
+            colors={
+                "primary":    "#1F3A5F",
+                "secondary":  "#4B627D",
+                "accent":     "#C47A2C",
+                "positive":   "#2F6B57",
+                "negative":   "#B34E48",
+                "highlight":  "#3F5F90",
+                "warning":    "#A8842C",
+                "text":       "#18232F",
+                "text_mid":   "#546170",
+                "text_light": "#7F8A96",
+                "bg":         "#FFFFFF",
+                "bg_alt":     "#F4F6F8",
+                "bg_accent":  "#EAF0F5",
+                "border":     "#D2D8DF",
+            },
+            fonts={
+                "title": 26,
+                "subtitle": 18,
+                "heading": 18,
+                "body": 16,
+                "caption": 12,
+                "small": 10,
+            },
+            font_family="Liberation Sans",
+            font_mono="Liberation Mono",
+        )
+
+    @functools.cached_property
     def professional(self) -> Theme:
         return Theme(
             name="professional",

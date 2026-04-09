@@ -1,3 +1,4 @@
+import shutil
 import sys
 from pathlib import Path
 
@@ -31,15 +32,15 @@ def _slide_notes(slide) -> str:
 
 def test_self_intro_slide_titles():
     assert SLIDE_TITLES[:5] == [
-        "Building World Models for Diagnostic Intelligence",
-        "The Vision",
-        "Premise 1: Atomic Faults",
-        "Premise 2: Simulatable",
-        "Premise 3: Verifiable",
+        "Diagnostic intelligence should be trained around world models",
+        "World-model RCA should verify causal loops, not predict labels",
+        "Fault injection makes RCA learnable",
+        "Simulation turns RCA data into controlled experiments",
+        "Verified propagation makes reasoning scoreable",
     ]
     assert SLIDE_TITLES[-2:] == [
-        "My Research Philosophy",
-        "Three Takeaways",
+        "World models create leverage across the diagnostic workflow",
+        "The opportunity is to train around causal structure",
     ]
 
 
@@ -76,56 +77,29 @@ def test_all_self_intro_slides_are_grounded_and_not_drafts(tmp_path: Path):
 
     assert "Trusted diagnosis" in slide_texts[0]
     assert "Black-box RCA" in slide_texts[1]
-    assert "F: O -> G" in slide_texts[7]
-    assert "9,152" in slide_texts[10]
-    assert "1,430" in slide_texts[10]
-    assert "25 fault types" in slide_texts[10]
-    assert "0.21" in slide_texts[10]
-    assert "0.37" in slide_texts[10]
-
-    assert "0.76" in slide_texts[11]
-    assert "0.63" in slide_texts[11]
-    assert "Pass@1" in slide_texts[11]
-    assert "Path Reachability" in slide_texts[11]
-
-    assert "Backward diagnosis" in slide_texts[12]
-    assert "Forward verification" in slide_texts[12]
-    assert "Known intervention" in slide_texts[12]
-
-    assert "500 instances" in slide_texts[13]
-    assert "step-wise causal annotations" in slide_texts[13]
-    assert "process supervision" in slide_texts[13]
-
-    assert "Analyzer Agent" in slide_texts[14]
-    assert "Decider Agent" in slide_texts[14]
-    assert "Team Manager Agent" in slide_texts[14]
-    assert "97%" in slide_texts[14]
-    assert "91%" in slide_texts[14]
-
-    assert "Simulation" in slide_texts[15]
-    assert "Hypothesis" in slide_texts[15]
-    assert "Verify" in slide_texts[15]
-    assert "Reward" in slide_texts[15]
-
-    assert "Many traces" in slide_texts[16]
-    assert "world model" in slide_texts[16]
-
-    assert "Root-cause localization" in slide_texts[17]
-    assert "Fault prediction" in slide_texts[17]
-    assert "Repair suggestion" in slide_texts[17]
-
-    assert "Simulate" in slide_texts[18]
-    assert "Compress" in slide_texts[18]
-    assert "Generalize" in slide_texts[18]
-
-    assert "Three Takeaways" in slide_texts[19]
-    assert "Score the path, not just the answer." in slide_texts[19]
-    assert "Train on verification loops, not only labels." in slide_texts[19]
-    assert "Build the model once, then reuse it broadly." in slide_texts[19]
-    assert "Build the model once" in slide_texts[19]
+    assert "Finite faults" in slide_texts[2]
+    assert "Replayable" in slide_texts[3]
+    assert "Verified propagation" in slide_texts[4]
+    assert "Root cause" in slide_texts[5]
+    assert "Simple baseline" in slide_texts[6]
+    assert "Shallow ground truth" in slide_texts[7]
+    assert "9,152" in slide_texts[8]
+    assert "0.21" in slide_texts[8]
+    assert "Effectiveness" in slide_texts[9]
+    assert "0.76" in slide_texts[10]
+    assert "Backward diagnosis" in slide_texts[11]
+    assert "500 cases" in slide_texts[12]
+    assert "Analyzer Agent" in slide_texts[13]
+    assert "Simulation" in slide_texts[14]
+    assert "Many traces" in slide_texts[15]
+    assert "Repair suggestion" in slide_texts[16]
+    assert "Score the reasoning path" in slide_texts[17]
 
 
 def test_build_self_intro_preview_when_requested(tmp_path: Path):
+    if shutil.which("soffice") is None or shutil.which("pdftoppm") is None:
+        return
+
     out_path = tmp_path / OUTPUT_FILE.name
     preview_dir = tmp_path / "preview"
     preview_dir.mkdir()

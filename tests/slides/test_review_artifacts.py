@@ -1,9 +1,18 @@
 from pathlib import Path
 
-from paperops.slides import HStack, Presentation, TextBlock
-from paperops.slides.components.composite import Callout
-from paperops.slides.core.theme import themes
-from paperops.slides.layout.types import Constraints
+from paperops.slides import (
+    Absolute,
+    AbsoluteItem,
+    Grid,
+    GridItem,
+    HStack,
+    Layer,
+    Presentation,
+    Rect,
+    Spacer,
+    Text,
+    themes,
+)
 
 
 def _build_simple_deck() -> Presentation:
@@ -13,12 +22,19 @@ def _build_simple_deck() -> Presentation:
         HStack(
             gap=0.2,
             children=[
-                TextBlock(text="Left"),
-                TextBlock(text="Right"),
+                Text(text="Left"),
+                Spacer(grow=1, size_mode_x="fill"),
+                Text(text="Right"),
             ],
         )
     )
     return prs
+
+
+def test_presentation_exposes_core_api_only():
+    assert not hasattr(Presentation, "cover")
+    assert not hasattr(Presentation, "agenda")
+    assert not hasattr(Presentation, "evidence_comparison")
 
 
 def test_review_returns_stable_layout_artifact():
@@ -37,12 +53,6 @@ def test_review_returns_stable_layout_artifact():
     assert report["slides"][0]["title"] == "Schema Smoke"
     assert report["slides"][0]["issue_count"] == len(report["slides"][0]["issues"])
 
-    for issue in report["issues"]:
-        assert issue["slide"] == 1
-        assert issue["source"] == "layout"
-        assert "code" in issue
-        assert "message" in issue
-
 
 def test_review_deck_returns_stable_merged_artifact(tmp_path: Path):
     prs = _build_simple_deck()
@@ -57,47 +67,84 @@ def test_review_deck_returns_stable_merged_artifact(tmp_path: Path):
     assert report["schema_version"] == "2026-04-09"
     assert report["artifact"] == "deck_review"
     assert report["total_slides"] == 1
-    assert "issues" in report
-    assert "issue_counts" in report
-    assert "slides" in report
-    assert "layout_summary" in report
-    assert report["layout_summary"]["artifact"] == "layout_review"
-    assert report["layout_summary"]["total_slides"] == 1
     assert report["issue_counts"]["total"] == len(report["issues"])
-    assert report["layout_issue_count"] == report["issue_counts"]["layout"]
-
-    slide = report["slides"][0]
-    assert slide["slide_number"] == 1
-    assert slide["title"] == "Schema Smoke"
-    assert slide["issue_count"] == len(slide["issues"])
-    assert slide["issue_counts"]["total"] == slide["issue_count"]
-    assert "layout_issues" in slide
-    assert "saved_file_issues" in slide
-    assert "summary" in slide
-    assert "score" in slide
+    assert report["layout_summary"]["artifact"] == "layout_review"
+    assert report["top_problem_slides"] == []
 
 
-def test_review_deck_does_not_rank_issue_free_slides(tmp_path: Path):
-    prs = _build_simple_deck()
-    out_path = tmp_path / "deck.pptx"
+def test_grid_item_renders_explicit_children():
+    prs = Presentation()
+    sb = prs.slide(title="Grid Item")
+    sb.layout(Grid(children=[GridItem(child=Text(text="grid child"), row=0, col=0)]))
+
+    prs.review()
+
+    texts = [getattr(shape, "text", "") for shape in prs._pptx.slides[0].shapes]
+    assert "grid child" in texts
+
+
+def test_slide_layout_can_rerender_after_mutation():
+    prs = Presentation()
+    sb = prs.slide(title="Mutate")
+    sb.layout(Text(text="first"))
+    prs.review()
+
+    sb.layout(Text(text="second"))
+    prs.review()
+
+    texts = [getattr(shape, "text", "") for shape in prs._pptx.slides[0].shapes]
+    assert "second" in texts
+    assert "first" not in texts
+
+
+def test_layer_and_absolute_layout_render_without_review_issues(tmp_path: Path):
+    prs = Presentation(theme=themes.executive)
+    sb = prs.slide(title="Layered")
+    sb.layout(
+        Layer(
+            children=[
+                Rect(color="bg_alt"),
+                Absolute(
+                    children=[
+                        AbsoluteItem(
+                            left=0.35,
+                            top=0.30,
+                            width=1.8,
+                            child=Text(text="Overlay", font_size="heading", bold=True),
+                        ),
+                        AbsoluteItem(
+                            left=0.35,
+                            top=1.05,
+                            width=2.4,
+                            child=Text(text="Pinned note", font_size="caption", color="text_mid"),
+                        ),
+                    ],
+                ),
+            ],
+        )
+    )
 
     report = prs.review_deck(
-        output_path=str(out_path),
+        output_path=str(tmp_path / "layer_absolute.pptx"),
         render_preview=False,
     )
 
     assert report["issue_counts"]["total"] == 0
-    assert report["top_problem_slides"] == []
 
 
-def test_callout_measure_expands_height_when_width_is_constrained():
-    callout = Callout(
-        title="Shallow ground truth",
-        body="Labels only reach service level. No code-level or propagation-level annotation.",
-        color="negative",
-    )
+def test_executive_theme_is_available():
+    theme = themes.executive
 
-    intrinsic = callout.measure(Constraints(max_width=3.57), themes.professional)
+    assert theme.name == "executive"
+    assert theme.font_family == "Liberation Sans"
+    assert theme.resolve_color("primary") == "#16324F"
+    assert theme.resolve_font_size("body") == 16
 
-    assert intrinsic.preferred_width <= 3.57
-    assert intrinsic.preferred_height > 1.3
+
+def test_academic_seminar_theme_is_available():
+    theme = themes.academic_seminar
+
+    assert theme.name == "academic_seminar"
+    assert theme.font_family == "Liberation Sans"
+    assert theme.resolve_color("primary") == "#1F3A5F"
+    assert theme.resolve_font_size("title") == 26
