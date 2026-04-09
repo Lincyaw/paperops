@@ -537,7 +537,7 @@ prs.transition(
 # ============================================================
 sb = prs.slide(title="两个方向的层间切换")
 
-ico_shuttle_lg = SvgImage(svg=icon_shuttle(), width=2.0, height=2.0)
+ico_shuttle_lg = SvgImage(svg=icon_shuttle(), width=1.7, height=1.7)
 
 fwd_label = TextBlock(
     text="正向构建：从探索到呈现", font_size="heading", bold=True, color="text"
@@ -559,9 +559,9 @@ rev = Flow(
     direction="horizontal",
 )
 
-flows = VStack(gap=0.25, children=[fwd_label, fwd, rev_label, rev])
+flows = VStack(gap=0.22, width=9.2, children=[fwd_label, fwd, rev_label, rev])
 
-sb.layout(HStack(gap=0.4, children=[flows, ico_shuttle_lg]))
+sb.layout(HStack(gap=0.28, align="center", children=[flows, ico_shuttle_lg]))
 sb.animate(
     [
         [fwd_label, fwd],

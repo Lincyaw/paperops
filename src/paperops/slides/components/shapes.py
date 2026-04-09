@@ -2,48 +2,33 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from paperops.slides.core.constants import Align, Direction
+from paperops.slides.layout.auto_size import TextStyle, build_intrinsic_size, measure_text_intrinsic
 from paperops.slides.layout.containers import LayoutNode
-from paperops.slides.layout.auto_size import estimate_min_text_width, measure_text
+from paperops.slides.layout.types import Constraints, IntrinsicSize
 
 
 def _resolve_font_pt(theme, size: str | float) -> float:
-    """Resolve a semantic or numeric font size to points."""
     if theme is not None:
         return theme.resolve_font_size(size)
     return float(size) if isinstance(size, (int, float)) else 18.0
 
 
-def _estimate_text_size(
-    text: str,
-    font_size_pt: float,
-    explicit_w: float | None,
-    explicit_h: float | None,
-    margin_x: float = 0.3,
-    margin_y: float = 0.2,
-    font_family: str = "Calibri",
-) -> tuple[float, float]:
-    """Estimate text bounding box in inches, delegating to measure_text.
-
-    Adds *margin_x* / *margin_y* padding around the measured content.
-    """
-    if not text:
-        w = explicit_w or 0.5
-        h = explicit_h or 0.5
-        return (w, h)
-
-    content_w, content_h = measure_text(text, font_family, font_size_pt)
-
-    w = explicit_w if explicit_w is not None else content_w + margin_x
-    h = explicit_h if explicit_h is not None else content_h + margin_y
-    return (w, h)
-
-
-def _apply_min_text_width(node, text: str, pt: float, font_family: str, padding_x: float) -> None:
-    if node.min_width is None and text:
-        node.min_width = max(estimate_min_text_width(text, font_family, pt) + padding_x, 0.25)
+def _clamp_intrinsic(node: LayoutNode, intrinsic: IntrinsicSize, constraints: Constraints) -> IntrinsicSize:
+    adjusted = intrinsic
+    if node.width is not None:
+        adjusted = IntrinsicSize(adjusted.min_width, node.width, adjusted.min_height, adjusted.preferred_height)
+    if node.height is not None:
+        adjusted = IntrinsicSize(adjusted.min_width, adjusted.preferred_width, adjusted.min_height, node.height)
+    if node.min_width is not None:
+        adjusted = IntrinsicSize(max(adjusted.min_width, node.min_width), adjusted.preferred_width, adjusted.min_height, adjusted.preferred_height)
+    if node.min_height is not None:
+        adjusted = IntrinsicSize(adjusted.min_width, adjusted.preferred_width, max(adjusted.min_height, node.min_height), adjusted.preferred_height)
+    if node.height is not None:
+        adjusted = IntrinsicSize(adjusted.min_width, adjusted.preferred_width, node.height, node.height)
+    return adjusted.clamp(constraints)
 
 
 @dataclass
@@ -58,32 +43,37 @@ class Box(LayoutNode):
     bold: bool = False
     align: Align | str = "center"
     border_width: float = 1.0
+    padding_x: float = 0.22
+    padding_y: float = 0.14
+
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        pt = _resolve_font_pt(theme, self.font_size)
+        ff = getattr(theme, "font_family", "Calibri") if theme else "Calibri"
+        style = TextStyle(
+            font_family=ff,
+            font_size_pt=pt,
+            bold=self.bold,
+            margin_x=self.padding_x * 2,
+            margin_y=self.padding_y * 2,
+        )
+        text_intrinsic = build_intrinsic_size(measure_text_intrinsic(self.text, style, max_width_inches=self.width or constraints.max_width))
+        if not self.text:
+            text_intrinsic = IntrinsicSize(0.5, 0.5, 0.35, 0.35)
+        return _clamp_intrinsic(self, text_intrinsic, constraints)
 
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
-        pt = _resolve_font_pt(theme, self.font_size)
-        ff = getattr(theme, 'font_family', 'Calibri') if theme else 'Calibri'
-        # Calculate full text width (not just longest word) to prevent unwanted wrapping
-        content_w, content_h = measure_text(self.text, ff, pt)
-        # Add safety margin to ensure text fits without wrapping
-        # The 1.5 factor accounts for PPT rendering differences (font metrics, kerning, margins, etc.)
-        w = self.width if self.width is not None else (content_w * 1.5 + 0.4)
-        h = self.height if self.height is not None else (content_h + 0.2)
-        # Set min_width to ensure the box is wide enough for the full text
-        if self.min_width is None and self.text:
-            self.min_width = w
-        return w, h
+        intrinsic = self.measure(Constraints(max_width=max(available_width, 0.0)), theme)
+        return intrinsic.preferred_width, intrinsic.preferred_height
 
 
 @dataclass
 class RoundedBox(Box):
-    """Rounded rectangle — same as Box but rendered with rounded corners."""
-
     radius: float = 0.08
 
 
 @dataclass
 class Circle(LayoutNode):
-    """Circle with optional centered text."""
+    """Circle with centered text."""
 
     text: str = ""
     color: str = "primary"
@@ -91,66 +81,81 @@ class Circle(LayoutNode):
     font_size: str | float = "body"
     bold: bool = True
     radius: float | None = None
+    padding: float = 0.18
 
-    def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
-        if self.width is not None and self.height is not None:
-            return (self.width, self.height)
-
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
         if self.radius is not None:
-            d = self.radius * 2
-            return (self.width or d, self.height or d)
+            diameter = self.radius * 2
+            return IntrinsicSize(diameter, diameter, diameter, diameter).clamp(constraints)
 
         pt = _resolve_font_pt(theme, self.font_size)
-        ff = getattr(theme, 'font_family', 'Calibri') if theme else 'Calibri'
-        w, h = _estimate_text_size(self.text, pt, None, None, margin_x=0.2,
-                                   margin_y=0.2, font_family=ff)
-        d = max(w, h)
-        return (self.width or d, self.height or d)
+        ff = getattr(theme, "font_family", "Calibri") if theme else "Calibri"
+        style = TextStyle(font_family=ff, font_size_pt=pt, bold=self.bold)
+        text_intrinsic = build_intrinsic_size(measure_text_intrinsic(self.text, style, max_width_inches=self.width or constraints.max_width))
+        diameter = max(text_intrinsic.preferred_width, text_intrinsic.preferred_height) + self.padding * 2
+        intrinsic = IntrinsicSize(diameter, diameter, diameter, diameter)
+        return _clamp_intrinsic(self, intrinsic, constraints)
+
+    def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
+        intrinsic = self.measure(Constraints(max_width=max(available_width, 0.0)), theme)
+        return intrinsic.preferred_width, intrinsic.preferred_height
 
 
 @dataclass
 class Badge(LayoutNode):
-    """Small colored label, auto-width."""
+    """Compact label."""
 
     text: str = ""
     color: str = "primary"
     text_color: str = "white"
     font_size: str | float = "caption"
     bold: bool = True
+    padding_x: float = 0.18
+    padding_y: float = 0.08
+
+    def __post_init__(self):
+        if self.size_mode_x == "auto":
+            self.size_mode_x = "fit"
+
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        pt = _resolve_font_pt(theme, self.font_size)
+        ff = getattr(theme, "font_family", "Calibri") if theme else "Calibri"
+        style = TextStyle(
+            font_family=ff,
+            font_size_pt=pt,
+            bold=self.bold,
+            margin_x=self.padding_x * 2,
+            margin_y=self.padding_y * 2,
+        )
+        intrinsic = build_intrinsic_size(measure_text_intrinsic(self.text, style, max_width_inches=self.width or constraints.max_width))
+        return _clamp_intrinsic(self, intrinsic, constraints)
 
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
-        pt = _resolve_font_pt(theme, self.font_size)
-        ff = getattr(theme, 'font_family', 'Calibri') if theme else 'Calibri'
-        # Calculate full text width (not just longest word) to prevent unwanted wrapping
-        content_w, content_h = measure_text(self.text, ff, pt)
-        # Add safety margin to ensure text fits without wrapping
-        # The 1.5 factor accounts for PPT rendering differences (font metrics, kerning, margins, etc.)
-        w = self.width if self.width is not None else (content_w * 1.5 + 0.4)
-        h = self.height if self.height is not None else (content_h + 0.16)
-        # Set min_width to ensure the box is wide enough for the full text
-        if self.min_width is None and self.text:
-            self.min_width = w
-        return w, h
+        intrinsic = self.measure(Constraints(max_width=max(available_width, 0.0)), theme)
+        return intrinsic.preferred_width, intrinsic.preferred_height
 
 
 @dataclass
 class Arrow(LayoutNode):
-    """Arrow connecting two components. Post-layout: rendered after positioning."""
+    """Connector placeholder resolved after layout."""
 
     from_component: LayoutNode | None = None
     to_component: LayoutNode | None = None
     label: str | None = None
     color: str = "primary"
     width_pt: float = 1.5
-    direction: Direction | str = "horizontal"  # "horizontal" or "vertical"
+    direction: Direction | str = "horizontal"
+
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        return IntrinsicSize(0.0, 0.0, 0.0, 0.0)
 
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
-        return (0, 0)
+        return (0.0, 0.0)
 
 
 @dataclass
 class Line(LayoutNode):
-    """Line connecting two components. Post-layout."""
+    """Line placeholder resolved after layout."""
 
     from_component: LayoutNode | None = None
     to_component: LayoutNode | None = None
@@ -158,5 +163,8 @@ class Line(LayoutNode):
     width_pt: float = 1.0
     dashed: bool = False
 
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        return IntrinsicSize(0.0, 0.0, 0.0, 0.0)
+
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
-        return (0, 0)
+        return (0.0, 0.0)

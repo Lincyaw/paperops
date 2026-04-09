@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from paperops.slides.components.svg_canvas import SvgCanvas
 from paperops.slides.layout.containers import LayoutNode
+from paperops.slides.layout.types import Constraints, IntrinsicSize
 from paperops.slides.components.charts._helpers import render_legend
 
 PieSlice = tuple[str, float, str]  # (label, value, color_name)
@@ -30,8 +31,19 @@ class PieChart(LayoutNode):
     show_labels: bool = True
     show_percentages: bool = True
 
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        width = self.width if self.width is not None else (constraints.max_width or 8.0)
+        height = self.height if self.height is not None else 5.0
+        return IntrinsicSize(
+            min_width=self.min_width or min(width, 4.0),
+            preferred_width=width,
+            min_height=self.min_height or min(height, 2.5),
+            preferred_height=height,
+        ).clamp(constraints)
+
     def preferred_size(self, theme, available_width):
-        return (self.width or 8.0, self.height or 5.0)
+        intrinsic = self.measure(Constraints(max_width=max(available_width, 0.0)), theme)
+        return intrinsic.preferred_width, intrinsic.preferred_height
 
     def to_svg(self, theme) -> str:
         """Generate SVG string for this chart."""

@@ -6,12 +6,13 @@ import os
 import shutil
 import subprocess
 import tempfile
+from collections import defaultdict
 from pathlib import Path
 
 from pptx import Presentation as PptxPresentation
 from pptx.util import Inches, Pt
 
-from paperops.slides.layout.auto_size import measure_text
+from paperops.slides.layout.auto_size import TextStyle, measure_text_metrics
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -118,15 +119,21 @@ def _estimate_text_height(
     font_size_emu: int,
     box_width_emu: int,
     font_family: str = "Calibri",
+    line_spacing: float = 1.0,
 ) -> int:
-    """Estimate text height in EMU, delegating to the unified measure_text."""
+    """Estimate text height in EMU using the same text metrics as layout."""
     font_size_pt = font_size_emu / EMU_PER_PT
     box_width_inches = box_width_emu / EMU_PER_INCH if box_width_emu > 0 else None
-    _w, h_inches = measure_text(
-        text, font_family, font_size_pt, max_width_inches=box_width_inches,
+    metrics = measure_text_metrics(
+        text,
+        TextStyle(
+            font_family=font_family,
+            font_size_pt=font_size_pt,
+            line_spacing=max(line_spacing, 0.8),
+        ),
+        max_width_inches=box_width_inches,
     )
-    del _w  # Width not used, we only need height
-    return int(h_inches * EMU_PER_INCH)
+    return int(metrics.height * EMU_PER_INCH)
 
 
 def _get_all_text(shape) -> str:
@@ -160,6 +167,29 @@ def _get_font_family(shape) -> str:
                 if run.font.name:
                     return run.font.name
     return "Calibri"
+
+
+def _get_line_spacing(shape) -> float:
+    if not shape.has_text_frame:
+        return 1.0
+
+    default_font_size = _get_font_size(shape)
+    default_pt = default_font_size.pt if hasattr(default_font_size, "pt") else float(default_font_size)
+    for para in shape.text_frame.paragraphs:
+        value = para.line_spacing
+        if value is None:
+            continue
+        if hasattr(value, "pt"):
+            if default_pt > 0:
+                return max(value.pt / default_pt, 0.8)
+            continue
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            continue
+        if 0.1 <= numeric <= 4.0:
+            return max(numeric, 0.8)
+    return 1.0
 
 
 def _get_shape_bounds(shape):
@@ -209,6 +239,94 @@ def _longest_token_len(text: str) -> int:
     if not tokens:
         return len(text.strip())
     return max(len(token) for token in tokens)
+
+
+def _measure_preview_text_width(draw, text: str, font) -> int:
+    if not text:
+        return 0
+    left, _top, right, _bottom = draw.textbbox((0, 0), text, font=font)
+    return max(right - left, 0)
+
+
+def _is_cjk_heavy(text: str) -> bool:
+    if not text:
+        return False
+    total = 0
+    cjk = 0
+    for ch in text:
+        if ch.isspace():
+            continue
+        total += 1
+        cp = ord(ch)
+        if (
+            0x4E00 <= cp <= 0x9FFF
+            or 0x3400 <= cp <= 0x4DBF
+            or 0xF900 <= cp <= 0xFAFF
+            or 0x3000 <= cp <= 0x303F
+        ):
+            cjk += 1
+    if total == 0:
+        return False
+    return cjk / total >= 0.4
+
+
+def _wrap_preview_chars(draw, text: str, font, max_width_px: int) -> list[str]:
+    lines: list[str] = []
+    current = ""
+    for ch in text:
+        candidate = current + ch
+        if _measure_preview_text_width(draw, candidate, font) <= max_width_px or not current:
+            current = candidate
+            continue
+        lines.append(current)
+        current = ch
+    if current:
+        lines.append(current)
+    return lines or [text]
+
+
+def _wrap_preview_text(draw, text: str, font, max_width_px: int) -> list[str]:
+    """Wrap text for preview rendering and diagnostics.
+
+    Handles both whitespace-delimited text and CJK-heavy text where spaces may
+    be sparse or absent.
+    """
+    if not text:
+        return []
+
+    wrapped: list[str] = []
+    for paragraph in text.splitlines() or [""]:
+        if not paragraph.strip():
+            wrapped.append("")
+            continue
+
+        if _is_cjk_heavy(paragraph) or " " not in paragraph:
+            wrapped.extend(_wrap_preview_chars(draw, paragraph, font, max_width_px))
+            continue
+
+        tokens = [t for t in paragraph.split(" ") if t]
+        line = ""
+        for token in tokens:
+            candidate = f"{line} {token}".strip() if line else token
+            if _measure_preview_text_width(draw, candidate, font) <= max_width_px:
+                line = candidate
+                continue
+
+            if line:
+                wrapped.append(line)
+                line = ""
+
+            if _measure_preview_text_width(draw, token, font) > max_width_px:
+                token_lines = _wrap_preview_chars(draw, token, font, max_width_px)
+                wrapped.extend(token_lines[:-1])
+                line = token_lines[-1]
+            else:
+                line = token
+
+        if line:
+            wrapped.append(line)
+
+    return wrapped
 
 
 def summarize_slide_shapes(slide) -> dict:
@@ -262,17 +380,64 @@ def summarize_slide_shapes(slide) -> dict:
     return summary
 
 
+def _normalize_issue(
+    issue: dict,
+    *,
+    source: str,
+    default_slide: int | None = None,
+    default_severity: str = "warning",
+) -> dict:
+    item = dict(issue)
+    if item.get("slide") is None and default_slide is not None:
+        item["slide"] = default_slide
+    if "source" not in item:
+        item["source"] = source
+    if "code" not in item:
+        item["code"] = item.get("type", f"{source}_issue")
+    if "type" not in item:
+        item["type"] = item["code"]
+    if "message" not in item:
+        item["message"] = item.get("detail", item["code"])
+    if "detail" not in item:
+        item["detail"] = item["message"]
+    if "severity" not in item:
+        item["severity"] = default_severity
+    return item
+
+
 def summarize_presentation_issues(issues: list[dict]) -> dict[int, list[dict]]:
-    grouped: dict[int, list[dict]] = {}
+    grouped: dict[int, list[dict]] = defaultdict(list)
     for issue in issues:
         slide_num = issue.get("slide")
-        if slide_num is None:
-            continue
-        grouped.setdefault(slide_num, []).append(issue)
-    return grouped
+        if isinstance(slide_num, int):
+            grouped[slide_num].append(issue)
+    return dict(grouped)
 
 
-def _score_slide_summary(summary: dict, layout_issues: list[dict], saved_issues: list[dict]) -> int:
+def _count_issues(issues: list[dict]) -> dict[str, int]:
+    counts = {
+        "total": 0,
+        "layout": 0,
+        "saved_file": 0,
+        "style": 0,
+        "error": 0,
+        "warning": 0,
+        "info": 0,
+    }
+    for issue in issues:
+        counts["total"] += 1
+        source = issue.get("source")
+        if source in counts:
+            counts[source] += 1
+        severity = issue.get("severity")
+        if severity in counts:
+            counts[severity] += 1
+    return counts
+
+
+def _score_slide_summary(summary: dict, issues: list[dict]) -> int:
+    layout_issues = [i for i in issues if i.get("source") == "layout"]
+    saved_issues = [i for i in issues if i.get("source") == "saved_file"]
     return (
         len(layout_issues) * 4
         + len(saved_issues) * 5
@@ -306,7 +471,11 @@ def check_presentation(pptx_path: str) -> list[dict]:
                     r > slide_width + Inches(0.1) or b > slide_height + Inches(0.1)):
                 all_issues.append({
                     'slide': slide_num,
+                    'source': 'saved_file',
+                    'severity': 'error',
+                    'code': 'off_slide',
                     'type': 'off_slide',
+                    'message': f'Shape {info} extends beyond slide boundaries',
                     'detail': f'Shape {info} extends beyond slide boundaries',
                     'position': _bounds_to_inches(bounds),
                 })
@@ -335,12 +504,17 @@ def check_presentation(pptx_path: str) -> list[dict]:
                             font_size,
                             usable_w + width_slack,
                             font_family=_get_font_family(shape),
+                            line_spacing=_get_line_spacing(shape),
                         )
-                        if needed_h > usable_h * 1.15:
+                        if needed_h > usable_h * 1.12 and needed_h - usable_h > Inches(0.06):
                             overflow_pct = (needed_h / usable_h - 1) * 100
                             all_issues.append({
                                 'slide': slide_num,
+                                'source': 'saved_file',
+                                'severity': 'warning',
+                                'code': 'text_overflow',
                                 'type': 'text_overflow',
+                                'message': f'Text {info} overflows by {overflow_pct:.0f}%',
                                 'detail': (f'Text {info} overflows by '
                                            f'{overflow_pct:.0f}%'),
                                 'position': _bounds_to_inches(bounds),
@@ -363,7 +537,11 @@ def check_presentation(pptx_path: str) -> list[dict]:
                         if pct > 10:
                             all_issues.append({
                                 'slide': slide_num,
+                                'source': 'saved_file',
+                                'severity': 'warning',
+                                'code': 'overlap',
                                 'type': 'overlap',
+                                'message': f'{info1} and {info2} overlap by {pct:.0f}%',
                                 'detail': (f'{info1} and {info2} overlap by '
                                            f'{pct:.0f}%'),
                             })
@@ -376,13 +554,23 @@ def review_deck_artifacts(
     layout_issues: list[dict] | None = None,
     preview_paths: list[str] | None = None,
     slide_titles: list[str] | None = None,
+    layout_summary: dict | None = None,
 ) -> dict:
-    """Return a merged, per-slide review artifact for a generated deck."""
+    """Return a stable, merged review artifact for a generated deck."""
     prs = PptxPresentation(pptx_path)
-    layout_issues = layout_issues or []
-    saved_issues = check_presentation(pptx_path)
+    raw_layout_issues = layout_issues or []
+    layout_issues = [
+        _normalize_issue(issue, source="layout")
+        for issue in raw_layout_issues
+        if isinstance(issue, dict)
+    ]
+    saved_issues = [
+        _normalize_issue(issue, source="saved_file")
+        for issue in check_presentation(pptx_path)
+    ]
     preview_paths = preview_paths or []
     slide_titles = slide_titles or []
+    layout_summary = layout_summary or {}
 
     layout_by_slide = summarize_presentation_issues(layout_issues)
     saved_by_slide = summarize_presentation_issues(saved_issues)
@@ -394,19 +582,21 @@ def review_deck_artifacts(
     slides: list[dict] = []
     for slide_num, slide in enumerate(prs.slides, 1):
         summary = summarize_slide_shapes(slide)
+        slide_layout_issues = layout_by_slide.get(slide_num, [])
+        slide_saved_issues = saved_by_slide.get(slide_num, [])
+        combined_issues = [*slide_layout_issues, *slide_saved_issues]
         slide_entry = {
             "slide_number": slide_num,
             "title": slide_titles[slide_num - 1] if slide_num - 1 < len(slide_titles) else None,
-            "layout_issues": layout_by_slide.get(slide_num, []),
-            "saved_file_issues": saved_by_slide.get(slide_num, []),
+            "issues": combined_issues,
+            "layout_issues": slide_layout_issues,
+            "saved_file_issues": slide_saved_issues,
             "preview_path": preview_by_slide.get(slide_num),
             "summary": summary,
         }
-        slide_entry["score"] = _score_slide_summary(
-            summary,
-            slide_entry["layout_issues"],
-            slide_entry["saved_file_issues"],
-        )
+        slide_entry["issue_count"] = len(combined_issues)
+        slide_entry["issue_counts"] = _count_issues(combined_issues)
+        slide_entry["score"] = _score_slide_summary(summary, combined_issues)
         slides.append(slide_entry)
 
     ranked = sorted(
@@ -415,18 +605,28 @@ def review_deck_artifacts(
                 "slide_number": slide["slide_number"],
                 "title": slide["title"],
                 "score": slide["score"],
+                "issue_count": slide["issue_count"],
             }
             for slide in slides
-            if slide["score"] > 0
+            if slide["issue_count"] > 0
         ),
         key=lambda item: (-item["score"], item["slide_number"]),
     )
 
+    all_issues = [*layout_issues, *saved_issues]
+    issue_counts = _count_issues(all_issues)
+
     return {
+        "schema_version": "2026-04-09",
+        "artifact": "deck_review",
         "total_slides": len(prs.slides),
-        "layout_issue_count": len(layout_issues),
-        "saved_issue_count": len(saved_issues),
+        "issue_counts": issue_counts,
+        "issues": all_issues,
         "preview_paths": preview_paths,
         "top_problem_slides": ranked,
         "slides": slides,
+        "layout_summary": layout_summary,
+        # Legacy compatibility fields.
+        "layout_issue_count": len(layout_issues),
+        "saved_issue_count": len(saved_issues),
     }

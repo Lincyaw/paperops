@@ -1,7 +1,32 @@
-"""Type conversion utilities — bridge between public API (plain Python types) and python-pptx internals."""
+"""Type conversion utilities — bridge between public API and pptx internals."""
 
-from pptx.util import Inches, Pt, Emu
-from pptx.dml.color import RGBColor
+try:
+    from pptx.util import Inches, Pt, Emu
+    from pptx.dml.color import RGBColor
+except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency fallback
+    if exc.name != "pptx":
+        raise
+
+    class _Length(float):
+        @property
+        def inches(self) -> float:
+            return float(self)
+
+        @property
+        def pt(self) -> float:
+            return float(self)
+
+    def Inches(value: float) -> _Length:  # type: ignore[override]
+        return _Length(value)
+
+    def Pt(value: float) -> _Length:  # type: ignore[override]
+        return _Length(value)
+
+    Emu = _Length  # type: ignore[assignment]
+
+    class RGBColor(tuple):  # type: ignore[override]
+        def __new__(cls, r: int, g: int, b: int):
+            return tuple.__new__(cls, (r, g, b))
 
 
 def resolve_color(theme, color) -> RGBColor:

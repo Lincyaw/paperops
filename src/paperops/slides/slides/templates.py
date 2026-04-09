@@ -12,7 +12,7 @@ from paperops.slides.core.constants import (
     MARGIN_LEFT, MARGIN_RIGHT,
 )
 from paperops.slides.core.types import resolve_color, resolve_font_size
-from paperops.slides.layout.containers import HStack, VStack, Padding
+from paperops.slides.layout.containers import Column, Padding, Row
 from paperops.slides.components.shapes import Box, RoundedBox
 from paperops.slides.components.text import TextBlock, BulletList
 from paperops.slides.components.table import Table
@@ -175,18 +175,18 @@ def register_templates(presentation_class):
         left_title, left_items = left
         right_title, right_items = right
 
-        left_col = VStack(gap=0.2, children=[
+        left_col = Column(gap=0.2, children=[
             TextBlock(text=left_title, font_size="heading", bold=True,
                       color="primary", height=0.6),
             BulletList(items=left_items, font_size="body"),
         ])
-        right_col = VStack(gap=0.2, children=[
+        right_col = Column(gap=0.2, children=[
             TextBlock(text=right_title, font_size="heading", bold=True,
                       color="secondary", height=0.6),
             BulletList(items=right_items, font_size="body"),
         ])
 
-        sb.layout(HStack(gap=0.5, children=[left_col, right_col]))
+        sb.layout(Row(gap=0.5, children=[left_col, right_col]))
         return sb
 
     def quote(self, text, author="", reference=None):

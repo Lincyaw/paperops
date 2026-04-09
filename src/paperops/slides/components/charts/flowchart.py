@@ -5,24 +5,31 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from paperops.slides.core.constants import Direction
-from paperops.slides.layout.containers import LayoutNode, HStack, VStack
-from paperops.slides.layout.auto_size import measure_text
+from paperops.slides.layout.containers import Column, LayoutNode, Row
+from paperops.slides.layout.types import Constraints, IntrinsicSize
 from paperops.slides.components.shapes import RoundedBox, Arrow
-from paperops.slides.components.text import TextBlock
 
 
-def _estimate_full_text_width(text: str, font_size_pt: float, font_family: str = "Calibri") -> float:
-    """Estimate the full width needed for text, accounting for margins.
+def _container_kwargs(node: LayoutNode) -> dict:
+    return {
+        "width": node.width,
+        "height": node.height,
+        "min_width": node.min_width,
+        "min_height": node.min_height,
+        "max_width": node.max_width,
+        "max_height": node.max_height,
+        "size_mode_x": node.size_mode_x,
+        "size_mode_y": node.size_mode_y,
+        "grow": node.grow,
+        "shrink": node.shrink,
+        "basis": node.basis,
+        "wrap": node.wrap,
+    }
 
-    Unlike estimate_min_text_width which only measures the longest token,
-    this measures the entire text string.
-    """
-    if not text:
-        return 0.5
-    content_w, _ = measure_text(text, font_family, font_size_pt)
-    # Add horizontal margin padding (0.6 inches total for comfortable fit)
-    # Increased from 0.3 to prevent text wrapping in PowerPoint
-    return content_w + 0.6
+
+def _is_rightward(direction: Direction | str) -> bool:
+    value = str(direction)
+    return value in {"right", "horizontal"}
 
 
 @dataclass
@@ -44,6 +51,9 @@ class Flowchart(LayoutNode):
     direction: Direction | str = "right"
     node_widths: dict[str, float] = field(default_factory=dict)
 
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        return self.to_layout().measure(constraints, theme)
+
     def preferred_size(self, theme, available_width):
         layout = self.to_layout()
         return layout.preferred_size(theme, available_width)
@@ -51,7 +61,7 @@ class Flowchart(LayoutNode):
     def to_layout(self) -> LayoutNode:
         """Expand into native shapes (RoundedBox + Arrow) layout tree."""
         if not self.nodes:
-            return HStack(children=[])
+            return Row(children=[])
 
         node_list = list(self.nodes.keys())
 
@@ -67,23 +77,13 @@ class Flowchart(LayoutNode):
                 return val, "bg_alt", self.node_widths[nid]
             return val, "bg_alt", None
 
-        # Determine box dimensions based on direction and node count
-        n = len(node_list)
-        if self.direction == "right":
-            box_height = self.height or 1.2
-        else:
-            box_height = 0.9
-
-        # Pre-calculate text widths to ensure boxes fit content
-        caption_pt = 10.0
-        font_family = "Liberation Sans"
+        box_height = self.height if _is_rightward(self.direction) and self.height is not None else 0.9
 
         # Build RoundedBox for each node
         node_boxes: dict[str, RoundedBox] = {}
         for nid in node_list:
             label, color, explicit_width = _parse_node(self.nodes[nid], nid)
             text_clr = "white" if color not in ("bg_alt", "bg", "bg_accent") else "text"
-            box_width = explicit_width if explicit_width is not None else _estimate_full_text_width(label, caption_pt, font_family)
             node_boxes[nid] = RoundedBox(
                 text=label,
                 color=color,
@@ -92,14 +92,15 @@ class Flowchart(LayoutNode):
                 bold=True,
                 font_size="caption",
                 height=box_height,
-                width=box_width,
+                width=explicit_width,
+                size_mode_x="fit" if explicit_width is None else "fixed",
             )
 
         # Build edge-ordered sequence following the edges
         ordered_ids = self._edge_order(node_list)
 
         # Build children: box, arrow, box, arrow, ...
-        arrow_dir = "vertical" if self.direction == "down" else "horizontal"
+        arrow_dir = "horizontal" if _is_rightward(self.direction) else "vertical"
         children: list[LayoutNode] = []
         for i, nid in enumerate(ordered_ids):
             box = node_boxes[nid]
@@ -125,18 +126,11 @@ class Flowchart(LayoutNode):
                 )
                 children.append(arr)
 
-        Container = HStack if self.direction == "right" else VStack
+        Container = Row if _is_rightward(self.direction) else Column
         return Container(
             gap=0.15,
             children=children,
-            width=self.width,
-            height=self.height,
-            size_mode_x=self.size_mode_x,
-            size_mode_y=self.size_mode_y,
-            grow=self.grow,
-            shrink=self.shrink,
-            basis=self.basis,
-            wrap=self.wrap,
+            **_container_kwargs(self),
         )
 
     def _edge_order(self, node_list: list[str]) -> list[str]:

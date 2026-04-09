@@ -1,35 +1,66 @@
-"""Text measurement utilities for layout calculations."""
+"""Pure text measurement utilities for layout, render checks, and preview logic."""
 
 from __future__ import annotations
 
 import logging
 import os
 import subprocess
+from dataclasses import dataclass
 from functools import lru_cache
+
+from paperops.slides.layout.types import Constraints, IntrinsicSize
 
 logger = logging.getLogger(__name__)
 
-# Font family fallback mappings
 _FONT_FALLBACKS: dict[str, list[str]] = {
     "Calibri": ["Liberation Sans", "DejaVu Sans", "Arial"],
     "Consolas": ["DejaVu Sans Mono", "Liberation Mono", "Courier New"],
     "Georgia": ["DejaVu Serif", "Liberation Serif", "Times New Roman"],
+    "FangSong": ["Noto Serif CJK SC", "Source Han Serif SC", "SimSun"],
 }
 
-# Cache for resolved font file paths
 _font_path_cache: dict[str, str | None] = {}
+
+
+@dataclass(frozen=True)
+class TextStyle:
+    font_family: str
+    font_size_pt: float
+    bold: bool = False
+    italic: bool = False
+    line_spacing: float = 1.25
+    margin_x: float = 0.0
+    margin_y: float = 0.0
+
+
+@dataclass(frozen=True)
+class TextMetrics:
+    width: float
+    height: float
+    line_count: int
+    lines: tuple[str, ...]
+    longest_unbreakable_width: float
+
+
+@dataclass(frozen=True)
+class TextIntrinsic:
+    min_width: float
+    preferred_width: float
+    min_height: float
+    preferred_height: float
+    metrics: TextMetrics
 
 
 @lru_cache(maxsize=64)
 def _fc_list_lookup(family: str) -> str | None:
-    """Use fc-list to find a font file for the given family name."""
     try:
         result = subprocess.run(
             ["fc-list", f":family={family}", "file"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
-            # fc-list returns lines like "/path/to/font.ttf: "
             first_line = result.stdout.strip().splitlines()[0]
             path = first_line.split(":")[0].strip()
             if os.path.isfile(path):
@@ -40,7 +71,6 @@ def _fc_list_lookup(family: str) -> str | None:
 
 
 def _scan_font_dirs(family: str) -> str | None:
-    """Search common font directories for a matching font file."""
     search_dirs = [
         "/usr/share/fonts/",
         "/usr/local/share/fonts/",
@@ -52,31 +82,25 @@ def _scan_font_dirs(family: str) -> str | None:
         if not os.path.isdir(base):
             continue
         for dirpath, _, filenames in os.walk(base):
-            for fn in filenames:
-                if fn.lower().endswith((".ttf", ".otf")):
-                    fn_lower = fn.lower().replace(" ", "").replace("-", "")
-                    if family_lower in fn_lower:
-                        return os.path.join(dirpath, fn)
+            for filename in filenames:
+                if not filename.lower().endswith((".ttf", ".otf")):
+                    continue
+                normalized = filename.lower().replace(" ", "").replace("-", "")
+                if family_lower in normalized:
+                    return os.path.join(dirpath, filename)
     return None
 
 
 def _find_font_path(family: str) -> str | None:
-    """Find the font file path for a given family, with fallback chain."""
     if family in _font_path_cache:
         return _font_path_cache[family]
 
-    # Try the exact family first, then fallbacks
     candidates = [family] + _FONT_FALLBACKS.get(family, [])
     for name in candidates:
-        path = _fc_list_lookup(name)
+        path = _fc_list_lookup(name) or _scan_font_dirs(name)
         if path:
             _font_path_cache[family] = path
             return path
-        path = _scan_font_dirs(name)
-        if path:
-            _font_path_cache[family] = path
-            return path
-
     _font_path_cache[family] = None
     return None
 
@@ -85,44 +109,235 @@ _pil_font_cache: dict[tuple[str, int], object] = {}
 
 
 def _load_pil_font(font_family: str, font_size_pt: float):
-    """Load a PIL ImageFont, with caching. Falls back to the default font."""
     cache_key = (font_family, int(font_size_pt))
     if cache_key in _pil_font_cache:
         return _pil_font_cache[cache_key]
 
-    result = None
+    font = None
     try:
         from PIL import ImageFont
+
         path = _find_font_path(font_family)
         if path:
             try:
-                result = ImageFont.truetype(path, size=int(font_size_pt))
+                font = ImageFont.truetype(path, size=max(int(font_size_pt), 1))
             except (OSError, IOError):
-                pass
-        if result is None:
-            result = ImageFont.load_default()
-    except Exception as exc:
+                font = None
+        if font is None:
+            font = ImageFont.load_default()
+    except Exception as exc:  # pragma: no cover - PIL missing is acceptable
         logger.debug("Failed to load font '%s': %s", font_family, exc)
 
-    _pil_font_cache[cache_key] = result
-    return result
+    _pil_font_cache[cache_key] = font
+    return font
 
 
-# Heuristic constants (inches per point)
-_AVG_CHAR_WIDTH_FACTOR = 0.015   # ~0.015 inches per pt per char (proportional)
-_CJK_CHAR_WIDTH_FACTOR = 0.026   # CJK characters are roughly full-width
-_LINE_HEIGHT_FACTOR = 1.3        # line height = font_size * factor
+_AVG_CHAR_WIDTH_FACTOR = 0.015
+_CJK_CHAR_WIDTH_FACTOR = 0.026
+_LINE_HEIGHT_FACTOR = 1.25
 
 
 def _is_cjk(ch: str) -> bool:
-    """Return True if the character is a CJK ideograph or symbol."""
     cp = ord(ch)
     return (
-        0x4E00 <= cp <= 0x9FFF       # CJK Unified Ideographs
-        or 0x3400 <= cp <= 0x4DBF    # CJK Extension A
-        or 0xF900 <= cp <= 0xFAFF    # CJK Compatibility Ideographs
-        or 0x3000 <= cp <= 0x303F    # CJK Symbols and Punctuation
+        0x4E00 <= cp <= 0x9FFF
+        or 0x3400 <= cp <= 0x4DBF
+        or 0xF900 <= cp <= 0xFAFF
+        or 0x3000 <= cp <= 0x303F
     )
+
+
+def _is_break_punct(ch: str) -> bool:
+    return ch in ",.;:!?)]}，。；：！？、）】》>"
+
+
+def _tokenize_text(text: str) -> list[str]:
+    tokens: list[str] = []
+    buffer = ""
+    mode = ""
+    for ch in text:
+        if ch.isspace():
+            if buffer:
+                tokens.append(buffer)
+                buffer = ""
+            tokens.append(ch)
+            mode = "space"
+            continue
+
+        char_mode = "cjk" if _is_cjk(ch) else "punct" if _is_break_punct(ch) else "word"
+        if char_mode == "cjk":
+            if buffer:
+                tokens.append(buffer)
+                buffer = ""
+            tokens.append(ch)
+            mode = char_mode
+            continue
+        if char_mode == "punct":
+            if buffer and mode == "word":
+                buffer += ch
+            else:
+                if buffer:
+                    tokens.append(buffer)
+                buffer = ch
+            mode = "word"
+            continue
+
+        if buffer and mode not in {"word", ""}:
+            tokens.append(buffer)
+            buffer = ch
+        else:
+            buffer += ch
+        mode = "word"
+
+    if buffer:
+        tokens.append(buffer)
+    return tokens
+
+
+def _measure_line_width(line: str, font, font_size_pt: float) -> float:
+    if not line:
+        return 0.0
+    if font is not None:
+        try:
+            bbox = font.getbbox(line)
+            return (bbox[2] - bbox[0]) / 72.0
+        except Exception:
+            try:
+                return font.getlength(line) / 72.0
+            except Exception:
+                pass
+
+    cjk_count = sum(1 for ch in line if _is_cjk(ch))
+    non_cjk_count = len(line) - cjk_count
+    scale = font_size_pt / 12.0
+    return (non_cjk_count * _AVG_CHAR_WIDTH_FACTOR + cjk_count * _CJK_CHAR_WIDTH_FACTOR) * scale
+
+
+def _split_long_token(token: str, max_width: float, font, font_size_pt: float) -> list[str]:
+    if not token:
+        return [token]
+    pieces: list[str] = []
+    current = ""
+    for ch in token:
+        candidate = current + ch
+        if current and _measure_line_width(candidate, font, font_size_pt) > max_width:
+            pieces.append(current)
+            current = ch
+        else:
+            current = candidate
+    if current:
+        pieces.append(current)
+    return pieces or [token]
+
+
+def _wrap_tokens(tokens: list[str], max_width: float | None, font, font_size_pt: float) -> tuple[str, ...]:
+    if max_width is None:
+        return ("".join(tokens),)
+
+    lines: list[str] = []
+    current = ""
+    for token in tokens:
+        if token == "\n":
+            lines.append(current.rstrip())
+            current = ""
+            continue
+        if token.isspace():
+            if current:
+                current += token
+            continue
+
+        candidate = current + token
+        if current and _measure_line_width(candidate.rstrip(), font, font_size_pt) > max_width:
+            lines.append(current.rstrip())
+            current = ""
+            if _measure_line_width(token, font, font_size_pt) > max_width:
+                token_lines = _split_long_token(token, max_width, font, font_size_pt)
+                lines.extend(token_lines[:-1])
+                current = token_lines[-1]
+            else:
+                current = token
+        else:
+            if not current and _measure_line_width(token, font, font_size_pt) > max_width:
+                token_lines = _split_long_token(token, max_width, font, font_size_pt)
+                lines.extend(token_lines[:-1])
+                current = token_lines[-1]
+            else:
+                current = candidate
+    if current or not lines:
+        lines.append(current.rstrip())
+    return tuple(lines)
+
+
+def measure_text_metrics(text: str, style: TextStyle, max_width_inches: float | None = None) -> TextMetrics:
+    if not text:
+        return TextMetrics(0.0, 0.0, 0, tuple(), 0.0)
+
+    font = _load_pil_font(style.font_family, style.font_size_pt)
+    line_height = (style.font_size_pt / 72.0) * max(style.line_spacing, _LINE_HEIGHT_FACTOR)
+
+    wrapped_lines: list[str] = []
+    longest_unbreakable = 0.0
+    for paragraph in text.split("\n"):
+        if not paragraph:
+            wrapped_lines.append("")
+            continue
+        tokens = _tokenize_text(paragraph)
+        for token in tokens:
+            if token.strip():
+                longest_unbreakable = max(longest_unbreakable, _measure_line_width(token, font, style.font_size_pt))
+        wrapped_lines.extend(_wrap_tokens(tokens, max_width_inches, font, style.font_size_pt))
+
+    widths = [_measure_line_width(line, font, style.font_size_pt) for line in wrapped_lines] or [0.0]
+    width = min(max(widths), max_width_inches) if max_width_inches is not None and widths else max(widths)
+    height = line_height * max(len(wrapped_lines), 1)
+    return TextMetrics(
+        width=width,
+        height=height,
+        line_count=len(wrapped_lines),
+        lines=tuple(wrapped_lines),
+        longest_unbreakable_width=longest_unbreakable,
+    )
+
+
+def measure_text_intrinsic(text: str, style: TextStyle, max_width_inches: float | None = None) -> TextIntrinsic:
+    unconstrained = measure_text_metrics(text, style, None)
+    wrapped = measure_text_metrics(text, style, max_width_inches)
+    min_width = unconstrained.longest_unbreakable_width + style.margin_x
+    preferred_width = (max_width_inches if max_width_inches is not None else unconstrained.width) if text else 0.0
+    if max_width_inches is not None:
+        preferred_width = min(unconstrained.width, max_width_inches)
+    preferred_width += style.margin_x
+    preferred_height = wrapped.height + style.margin_y
+    min_height = max((style.font_size_pt / 72.0) * style.line_spacing + style.margin_y, 0.0)
+    return TextIntrinsic(
+        min_width=max(min_width, 0.0),
+        preferred_width=max(preferred_width, min_width),
+        min_height=min_height,
+        preferred_height=max(preferred_height, min_height),
+        metrics=wrapped,
+    )
+
+
+def build_intrinsic_size(intrinsic: TextIntrinsic) -> IntrinsicSize:
+    return IntrinsicSize(
+        min_width=intrinsic.min_width,
+        preferred_width=intrinsic.preferred_width,
+        min_height=intrinsic.min_height,
+        preferred_height=intrinsic.preferred_height,
+    )
+
+
+def preferred_size_from_intrinsic(intrinsic: TextIntrinsic, constraints: Constraints | None = None) -> tuple[float, float]:
+    if constraints is None:
+        return intrinsic.preferred_width, intrinsic.preferred_height
+    boxed = build_intrinsic_size(intrinsic).clamp(constraints)
+    return boxed.preferred_width, boxed.preferred_height
+
+
+def constraint_value(constraints: Constraints | None, axis: str) -> float | None:
+    if constraints is None:
+        return None
+    return constraints.max_width if axis == "x" else constraints.max_height
 
 
 def measure_text(
@@ -131,97 +346,9 @@ def measure_text(
     font_size_pt: float,
     max_width_inches: float | None = None,
 ) -> tuple[float, float]:
-    """Measure text dimensions in inches.  Returns (width, height).
-
-    If *max_width_inches* is set, simulate word wrapping and return the
-    multi-line height.  Uses PIL.ImageFont.truetype() when available,
-    falling back to character-width heuristics.
-    """
-    if not text:
-        return (0.0, 0.0)
-
-    font = _load_pil_font(font_family, font_size_pt)
-
-    # --- helpers to measure a single line ---
-    def _measure_line_pil(line: str) -> float:
-        """Return line width in pixels using PIL font."""
-        try:
-            bbox = font.getbbox(line)
-            return bbox[2] - bbox[0]
-        except Exception:
-            return font.getlength(line)
-
-    def _px_to_inches(px: float) -> float:
-        """72 DPI mapping: 1 pt = 1 px at 72 DPI, 1 inch = 72 pt."""
-        return px / 72.0
-
-    def _measure_line_heuristic(line: str) -> float:
-        """Return line width in inches using CJK-aware character-count heuristic."""
-        scale = font_size_pt / 12.0
-        cjk_count = sum(1 for ch in line if _is_cjk(ch))
-        non_cjk_count = len(line) - cjk_count
-        return (non_cjk_count * _AVG_CHAR_WIDTH_FACTOR
-                + cjk_count * _CJK_CHAR_WIDTH_FACTOR) * scale
-
-    use_pil = font is not None
-    line_height_inches = (font_size_pt / 72.0) * _LINE_HEIGHT_FACTOR
-
-    # Split text into hard-break lines
-    raw_lines = text.split("\n")
-
-    if max_width_inches is None:
-        # No wrapping — measure each hard line, take the widest
-        max_w = 0.0
-        for line in raw_lines:
-            if use_pil:
-                w = _px_to_inches(_measure_line_pil(line))
-            else:
-                w = _measure_line_heuristic(line)
-            max_w = max(max_w, w)
-        total_h = line_height_inches * max(len(raw_lines), 1)
-        return (max_w, total_h)
-
-    # --- word-wrap mode ---
-    total_lines = 0
-    max_w = 0.0
-
-    for raw_line in raw_lines:
-        if not raw_line.strip():
-            total_lines += 1
-            continue
-
-        words = raw_line.split()
-        current_line = ""
-        for word in words:
-            candidate = f"{current_line} {word}".strip() if current_line else word
-            if use_pil:
-                cw = _px_to_inches(_measure_line_pil(candidate))
-            else:
-                cw = _measure_line_heuristic(candidate)
-
-            if cw > max_width_inches and current_line:
-                # Emit current_line
-                if use_pil:
-                    lw = _px_to_inches(_measure_line_pil(current_line))
-                else:
-                    lw = _measure_line_heuristic(current_line)
-                max_w = max(max_w, lw)
-                total_lines += 1
-                current_line = word
-            else:
-                current_line = candidate
-
-        # Emit remaining
-        if current_line:
-            if use_pil:
-                lw = _px_to_inches(_measure_line_pil(current_line))
-            else:
-                lw = _measure_line_heuristic(current_line)
-            max_w = max(max_w, lw)
-            total_lines += 1
-
-    total_h = line_height_inches * max(total_lines, 1)
-    return (min(max_w, max_width_inches), total_h)
+    style = TextStyle(font_family=font_family, font_size_pt=font_size_pt)
+    metrics = measure_text_metrics(text, style, max_width_inches=max_width_inches)
+    return metrics.width, metrics.height
 
 
 def measure_wrapped_text_height(
@@ -230,14 +357,9 @@ def measure_wrapped_text_height(
     font_size_pt: float,
     usable_width_inches: float,
 ) -> float:
-    """Return wrapped text height in inches for a given usable width."""
-    _w, h = measure_text(
-        text,
-        font_family,
-        font_size_pt,
-        max_width_inches=max(usable_width_inches, 0.01),
-    )
-    return h
+    style = TextStyle(font_family=font_family, font_size_pt=font_size_pt)
+    metrics = measure_text_metrics(text, style, max_width_inches=max(usable_width_inches, 0.01))
+    return metrics.height
 
 
 def estimate_min_text_width(
@@ -245,11 +367,6 @@ def estimate_min_text_width(
     font_family: str,
     font_size_pt: float,
 ) -> float:
-    """Estimate the smallest readable width based on the longest token."""
-    if not text:
-        return 0.0
-
-    tokens = [token for token in text.replace("\n", " ").split(" ") if token]
-    sample = max(tokens, key=len) if tokens else text
-    w, _h = measure_text(sample, font_family, font_size_pt)
-    return w
+    style = TextStyle(font_family=font_family, font_size_pt=font_size_pt)
+    intrinsic = measure_text_intrinsic(text, style)
+    return intrinsic.min_width

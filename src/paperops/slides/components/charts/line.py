@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from paperops.slides.components.svg_canvas import SvgCanvas
 from paperops.slides.layout.containers import LayoutNode
+from paperops.slides.layout.types import Constraints, IntrinsicSize
 from paperops.slides.components.charts._helpers import format_value, render_legend
 
 LineSeries = tuple[str, list[float], str]  # (name, values, color_name)
@@ -34,8 +35,19 @@ class LineChart(LayoutNode):
     show_dots: bool = True
     max_value: float | None = None
 
+    def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
+        width = self.width if self.width is not None else (constraints.max_width or 10.0)
+        height = self.height if self.height is not None else 4.0
+        return IntrinsicSize(
+            min_width=self.min_width or min(width, 4.0),
+            preferred_width=width,
+            min_height=self.min_height or min(height, 2.0),
+            preferred_height=height,
+        ).clamp(constraints)
+
     def preferred_size(self, theme, available_width):
-        return (self.width or 10.0, self.height or 4.0)
+        intrinsic = self.measure(Constraints(max_width=max(available_width, 0.0)), theme)
+        return intrinsic.preferred_width, intrinsic.preferred_height
 
     def to_svg(self, theme) -> str:
         """Generate SVG string for this chart."""

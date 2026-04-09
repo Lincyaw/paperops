@@ -206,7 +206,7 @@ hero = HStack(gap=0.35, children=[
         ),
     ]),
     VStack(gap=0.2, width=4.1, children=[
-        Image(path=asset("wm-data-center-unc.jpg"), width=4.1, height=4.9),
+        Image(path=asset("wm-data-center-unc.jpg"), width=4.1, height=4.55),
         TextBlock(text="Fault propagation in large-scale service systems", font_size="small", color="#8EA2BE"),
     ]),
 ])
@@ -319,16 +319,16 @@ performance = VStack(gap=0.3, children=[
     ]),
 ])
 
-trend_visual = Image(path=asset("wm-control-room.jpg"), height=0.95)
+trend_visual = Image(path=asset("wm-control-room.jpg"), height=0.6)
 
 # The question
 question = Callout(
     title="But...",
-    body="Different papers use different datasets\nAre these numbers reliable?",
+    body="Different papers use different datasets.\nAre the scores really comparable?",
     color="warning"
 )
 
-sb.layout(VStack(gap=0.4, children=[
+sb.layout(VStack(gap=0.12, children=[
     Padding(child=evolution, left=0.2, right=0.2),
     Padding(child=trend_visual, left=0.2, right=0.2),
     Padding(child=performance, left=0.2, right=0.2),
@@ -473,9 +473,9 @@ pattern = VStack(gap=0.2, children=[
     TextBlock(text="Simple correlation works → no need for complex causal reasoning", font_size="body", italic=True, color="text_mid"),
 ])
 
-complexity_visual = Image(path=asset("network-cables.jpg"), height=1.15)
+complexity_visual = Image(path=asset("network-cables.jpg"), height=0.78)
 
-sb.layout(VStack(gap=0.4, children=[
+sb.layout(VStack(gap=0.18, children=[
     Padding(child=limitations, left=0.2, right=0.2),
     Padding(child=complexity_visual, left=0.2, right=0.2),
     Padding(child=pattern, left=0.2, right=0.2),
@@ -523,15 +523,15 @@ innovation = Callout(
     color="accent"
 )
 
-benchmark_visual = VStack(gap=0.2, children=[
-    Image(path=asset("data-center-wide.jpg"), height=1.8),
+benchmark_visual = VStack(gap=0.16, children=[
+    Image(path=asset("data-center-wide.jpg"), height=1.45),
     TextBlock(text="Larger and noisier environments demand stronger RCA reasoning", font_size="small", color="text_mid"),
 ])
 
-sb.layout(VStack(gap=0.5, children=[
-    Padding(child=benchmark_visual, left=0.3, right=0.3),
-    Padding(child=numbers, left=0.3, right=0.3),
-    Padding(child=innovation, left=0.3, right=0.3),
+sb.layout(VStack(gap=0.28, children=[
+    Padding(child=benchmark_visual, left=0.2, right=0.2),
+    Padding(child=numbers, left=0.2, right=0.2),
+    Padding(child=innovation, left=0.2, right=0.2),
 ]))
 
 sb.animate([[benchmark_visual], [numbers], [innovation]])
@@ -559,7 +559,9 @@ pipeline = Flowchart(
         "f": ("Validation\n(SLI-based)", "positive"),
     },
     edges=[("a", "b"), ("b", "c"), ("c", "d"), ("d", "e"), ("e", "f")],
-    direction="right"
+    direction="right",
+    height=0.95,
+    node_widths={key: 1.45 for key in ["a", "b", "c", "d", "e", "f"]},
 )
 
 workflow_visual = VStack(gap=0.15, children=[
@@ -567,21 +569,21 @@ workflow_visual = VStack(gap=0.15, children=[
     TextBlock(text="Pipeline design principle: traceable transitions across stages", font_size="small", color="text_mid"),
 ])
 
-framework_cards = Grid(cols=3, gap=0.25, children=[
-    VStack(gap=0.14, children=[
+framework_cards = Grid(cols=3, gap=0.2, children=[
+    VStack(gap=0.1, children=[
         SvgImage(svg=svg_server(color="#8B4513"), width=0.6, height=0.6),
-        TextBlock(text="1. Realistic System Scope", font_size="body", bold=True, color="primary"),
-        TextBlock(text="50 services, 36 workloads, and 31 injected fault types prevent shortcut solutions.", font_size="caption", color="text_mid"),
+        TextBlock(text="1. Realistic System Scope", font_size="small", bold=True, color="primary"),
+        TextBlock(text="50 services, 36 workloads, and 31 injected fault types prevent shortcut solutions.", font_size="small", color="text_mid"),
     ]),
-    VStack(gap=0.14, children=[
+    VStack(gap=0.1, children=[
         SvgImage(svg=svg_trace(color="#2E6B4F"), width=0.6, height=0.6),
-        TextBlock(text="2. Multi-Modal Evidence", font_size="body", bold=True, color="secondary"),
-        TextBlock(text="Metrics, logs, and traces are collected together so RCA methods must reconcile conflicting signals.", font_size="caption", color="text_mid"),
+        TextBlock(text="2. Multi-Modal Evidence", font_size="small", bold=True, color="secondary"),
+        TextBlock(text="Metrics, logs, and traces are collected together so RCA methods must reconcile conflicting signals.", font_size="small", color="text_mid"),
     ]),
-    VStack(gap=0.14, children=[
+    VStack(gap=0.1, children=[
         SvgImage(svg=svg_warning(color="#4A6FA5"), width=0.6, height=0.6),
-        TextBlock(text="3. Impact-Driven Filtering", font_size="body", bold=True, color="accent"),
-        TextBlock(text="Only cases with observable SLI impact survive, making the benchmark operationally meaningful.", font_size="caption", color="text_mid"),
+        TextBlock(text="3. Impact-Driven Filtering", font_size="small", bold=True, color="accent"),
+        TextBlock(text="Only cases with observable SLI impact survive, making the benchmark operationally meaningful.", font_size="small", color="text_mid"),
     ]),
 ])
 
@@ -591,8 +593,8 @@ framework_takeaway = Callout(
     color="primary",
 )
 
-sb.layout(VStack(gap=0.26, children=[
-    Padding(child=pipeline, left=0.25, right=0.25),
+sb.layout(VStack(gap=0.16, children=[
+    Padding(child=pipeline, left=0.15, right=0.15),
     Padding(child=framework_cards, left=0.25, right=0.25),
     Padding(child=framework_takeaway, left=0.35, right=0.35),
 ]))
@@ -768,54 +770,54 @@ core_message = Callout(
 )
 
 # Contributions
-contributions = VStack(gap=0.3, children=[
+contributions = VStack(gap=0.18, children=[
     TextBlock(text="Contributions:", font_size="heading", bold=True),
-    Grid(cols=2, gap=0.3, children=[
-        VStack(gap=0.1, children=[
+    Grid(cols=2, gap=0.22, children=[
+        VStack(gap=0.08, children=[
             SvgImage(svg=svg_search(), width=0.5, height=0.5),
             TextBlock(text="Revealed benchmark oversimplification", font_size="caption", bold=True),
-            TextBlock(text="Simple baselines can match or beat many reported SOTA methods.", font_size="small", color="text_mid"),
+            TextBlock(text="Simple baselines can match or beat reported SOTA methods.", font_size="small", color="text_mid"),
         ]),
-        VStack(gap=0.1, children=[
+        VStack(gap=0.08, children=[
             SvgImage(svg=svg_tools(), width=0.5, height=0.5),
             TextBlock(text="Built propagation-aware benchmark", font_size="caption", bold=True),
-            TextBlock(text="The benchmark scales system size, fault diversity, and call depth together.", font_size="small", color="text_mid"),
+            TextBlock(text="System size, fault diversity, and call depth scale together.", font_size="small", color="text_mid"),
         ]),
-        VStack(gap=0.1, children=[
+        VStack(gap=0.08, children=[
             SvgImage(svg=svg_warning(), width=0.5, height=0.5),
             TextBlock(text="Identified three failure patterns", font_size="caption", bold=True),
-            TextBlock(text="The analysis surfaces bottlenecks in scalability, visibility, and modeling assumptions.", font_size="small", color="text_mid"),
+            TextBlock(text="The analysis surfaces scalability, visibility, and modeling bottlenecks.", font_size="small", color="text_mid"),
         ]),
-        VStack(gap=0.1, children=[
+        VStack(gap=0.08, children=[
             SvgImage(svg=svg_github(), width=0.5, height=0.5),
             TextBlock(text="Open-sourced all artifacts", font_size="caption", bold=True),
-            TextBlock(text="Code, data, labels, and evaluation scripts are released for reproducibility.", font_size="small", color="text_mid"),
+            TextBlock(text="Code, data, labels, and evaluation scripts support reproducibility.", font_size="small", color="text_mid"),
         ]),
     ]),
 ])
 
-closing_points = VStack(gap=0.16, width=4.2, children=[
+closing_points = VStack(gap=0.1, width=4.0, children=[
     TextBlock(text="Bottom line", font_size="heading", bold=True, color="primary"),
-    HStack(gap=0.16, children=[
+    HStack(gap=0.14, children=[
         RoundedBox(text="1", color="primary", text_color="white", bold=True, width=0.42, height=0.42),
-        TextBlock(text="A benchmark should reject trivial heuristics before claiming progress.", font_size="caption"),
+        TextBlock(text="Reject trivial heuristics before claiming progress.", font_size="caption"),
     ]),
-    HStack(gap=0.16, children=[
+    HStack(gap=0.14, children=[
         RoundedBox(text="2", color="secondary", text_color="white", bold=True, width=0.42, height=0.42),
-        TextBlock(text="Realistic RCA evaluation must include propagation depth and user impact.", font_size="caption"),
+        TextBlock(text="Realistic RCA evaluation must include propagation depth and user impact.", font_size="small"),
     ]),
-    HStack(gap=0.16, children=[
+    HStack(gap=0.14, children=[
         RoundedBox(text="3", color="accent", text_color="white", bold=True, width=0.42, height=0.42),
-        TextBlock(text="Current methods still have substantial headroom on realistic benchmarks.", font_size="caption"),
+        TextBlock(text="Current methods still have substantial headroom on realistic benchmarks.", font_size="small"),
     ]),
 ])
 
-sb.layout(VStack(gap=0.24, children=[
-    Padding(child=core_message, left=0.3, right=0.3),
-    Padding(child=HStack(gap=0.35, children=[
-        VStack(gap=0.22, width=6.7, children=[contributions]),
-        VStack(gap=0.22, width=3.8, children=[closing_points]),
-    ]), left=0.25, right=0.25),
+sb.layout(VStack(gap=0.14, children=[
+    Padding(child=core_message, left=0.25, right=0.25),
+    Padding(child=HStack(gap=0.28, children=[
+        VStack(gap=0.18, width=6.55, children=[contributions]),
+        VStack(gap=0.18, width=3.95, children=[closing_points]),
+    ]), left=0.2, right=0.2),
 ]))
 
 sb.animate([[core_message], [contributions], [closing_points]])

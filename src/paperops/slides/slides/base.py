@@ -19,7 +19,7 @@ from paperops.slides.core.constants import (
 from paperops.slides.core.types import resolve_color as _resolve_color_raw
 from paperops.slides.core.types import resolve_font_size, resolve_size
 from paperops.slides.layout.engine import compute_layout
-from paperops.slides.layout.containers import LayoutNode, HStack, VStack, Grid, Padding
+from paperops.slides.layout.containers import Flex, Grid, HStack, LayoutNode, Padding, VStack
 from paperops.slides.components.shapes import Box, RoundedBox, Circle, Badge, Arrow, Line
 from paperops.slides.components.text import TextBlock, BulletList
 from paperops.slides.components.table import Table
@@ -58,15 +58,17 @@ _ALIGN_MAP = {
 class SlideBuilder:
     """Builder for a single slide. Created by Presentation.slide()."""
 
-    def __init__(self, pptx_slide, theme, title=None, reference=None):
+    def __init__(self, pptx_slide, theme, title=None, reference=None, slide_number=None):
         self._slide = pptx_slide
         self._theme = theme
         self._title = title
         self._reference = reference
+        self._slide_number = slide_number
         self._component = None
         self._click_groups = None
         self._component_to_shape_ids: dict[int, list[int]] = {}  # id(component) -> [shape_ids]
         self._issues: list[dict] = []
+        self._resolved_regions: dict[int, Region] = {}
         self._rendered = False
         self._bg_color = None
         self._bg_image = None
@@ -101,8 +103,10 @@ class SlideBuilder:
     # Rendering
     # ------------------------------------------------------------------
 
-    def _render(self):
+    def _render(self, slide_number: int | None = None):
         """Render everything onto the pptx slide."""
+        if slide_number is not None:
+            self._slide_number = slide_number
         if self._rendered:
             return self._issues
         self._rendered = True
@@ -129,7 +133,7 @@ class SlideBuilder:
 
         # 3. Layout engine + render component tree
         if self._component is not None:
-            issues = compute_layout(self._component, CONTENT_REGION, self._theme)
+            _layout_meta, issues = self._resolve_layout(self._component, CONTENT_REGION)
             self._issues.extend(issues)
             self._render_node(self._component)
 
@@ -155,6 +159,87 @@ class SlideBuilder:
                 )
 
         return self._issues
+
+    def _coerce_region(self, value):
+        if value is None:
+            return None
+        if isinstance(value, Region):
+            return value
+        if isinstance(value, dict):
+            if all(k in value for k in ("left", "top", "width", "height")):
+                try:
+                    return Region(
+                        left=float(value["left"]),
+                        top=float(value["top"]),
+                        width=float(value["width"]),
+                        height=float(value["height"]),
+                    )
+                except (TypeError, ValueError):
+                    return None
+        return None
+
+    def _bind_layout_regions(self, layout_meta):
+        """Cache resolved regions when the layout engine returns explicit maps."""
+        if not isinstance(layout_meta, dict):
+            return
+        node_regions = layout_meta.get("node_regions")
+        if not isinstance(node_regions, dict):
+            return
+        for key, value in node_regions.items():
+            if not isinstance(key, int):
+                continue
+            region = self._coerce_region(value)
+            if region is not None:
+                self._resolved_regions[key] = region
+
+    def _normalize_layout_issues(self, issues: list[dict], *, default_source: str = "layout") -> list[dict]:
+        normalized: list[dict] = []
+        for issue in issues:
+            if not isinstance(issue, dict):
+                continue
+            item = dict(issue)
+            if self._slide_number is not None and item.get("slide") is None:
+                item["slide"] = self._slide_number
+            if "code" not in item:
+                item["code"] = item.get("type", "layout_issue")
+            if "type" not in item:
+                item["type"] = item["code"]
+            if "message" not in item:
+                item["message"] = item.get("detail", item["code"])
+            if "detail" not in item:
+                item["detail"] = item["message"]
+            if "severity" not in item:
+                item["severity"] = "warning"
+            if "source" not in item:
+                item["source"] = default_source
+            normalized.append(item)
+        return normalized
+
+    def _resolve_layout(self, root: LayoutNode, region: Region):
+        """Run layout and normalize outputs across legacy/new engine return shapes."""
+        result = compute_layout(root, region, self._theme, slide=self._slide_number)
+        issues: list[dict] = []
+        layout_meta = None
+
+        if isinstance(result, tuple) and len(result) == 2:
+            layout_meta, raw_issues = result
+            if isinstance(raw_issues, list):
+                issues = raw_issues
+            self._bind_layout_regions(layout_meta)
+        elif isinstance(result, dict):
+            layout_meta = result
+            raw_issues = result.get("issues", [])
+            if isinstance(raw_issues, list):
+                issues = raw_issues
+            self._bind_layout_regions(result)
+        elif isinstance(result, list):
+            issues = result
+        elif result is None:
+            issues = []
+        else:
+            issues = []
+
+        return layout_meta, self._normalize_layout_issues(issues)
 
     # ------------------------------------------------------------------
     # Title / Reference helpers
@@ -206,7 +291,7 @@ class SlideBuilder:
     def _render_node(self, node: LayoutNode):
         """Recursively render a positioned node."""
         # Containers: recurse into children
-        if isinstance(node, (HStack, VStack, Grid)):
+        if isinstance(node, (Flex, HStack, VStack, Grid)):
             for child in node.children:
                 self._render_node(child)
             return
@@ -220,7 +305,8 @@ class SlideBuilder:
             expanded = node.to_layout()
             # Re-layout the expanded tree within the node's region
             if node._region is not None:
-                compute_layout(expanded, node._region, self._theme)
+                _layout_meta, nested_issues = self._resolve_layout(expanded, node._region)
+                self._issues.extend(nested_issues)
                 self._render_node(expanded)
                 self._track_composite(node, expanded)
             return
@@ -265,6 +351,10 @@ class SlideBuilder:
     def _region_args(self, node):
         """Return (left, top, width, height) in EMU from node._region."""
         r = node._region
+        if r is None:
+            r = self._resolved_regions.get(id(node))
+        if r is None:
+            raise ValueError(f"Node {type(node).__name__} has no resolved region")
         return Inches(r.left), Inches(r.top), Inches(r.width), Inches(r.height)
 
     def _track(self, node, shape):
@@ -284,7 +374,7 @@ class SlideBuilder:
         cid = id(node)
         if cid in self._component_to_shape_ids:
             ids.extend(self._component_to_shape_ids[cid])
-        if isinstance(node, (HStack, VStack, Grid)):
+        if isinstance(node, (Flex, HStack, VStack, Grid)):
             for child in node.children:
                 ids.extend(self._collect_shape_ids(child))
         elif isinstance(node, Padding) and node.child is not None:
@@ -309,8 +399,6 @@ class SlideBuilder:
         text = getattr(node, 'text', '')
         if text:
             tf = shape.text_frame
-            # Smart word wrap: disable for short text that should fit on one line
-            # This prevents unwanted line breaks like "Telemet ry" instead of "Telemetry"
             font_size_val = resolve_font_size(self._theme, node.font_size)
             if font_size_val is None:
                 font_size_pt = 14.0  # Default to 14pt (caption size)
@@ -318,17 +406,8 @@ class SlideBuilder:
                 font_size_pt = font_size_val.pt
             else:
                 font_size_pt = float(font_size_val)
-            # Estimate text width: char width is roughly font_size_pt / 72 * 0.6 for typical fonts
-            char_width_inches = (font_size_pt / 72) * 0.6
-            estimated_text_width = len(text) * char_width_inches
-            # Get box width from the shape we just created
-            box_width = width.inches
-            # Add safety margin for text frame margins (typically 0.1-0.2 inches)
-            usable_width = box_width - 0.25
-            # Disable word wrap if text should fit in one line
-            # Use 1.0x factor since we already accounted for margins in usable_width
-            should_wrap = estimated_text_width > usable_width
-            tf.word_wrap = should_wrap
+            # Rely on layout-engine sizing decisions; do not re-estimate wrapping here.
+            tf.word_wrap = bool(getattr(node, "word_wrap", True))
             align = _ALIGN_MAP.get(getattr(node, 'align', 'center'), PP_ALIGN.CENTER)
             p = tf.paragraphs[0]
             p.text = text
