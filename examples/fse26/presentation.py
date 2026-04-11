@@ -883,25 +883,25 @@ core_message = Callout(
 )
 
 # Contributions
-contributions = VStack(gap=0.18, children=[
+contributions = VStack(gap=0.12, children=[
     TextBlock(text="Contributions:", font_size="heading", bold=True),
-    Grid(cols=2, gap=0.22, children=[
-        VStack(gap=0.08, children=[
+    Grid(cols=2, gap=0.14, children=[
+        VStack(gap=0.04, children=[
             SvgImage(svg=svg_search(), width=0.5, height=0.5),
             TextBlock(text="Revealed benchmark oversimplification", font_size="caption", bold=True),
             TextBlock(text="Simple baselines can match or beat reported SOTA methods.", font_size="small", color="text_mid"),
         ]),
-        VStack(gap=0.08, children=[
+        VStack(gap=0.04, children=[
             SvgImage(svg=svg_tools(), width=0.5, height=0.5),
             TextBlock(text="Built propagation-aware benchmark", font_size="caption", bold=True),
             TextBlock(text="System size, fault diversity, and call depth scale together.", font_size="small", color="text_mid"),
         ]),
-        VStack(gap=0.08, children=[
+        VStack(gap=0.04, children=[
             SvgImage(svg=svg_warning(), width=0.5, height=0.5),
             TextBlock(text="Identified three failure patterns", font_size="caption", bold=True),
             TextBlock(text="The analysis surfaces scalability, visibility, and modeling bottlenecks.", font_size="small", color="text_mid"),
         ]),
-        VStack(gap=0.08, children=[
+        VStack(gap=0.04, children=[
             SvgImage(svg=svg_github(), width=0.5, height=0.5),
             TextBlock(text="Open-sourced all artifacts", font_size="caption", bold=True),
             TextBlock(text="Code, data, labels, and evaluation scripts support reproducibility.", font_size="small", color="text_mid"),
@@ -925,12 +925,12 @@ closing_points = VStack(gap=0.1, width=4.0, children=[
     ]),
 ])
 
-sb.layout(VStack(gap=0.14, children=[
+sb.layout(VStack(gap=0.10, children=[
     Padding(child=core_message, left=0.25, right=0.25),
-    Padding(child=HStack(gap=0.28, children=[
-        VStack(gap=0.18, width=6.55, children=[contributions]),
-        VStack(gap=0.18, width=3.95, children=[closing_points]),
-    ]), left=0.2, right=0.2),
+    Padding(child=HStack(gap=0.24, children=[
+        VStack(gap=0.18, width=6.9, children=[contributions]),
+        VStack(gap=0.18, width=4.1, children=[closing_points]),
+    ]), left=0.04, right=0.04),
 ]))
 
 sb.animate([[core_message], [contributions], [closing_points]])

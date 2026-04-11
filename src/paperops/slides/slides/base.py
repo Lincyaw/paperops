@@ -378,6 +378,54 @@ class SlideBuilder:
         spid = shape.shape_id
         self._component_to_shape_ids.setdefault(id(node), []).append(spid)
 
+    def _emu_from_inches(self, value: float) -> int:
+        return int(Inches(max(float(value), 0.0)))
+
+    def _text_frame_margins_emu(self, node) -> tuple[int, int, int, int] | None:
+        # Prefer explicit shape paddings when available. Otherwise map aggregate
+        # text margins to per-side values so render/checker use the same bounds.
+        if hasattr(node, "padding_x") or hasattr(node, "padding_y"):
+            pad_x = float(getattr(node, "padding_x", 0.0))
+            pad_y = float(getattr(node, "padding_y", 0.0))
+            margin = self._emu_from_inches(pad_x), self._emu_from_inches(pad_y)
+            return (margin[0], margin[0], margin[1], margin[1])
+
+        if hasattr(node, "padding"):
+            pad = self._emu_from_inches(float(getattr(node, "padding", 0.0)))
+            return (pad, pad, pad, pad)
+
+        if hasattr(node, "margin_x") or hasattr(node, "margin_y"):
+            margin_x = float(getattr(node, "margin_x", 0.0)) / 2.0
+            margin_y = float(getattr(node, "margin_y", 0.0)) / 2.0
+            return (
+                self._emu_from_inches(margin_x),
+                self._emu_from_inches(margin_x),
+                self._emu_from_inches(margin_y),
+                self._emu_from_inches(margin_y),
+            )
+
+        return None
+
+    def _apply_text_frame_layout(self, tf, node, *, default_word_wrap: bool = True):
+        tf.word_wrap = bool(getattr(node, "word_wrap", default_word_wrap))
+        margins = self._text_frame_margins_emu(node)
+        if margins is not None:
+            margin_left, margin_right, margin_top, margin_bottom = margins
+            tf.margin_left = margin_left
+            tf.margin_right = margin_right
+            tf.margin_top = margin_top
+            tf.margin_bottom = margin_bottom
+
+    def _apply_paragraph_layout(self, paragraph, node):
+        line_spacing = getattr(node, "line_spacing", None)
+        if line_spacing is not None:
+            try:
+                numeric = float(line_spacing)
+            except (TypeError, ValueError):
+                numeric = None
+            if numeric is not None and numeric > 0:
+                paragraph.line_spacing = numeric
+
     def _collect_shape_ids(self, node) -> list[int]:
         """Collect all shape IDs from a rendered subtree."""
         ids = []
@@ -432,12 +480,12 @@ class SlideBuilder:
                 font_size_pt = font_size_val.pt
             else:
                 font_size_pt = float(font_size_val)
-            # Rely on layout-engine sizing decisions; do not re-estimate wrapping here.
-            tf.word_wrap = bool(getattr(node, "word_wrap", True))
+            self._apply_text_frame_layout(tf, node)
             align = _ALIGN_MAP.get(getattr(node, 'align', 'center'), PP_ALIGN.CENTER)
             p = tf.paragraphs[0]
             p.text = text
             p.alignment = align
+            self._apply_paragraph_layout(p, node)
             p.font.size = Pt(font_size_pt)
             p.font.color.rgb = resolve_color(self._theme, node.text_color)
             p.font.bold = node.bold
@@ -469,7 +517,7 @@ class SlideBuilder:
         left, top, width, height = self._region_args(node)
         txbox = self._slide.shapes.add_textbox(left, top, width, height)
         tf = txbox.text_frame
-        tf.word_wrap = True
+        self._apply_text_frame_layout(tf, node)
 
         alignment = _ALIGN_MAP.get(node.align, PP_ALIGN.LEFT)
         default_font_size = resolve_font_size(self._theme, node.font_size)
@@ -479,6 +527,7 @@ class SlideBuilder:
             # RichText mode: render each (text, format_dict) as a separate run
             p = tf.paragraphs[0]
             p.alignment = alignment
+            self._apply_paragraph_layout(p, node)
             for run_text, fmt in node.runs:
                 run = p.add_run()
                 run.text = run_text
@@ -500,6 +549,7 @@ class SlideBuilder:
                     p = tf.add_paragraph()
                 p.text = line
                 p.alignment = alignment
+                self._apply_paragraph_layout(p, node)
                 p.font.size = default_font_size
                 p.font.color.rgb = default_color
                 p.font.bold = node.bold
@@ -512,7 +562,7 @@ class SlideBuilder:
         left, top, width, height = self._region_args(node)
         txbox = self._slide.shapes.add_textbox(left, top, width, height)
         tf = txbox.text_frame
-        tf.word_wrap = True
+        self._apply_text_frame_layout(tf, node)
 
         for i, item in enumerate(node.items):
             if isinstance(item, tuple):
@@ -528,6 +578,7 @@ class SlideBuilder:
 
             p.text = text
             p.level = indent
+            self._apply_paragraph_layout(p, node)
             p.font.size = resolve_font_size(self._theme, node.font_size)
             p.font.color.rgb = resolve_color(self._theme, node.color)
             p.font.name = self._theme.font_family

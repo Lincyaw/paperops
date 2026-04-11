@@ -134,7 +134,7 @@ def _load_pil_font(font_family: str, font_size_pt: float):
 
 _AVG_CHAR_WIDTH_FACTOR = 0.015
 _CJK_CHAR_WIDTH_FACTOR = 0.026
-_LINE_HEIGHT_FACTOR = 1.25
+_LINE_HEIGHT_FACTOR = 1.10
 
 
 def _is_cjk(ch: str) -> bool:
@@ -273,7 +273,8 @@ def measure_text_metrics(text: str, style: TextStyle, max_width_inches: float | 
         return TextMetrics(0.0, 0.0, 0, tuple(), 0.0)
 
     font = _load_pil_font(style.font_family, style.font_size_pt)
-    line_height = (style.font_size_pt / 72.0) * max(style.line_spacing, _LINE_HEIGHT_FACTOR)
+    effective_line_spacing = max(style.line_spacing, _LINE_HEIGHT_FACTOR)
+    line_height = (style.font_size_pt / 72.0) * effective_line_spacing
 
     wrapped_lines: list[str] = []
     longest_unbreakable = 0.0
@@ -308,7 +309,8 @@ def measure_text_intrinsic(text: str, style: TextStyle, max_width_inches: float 
         preferred_width = min(unconstrained.width, max_width_inches)
     preferred_width += style.margin_x
     preferred_height = wrapped.height + style.margin_y
-    min_height = max((style.font_size_pt / 72.0) * style.line_spacing + style.margin_y, 0.0)
+    effective_line_spacing = max(style.line_spacing, _LINE_HEIGHT_FACTOR)
+    min_height = max((style.font_size_pt / 72.0) * effective_line_spacing + style.margin_y, 0.0)
     return TextIntrinsic(
         min_width=max(min_width, 0.0),
         preferred_width=max(preferred_width, min_width),

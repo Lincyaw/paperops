@@ -1,0 +1,4 @@
+display_name: Talk Architect
+short_description: Turn papers and source docs into an audience-aware academic talk plan before slide generation.
+default_prompt: >-
+  Use this skill to plan an academic talk from one or more source documents. Pick or confirm the talk style first, then produce a thesis, story arc, timing, slide-by-slide messages, and speaker notes before building slides.

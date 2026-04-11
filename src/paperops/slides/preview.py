@@ -129,11 +129,51 @@ def _estimate_text_height(
         TextStyle(
             font_family=font_family,
             font_size_pt=font_size_pt,
-            line_spacing=max(line_spacing, 0.8),
+            line_spacing=max(line_spacing, 1.0),
         ),
         max_width_inches=box_width_inches,
     )
     return int(metrics.height * EMU_PER_INCH)
+
+
+def _overflow_thresholds(
+    *,
+    text: str,
+    usable_width_emu: int,
+    line_spacing: float,
+    estimated_line_count: int,
+) -> tuple[float, int]:
+    """Return ratio/absolute thresholds tuned for false-positive reduction."""
+    ratio_threshold = 1.12
+    absolute_threshold = Inches(0.06)
+    is_cjk = _is_cjk_heavy(text)
+
+    if not is_cjk:
+        stripped_len = len(text.strip())
+        if estimated_line_count <= 1 and stripped_len <= 16:
+            ratio_threshold = max(ratio_threshold, 1.35)
+            absolute_threshold = max(absolute_threshold, Inches(0.16))
+
+        if usable_width_emu >= Inches(2.8):
+            ratio_threshold = 1.18
+            absolute_threshold = Inches(0.10)
+        elif usable_width_emu >= Inches(1.6):
+            ratio_threshold = 1.16
+            absolute_threshold = Inches(0.08)
+
+        if estimated_line_count <= 2 and len(text.strip()) <= 64:
+            ratio_threshold = max(ratio_threshold, 1.22)
+            absolute_threshold = max(absolute_threshold, Inches(0.12))
+
+        if line_spacing <= 1.01 and estimated_line_count <= 2 and len(text.strip()) <= 64:
+            ratio_threshold += 0.02
+            absolute_threshold = max(absolute_threshold, Inches(0.09))
+    else:
+        if usable_width_emu <= Inches(1.2):
+            ratio_threshold = 1.08
+            absolute_threshold = Inches(0.04)
+
+    return ratio_threshold, absolute_threshold
 
 
 def _get_all_text(shape) -> str:
@@ -498,15 +538,33 @@ def check_presentation(pptx_path: str) -> list[dict]:
                     usable_h = box_h - margin_t - margin_b
 
                     if usable_w > 0 and usable_h > 0:
-                        width_slack = Inches(0.08)
+                        line_spacing = _get_line_spacing(shape)
+                        is_cjk = _is_cjk_heavy(text)
+                        width_slack = Inches(0.06) if is_cjk else Inches(0.12)
+                        estimated_metrics = measure_text_metrics(
+                            text,
+                            TextStyle(
+                                font_family=_get_font_family(shape),
+                                font_size_pt=(font_size.pt if hasattr(font_size, "pt") else float(font_size)),
+                                line_spacing=max(line_spacing, 0.95),
+                            ),
+                            max_width_inches=(usable_w + width_slack) / EMU_PER_INCH,
+                        )
                         needed_h = _estimate_text_height(
                             text,
                             font_size,
                             usable_w + width_slack,
                             font_family=_get_font_family(shape),
-                            line_spacing=_get_line_spacing(shape),
+                            line_spacing=line_spacing,
                         )
-                        if needed_h > usable_h * 1.12 and needed_h - usable_h > Inches(0.06):
+                        ratio_threshold, absolute_threshold = _overflow_thresholds(
+                            text=text,
+                            usable_width_emu=usable_w,
+                            line_spacing=line_spacing,
+                            estimated_line_count=max(estimated_metrics.line_count, 1),
+                        )
+                        overflow_gap = needed_h - usable_h
+                        if needed_h > usable_h * ratio_threshold and overflow_gap > absolute_threshold:
                             overflow_pct = (needed_h / usable_h - 1) * 100
                             all_issues.append({
                                 'slide': slide_num,
