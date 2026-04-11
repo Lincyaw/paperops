@@ -46,19 +46,22 @@ The goal is not to sound tasteful. The goal is to make another agent render a co
 1. Read the talk intent
    - identify audience, venue, topic, duration, and desired academic tone
    - infer whether the deck needs to feel more conference-like, seminar-like, tutorial-like, or candidate-talk-like
-2. Define system foundations
+2. Choose a system starting point
+   - select or adapt an archetype from `references/archetypes.md` when it fits
+   - decide which parts stay fixed and which parts should be customized for the talk
+3. Define system foundations
    - choose palette roles, type scale, spacing rhythm, and 2-4 recurring layout families
    - decide what must stay constant across the whole deck
-3. Define symbol language
+4. Define symbol language
    - map recurring concepts to stable shape families and icon metaphors
    - keep the number of symbol families low enough to learn in one viewing
-4. Define image policy
+5. Define image policy
    - specify when to use native shapes, plots, tables, screenshots, photos, or no image at all
    - reject decorative imagery that does not advance the argument
-5. Define emphasis and accessibility rules
+6. Define emphasis and accessibility rules
    - specify how focus is created using size, contrast, position, whitespace, and reveal order
    - enforce readability, contrast, and non-color-only meaning
-6. Package the brief for implementation and review
+7. Package the brief for implementation and review
    - write the spec in concrete terms that `slidecraft` can apply
    - include drift checks that `slide-review` can use later
 
@@ -71,6 +74,7 @@ The goal is not to sound tasteful. The goal is to make another agent render a co
 ## References
 
 - `references/style-brief-template.md` for the required output shape
+- `references/archetypes.md` for reusable starting-point systems
 - `references/system-foundation.md` for palette, type, spacing, and layout-system decisions
 - `references/iconography.md` for symbol and icon rules
 - `references/image-policy.md` for asset selection decisions

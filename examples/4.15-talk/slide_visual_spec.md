@@ -38,6 +38,10 @@ backup_slide_count: 6
 - Keep the base object stable across states: normal `Service` -> suspect `Service` -> confirmed `Root cause` should look like the same entity with incremental overlays.
 - Charts and diagrams should follow the same logic: gray context, colored focus, explicit takeaway label on the emphasized region.
 - Animation should only reveal reasoning order: symptom -> propagation -> verification -> root cause.
+- For slides 09-32, default to one dominant visual plus one compact interpretation area; avoid multi-column equal-weight text panels unless the contrast itself is the point.
+- Act-close slides (`15`, `21`, `29`) and section slides (`16`, `32`) should intentionally reduce density so the audience gets a pacing reset.
+- Results slides should prefer direct deltas, thresholds, and on-chart annotations over detached bullet summaries.
+- Mechanism slides should use semantic SVGs rather than generic rounded-box pipelines whenever a repeated RCA concept is present.
 
 ### Color Semantics (use theme semantic tokens)
 

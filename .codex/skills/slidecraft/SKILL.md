@@ -33,17 +33,21 @@ Before writing slide code, confirm or infer:
 1. Stabilize inputs
    - if the story is still moving, send the task to `talk-architect`
    - if the deck lacks a coherent visual system, get a brief from `visual-language`
-2. Build the deck structure
+2. Translate the brief into implementation choices
+   - map palette roles into theme and emphasis usage
+   - map layout families into reusable slide skeletons
+   - map symbol vocabulary into repeated components, icons, and connector styles
+3. Build the deck structure
    - choose the theme, slide sequence, and reusable slide patterns
    - decide where template slides are enough and where custom composition is needed
-3. Compose slides in code
+4. Compose slides in code
    - use containers to express relationships first, then fill them with content
    - keep each slide centered on one message and one visual focal point
    - add animations only when they reveal reasoning order
-4. Integrate assets
+5. Integrate assets
    - embed plotting outputs, images, and diagrams only after the slide structure is clear
    - reuse recurring visual motifs instead of inventing a new one per slide
-5. Validate the result
+6. Validate the result
    - save the deck
    - run review/preview checks
    - route rendering problems into `slide-review`
@@ -60,4 +64,5 @@ Before writing slide code, confirm or infer:
 - `references/workflow.md` for the generation loop and routing rules
 - `references/layout-patterns.md` for common slide structures
 - `references/component-reference.md` for high-frequency components and pairings
+- `references/brief-consumption.md` for turning a visual-language brief into SlideCraft choices
 - `references/handoff-rules.md` for skill boundaries and transitions

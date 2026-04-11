@@ -13,10 +13,13 @@ Use when the talk plan already defines:
 ## `visual-language` -> `slidecraft`
 
 Use when the style brief already defines:
-- color roles and emphasis rules
-- shape and symbol vocabulary
-- diagram grammar
-- recurring motifs and do/don't rules
+- palette roles, type scale, and spacing rhythm
+- layout families for recurring slide types
+- shape, icon, and connector vocabulary
+- image policy and emphasis rules
+- drift checks that later review can enforce
+
+Before implementing, translate that brief with `references/brief-consumption.md`.
 
 ## `slidecraft` -> `slide-review`
 

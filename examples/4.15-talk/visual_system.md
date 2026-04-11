@@ -102,9 +102,56 @@ Evidence chips should be small, attachable, and readable from a distance.
 ### Results slides
 - annotate the winning or failing region directly on the chart
 - suppress non-essential axes, legends, and borders
+- pair one dominant chart with one interpretation strip; avoid dual-equal charts unless the slide's point is explicitly "two regimes"
+- prefer delta badges and threshold lines over long result bullets
+- gray context, color focus: old regime / weaker metric / non-winning models should visually recede
 
 ### Transition slides
 - reduce density; preserve the same color semantics so the audience does not have to relearn the language
+- use large whitespace, one core sentence, and one act marker; these pages should reset attention, not keep explaining
+
+## Layout Families for Slides 09-32
+
+- `Mechanism panel`: one SVG occupies 55-70% width, plus a short interpretation strip or claim box
+- `Evidence slide`: one dominant chart on the right or center, plus one compact summary column with 2-3 evidence badges
+- `Act close`: one claim card, one bridge strip, minimal supporting text
+- `Section divider`: oversized question sentence, one recap badge, no explanatory body text
+
+## Additional Symbol Rules for Later Acts
+
+### Validation Gate
+
+Purpose: distinguish "fault injected" from "operationally relevant case retained".
+
+Shape rules:
+- render as a gate or filter throat, not a normal pipeline box
+- discarded cases should peel off into a muted branch with a `warning` chip
+- retained cases continue as a higher-contrast verified path
+
+### Telemetry Bundle
+
+Purpose: represent metrics, logs, and traces as one analyzable evidence bundle.
+
+Shape rules:
+- use three attachable chips or mini cards with distinct glyphs
+- bundle should read as "heterogeneous evidence arrives together", not three unrelated icons
+
+### Step-Wise Verification
+
+Purpose: show that propagation hops themselves are verified.
+
+Shape rules:
+- each hop gets a checkpoint token
+- verified hops use solid connectors and check markers
+- unverified or old-style supervision should look shallower and less structured
+
+### Metric Semantics
+
+Purpose: visually explain why `Pass@1` and `PR` are related but not identical.
+
+Shape rules:
+- use containment, overlap, or nested regions instead of purely textual definitions
+- the audience should infer `PR <= Pass@1` in a glance before reading the sentence
 
 ## Immediate Refactor Targets
 
