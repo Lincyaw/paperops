@@ -124,25 +124,25 @@ Evaluation must progress from realistic failure generation, to realistic LLM tas
 ### Slide 05
 - `slide_no`: 05
 - `title_en`: Our Evaluation Ladder Uses Three Questions
-- `message`: We evaluate RCA progress with realism, capability, and trustworthiness in sequence.
+- `message`: Question A/B/C form a dependency chain: realism first, then capability, then trustworthiness.
 - `role`: transition
 - `transition_from_previous`: Convert problem statement into research design
 - `visual_goal`: A/B/C question ladder
 - `keep`: three questions and dependencies
 - `cut`: per-paper chronological list
-- `notes_zh`: 明确方法论：先确认题目是否真实，再测能力，最后测推理是否可信。
+- `notes_zh`: 这页只做研究问题框架：A/B/C 三问和依赖关系，不提前讲记忆点。
 - `time_sec`: 90
 
 ### Slide 06
 - `slide_no`: 06
 - `title_en`: What You Should Remember in 45 Minutes
-- `message`: Reported gains are reliable only when all three layers are satisfied.
+- `message`: Use one decision rule for the whole talk: reported gains are reliable only when all three layers are satisfied.
 - `role`: transition
 - `transition_from_previous`: Lock audience expectation before evidence
 - `visual_goal`: three takeaways placeholder
 - `keep`: three recurring messages
 - `cut`: premature result details
-- `notes_zh`: 先给听众“记忆钩子”，后面所有证据都回扣这三句话。
+- `notes_zh`: 这页只做记忆锚点和判断规则，作为后续所有证据的统一尺子。
 - `time_sec`: 90
 
 ## Act II - Realism Stress Test (Slide 07-15, 13 min)
@@ -190,21 +190,21 @@ Evaluation must progress from realistic failure generation, to realistic LLM tas
 - `role`: method
 - `transition_from_previous`: From diagnosis of old benchmarks to design principle
 - `visual_goal`: injection -> validation -> retained cases pipeline
-- `keep`: impact-driven validation principle
+- `keep`: realism principle and retention rule based on SLI impact
 - `cut`: internal tooling specifics
-- `notes_zh`: 点出关键原则：并非注入就算故障，必须对用户指标产生影响才有评测价值。
+- `notes_zh`: 这页只讲原则：impact-validated 才算有效样本。
 - `time_sec`: 90
 
 ### Slide 11
 - `slide_no`: 11
 - `title_en`: Fault-Propagation-Aware Benchmarking at Scale
-- `message`: Systematic generation creates more realistic and diverse RCA difficulty.
+- `message`: A systematic generation framework operationalizes the realism principle at scale.
 - `role`: method
 - `transition_from_previous`: Show how design principle is operationalized
 - `visual_goal`: six-stage generation framework
-- `keep`: dynamic workload, diverse fault space, hierarchical labels
+- `keep`: six-stage construction framework and reproducible scaling
 - `cut`: low-level platform config
-- `notes_zh`: 这页强调“可复现的大规模构建能力”，不是一次性手工造数据。
+- `notes_zh`: 这页只讲方法实现：如何把第10页原则系统化落地。
 - `time_sec`: 90
 
 ### Slide 12
@@ -214,9 +214,9 @@ Evaluation must progress from realistic failure generation, to realistic LLM tas
 - `role`: evidence
 - `transition_from_previous`: Quantify realism change
 - `visual_goal`: key numbers card
-- `keep`: 1,430 / 9,152 / 25 / 6 categories / dynamic workload / 50 services
+- `keep`: 1,430 / 9,152 / 25 / 6 / 50 and the implied difficulty-regime shift
 - `cut`: decorative statistics
-- `notes_zh`: 只保留改变结论的数字，让听众看到“难度分布已经变了”。
+- `notes_zh`: 这页只讲结果态：构建后形成了新的难度分布。
 - `time_sec`: 90
 
 ### Slide 13
@@ -252,7 +252,7 @@ Evaluation must progress from realistic failure generation, to realistic LLM tas
 - `visual_goal`: one-sentence conclusion + bridge arrow
 - `keep`: realism-first claim
 - `cut`: additional benchmarks
-- `notes_zh`: 结论收口：先把题目做对，后续谈模型能力才有意义。
+- `notes_zh`: 结论收口并桥接：先修正真实性合同，后续能力测量才有解释力。
 - `time_sec`: 75
 
 ## Act III - LLM Capability Under Real Telemetry (Slide 16-22, 10 min)
@@ -260,13 +260,13 @@ Evaluation must progress from realistic failure generation, to realistic LLM tas
 ### Slide 16
 - `slide_no`: 16
 - `title_en`: Now We Ask the LLM Capability Question
-- `message`: With a realistic task definition, we can test whether LLMs can actually diagnose RCA.
+- `message`: Only after fixing the realism contract can Question B validly test whether LLMs can diagnose RCA.
 - `role`: transition
-- `transition_from_previous`: From realism to capability
+- `transition_from_previous`: From realism contract closure to capability measurement
 - `visual_goal`: Question B framing
-- `keep`: why this question is now valid
+- `keep`: explicit dependency of Question B on Question A
 - `cut`: repeated benchmark history
-- `notes_zh`: 过渡语义：不是“LLM 万能论”，而是在真实任务上做能力测量。
+- `notes_zh`: 明确桥接句：先修正真实性合同，再进入能力测量。
 - `time_sec`: 75
 
 ### Slide 17
@@ -332,13 +332,13 @@ Evaluation must progress from realistic failure generation, to realistic LLM tas
 ### Slide 22
 - `slide_no`: 22
 - `title_en`: Correct Labels Can Still Hide Wrong Reasoning
-- `message`: Outcome accuracy alone cannot guarantee trustworthy diagnosis.
+- `message`: A model can output the correct root-cause label yet still rely on an invalid causal story.
 - `role`: transition
 - `transition_from_previous`: Open Question C
 - `visual_goal`: correct answer vs valid causal path contrast
-- `keep`: trust gap setup
+- `keep`: intuitive tension with one fast contrast example
 - `cut`: early metric definitions
-- `notes_zh`: 关键转折页：引出第三问，为什么“答对”不等于“可托付”。
+- `notes_zh`: 这页偏直觉冲击：先让听众接受“答对不等于推理对”。
 - `time_sec`: 75
 
 ## Act IV - Process-Level Trustworthiness (Slide 23-29, 10 min)
@@ -346,13 +346,13 @@ Evaluation must progress from realistic failure generation, to realistic LLM tas
 ### Slide 23
 - `slide_no`: 23
 - `title_en`: Outcome-Only Evaluation Misses Process Failures
-- `message`: Existing labels usually check what the answer is, not how the answer was derived.
+- `message`: Formally, outcome-only labels evaluate what answer is given, but not whether the causal derivation process is valid.
 - `role`: problem
-- `transition_from_previous`: Formalize trust gap
+- `transition_from_previous`: Move from intuitive tension to formal evaluation diagnosis
 - `visual_goal`: outcome-only limitation graphic
-- `keep`: process blind spot concept
+- `keep`: evaluation contract gap: outcome check without process verification
 - `cut`: broad LLM alignment discussion
-- `notes_zh`: 把问题说清：缺的是过程可验证性，不是再多一个最终标签。
+- `notes_zh`: 这页偏形式化诊断：不是直觉例子，而是评测合同缺口。
 - `time_sec`: 75
 
 ### Slide 24
@@ -382,13 +382,13 @@ Evaluation must progress from realistic failure generation, to realistic LLM tas
 ### Slide 26
 - `slide_no`: 26
 - `title_en`: Process Metrics Separate Identification from Reasoning
-- `message`: Pass@1 and Path Reachability measure different properties and should be reported together.
+- `message`: Use two complementary metrics: Pass@1 asks whether the root cause was identified; PR asks whether that claimed cause can reach symptoms through a valid path.
 - `role`: method
 - `transition_from_previous`: Define evaluation axes
 - `visual_goal`: metric semantics chart
-- `keep`: Pass@1 vs PR meaning and inequality PR <= Pass@1
+- `keep`: plain-language metric meanings plus inequality PR <= Pass@1
 - `cut`: complete metric derivations
-- `notes_zh`: 把指标解释成“会不会找对”和“能不能讲对因果链”两层能力。
+- `notes_zh`: 低术语解释：Pass@1 看“找没找对”，PR 看“路径是否成立”。
 - `time_sec`: 90
 
 ### Slide 27

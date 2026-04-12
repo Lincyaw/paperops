@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from html import escape
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -13,6 +14,7 @@ from paperops.slides import (  # noqa: E402
     Badge,
     Box,
     BulletList,
+    Circle,
     Grid,
     HStack,
     Padding,
@@ -25,9 +27,9 @@ from paperops.slides import (  # noqa: E402
     VStack,
     themes,
 )
-from paperops.slides.components.svg_canvas import SvgCanvas
 
 OUTPUT_FILE = Path(__file__).with_name("talk_4_15.pptx")
+SVG_ASSET_DIR = Path(__file__).with_name("talk_4_15_svg_assets")
 
 # ---------------------------------------------------------------------------
 # Theme
@@ -58,11 +60,230 @@ THEME = themes.academic_seminar.override(
 
 
 # ---------------------------------------------------------------------------
-# Icon functions — SvgCanvas-based, theme-aware
+# Local SVG builder — custom SVG string generation, no DeckSvg dependency
 # ---------------------------------------------------------------------------
 
+
+class DeckSvg:
+    def __init__(self, width: int = 1200, height: int = 600, *, theme=THEME, bg: str | None = None):
+        self.width = width
+        self.height = height
+        self.theme = theme
+        self.bg = bg
+        self._defs: list[str] = []
+        self._elements: list[str] = []
+        self._marker_colors: set[str] = set()
+
+    def _color(self, color: str | tuple[int, int, int] | None) -> str:
+        if color is None:
+            return "none"
+        if color == "none":
+            return "none"
+        if isinstance(color, tuple):
+            r, g, b = color
+            return f"rgb({r},{g},{b})"
+        try:
+            return self.theme.resolve_color(color)
+        except ValueError:
+            # Allow raw SVG/CSS color values for slide-local accents like white text.
+            return color
+
+    def _font_size(self, size: str | int | float) -> float:
+        return self.theme.resolve_font_size(size)
+
+    @staticmethod
+    def _fmt(value: float | int) -> str:
+        return f"{float(value):.2f}".rstrip("0").rstrip(".")
+
+    def _attrs(self, **attrs: object) -> str:
+        parts: list[str] = []
+        for key, value in attrs.items():
+            if value is None:
+                continue
+            if isinstance(value, bool):
+                if value:
+                    parts.append(f'{key}="true"')
+                continue
+            parts.append(f'{key}="{escape(str(value), quote=True)}"')
+        return " ".join(parts)
+
+    def _dasharray(self, dashed: bool) -> str | None:
+        return "8 6" if dashed else None
+
+    def render(self) -> str:
+        bg_rect = ""
+        if self.bg is not None:
+            bg_rect = (
+                f'<rect x="0" y="0" width="{self.width}" height="{self.height}" '
+                f'fill="{self._color(self.bg)}" />'
+            )
+        defs = f"<defs>{''.join(self._defs)}</defs>" if self._defs else ""
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" '
+            f'width="{self.width}" height="{self.height}" '
+            f'viewBox="0 0 {self.width} {self.height}">'
+            f"{defs}{bg_rect}{''.join(self._elements)}</svg>"
+        )
+
+    def rect(
+        self,
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        *,
+        fill: str = "none",
+        stroke: str = "none",
+        stroke_width: float = 1.0,
+        rx: float = 0.0,
+        opacity: float | None = None,
+        text: str | None = None,
+        text_color: str = "text",
+        font_size: str | int | float = 12,
+        bold: bool = False,
+    ) -> None:
+        self._elements.append(
+            f'<rect {self._attrs(x=self._fmt(x), y=self._fmt(y), width=self._fmt(w), height=self._fmt(h), rx=self._fmt(rx) if rx else None, fill=self._color(fill), stroke=self._color(stroke), **{"stroke-width": self._fmt(stroke_width), "opacity": opacity})} />'
+        )
+        if text:
+            self.text(
+                x + w / 2,
+                y + h / 2 + self._font_size(font_size) * 0.35,
+                text,
+                color=text_color,
+                size=font_size,
+                bold=bold,
+            )
+
+    def rounded_rect(self, x: float, y: float, w: float, h: float, **kwargs: object) -> None:
+        kwargs.setdefault("rx", 14)
+        self.rect(x, y, w, h, **kwargs)
+
+    def circle(
+        self,
+        cx: float,
+        cy: float,
+        r: float,
+        *,
+        fill: str = "none",
+        stroke: str = "none",
+        stroke_width: float = 1.0,
+        opacity: float | None = None,
+        text: str | None = None,
+        color: str = "text",
+        size: str | int | float = 12,
+        bold: bool = False,
+    ) -> None:
+        self._elements.append(
+            f'<circle {self._attrs(cx=self._fmt(cx), cy=self._fmt(cy), r=self._fmt(r), fill=self._color(fill), stroke=self._color(stroke), **{"stroke-width": self._fmt(stroke_width), "opacity": opacity})} />'
+        )
+        if text:
+            self.text(cx, cy + self._font_size(size) * 0.35, text, color=color, size=size, bold=bold)
+
+    def line(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        *,
+        color: str = "text",
+        width: float = 1.0,
+        opacity: float | None = None,
+        dashed: bool = False,
+        marker_end: str | None = None,
+    ) -> None:
+        self._elements.append(
+            f'<line {self._attrs(x1=self._fmt(x1), y1=self._fmt(y1), x2=self._fmt(x2), y2=self._fmt(y2), stroke=self._color(color), **{"stroke-width": self._fmt(width), "opacity": opacity, "stroke-dasharray": self._dasharray(dashed), "marker-end": marker_end})} />'
+        )
+
+    def path(
+        self,
+        d: str,
+        *,
+        stroke: str = "text",
+        fill: str = "none",
+        stroke_width: float = 1.0,
+        opacity: float | None = None,
+        dashed: bool = False,
+    ) -> None:
+        self._elements.append(
+            f'<path {self._attrs(d=d, stroke=self._color(stroke), fill=self._color(fill), **{"stroke-width": self._fmt(stroke_width), "opacity": opacity, "stroke-dasharray": self._dasharray(dashed)})} />'
+        )
+
+    def polygon(
+        self,
+        points: list[tuple[float, float]],
+        *,
+        fill: str = "none",
+        stroke: str = "none",
+        stroke_width: float = 1.0,
+        opacity: float | None = None,
+    ) -> None:
+        pts = " ".join(f"{self._fmt(x)},{self._fmt(y)}" for x, y in points)
+        self._elements.append(
+            f'<polygon {self._attrs(points=pts, fill=self._color(fill), stroke=self._color(stroke), **{"stroke-width": self._fmt(stroke_width), "opacity": opacity})} />'
+        )
+
+    def text(
+        self,
+        x: float,
+        y: float,
+        text: str,
+        *,
+        color: str = "text",
+        size: str | int | float = 12,
+        bold: bool = False,
+        italic: bool = False,
+        anchor: str = "middle",
+        opacity: float | None = None,
+    ) -> None:
+        anchor_map = {"start": "start", "middle": "middle", "end": "end"}
+        self._elements.append(
+            f'<text {self._attrs(x=self._fmt(x), y=self._fmt(y), fill=self._color(color), **{"font-size": self._fmt(self._font_size(size)), "font-family": self.theme.font_family, "font-weight": "700" if bold else "400", "font-style": "italic" if italic else None, "text-anchor": anchor_map.get(anchor, "middle"), "opacity": opacity})}>{escape(text)}</text>'
+        )
+
+    def arrow_markers(self, colors: list[str] | None = None) -> None:
+        if not colors:
+            return
+        for color in colors:
+            self._ensure_arrow_marker(color)
+
+    def _ensure_arrow_marker(self, color: str) -> str:
+        hex_color = self._color(color).replace("#", "")
+        marker_id = f"arrow-{hex_color.lower()}"
+        if marker_id not in self._marker_colors:
+            self._marker_colors.add(marker_id)
+            self._defs.append(
+                f'<marker id="{marker_id}" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">'
+                f'<path d="M0,0 L0,6 L9,3 z" fill="{self._color(color)}" /></marker>'
+            )
+        return f"url(#{marker_id})"
+
+    def arrow(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        *,
+        color: str = "accent",
+        width: float = 2.0,
+        opacity: float | None = None,
+    ) -> None:
+        self.line(
+            x1,
+            y1,
+            x2,
+            y2,
+            color=color,
+            width=width,
+            opacity=opacity,
+            marker_end=self._ensure_arrow_marker(color),
+        )
+
 def _draw_anomaly_burst(
-    c: SvgCanvas,
+    c: DeckSvg,
     *,
     cx: float,
     cy: float,
@@ -86,7 +307,7 @@ def _draw_anomaly_burst(
 
 
 def _draw_root_cause_mark(
-    c: SvgCanvas,
+    c: DeckSvg,
     *,
     cx: float,
     cy: float,
@@ -107,7 +328,7 @@ def _draw_root_cause_mark(
 
 
 def _draw_service_module(
-    c: SvgCanvas,
+    c: DeckSvg,
     *,
     x: float,
     y: float,
@@ -117,6 +338,7 @@ def _draw_service_module(
     subtitle: str,
     status: str = "normal",
     badge: str | None = None,
+    style: str = "rich",
 ) -> None:
     palette = {
         "normal": {
@@ -148,28 +370,36 @@ def _draw_service_module(
         },
     }[status]
 
-    if status != "normal":
-        c.rect(x - 7, y - 7, w + 14, h + 14, fill="none", stroke=palette["halo"], stroke_width=2, rx=22, opacity=0.18)
+    if style == "minimal":
+        c.rect(x, y, w, h, fill=palette["fill"], stroke=palette["stroke"], stroke_width=2.0, rx=16)
+        c.rect(x + 10, y + 10, 8, h - 20, fill=palette["header"], stroke="none", rx=4, opacity=0.92)
+        c.circle(x + w - 18, y + 18, 5.5, fill=palette["accent"], opacity=0.95)
+        c.text(x + 34, y + 33, title, color=palette["text"], size=15, bold=True, anchor="start")
+        c.text(x + 34, y + 54, subtitle, color=palette["subtext"], size=11, anchor="start")
+        c.line(x + 34, y + h - 21, x + w - 20, y + h - 21, color="border", width=1.4)
+    else:
+        if status != "normal":
+            c.rect(x - 7, y - 7, w + 14, h + 14, fill="none", stroke=palette["halo"], stroke_width=2, rx=22, opacity=0.18)
 
-    c.rect(x, y, w, h, fill=palette["fill"], stroke=palette["stroke"], stroke_width=2.4, rx=18)
-    c.rect(x + 12, y + 11, w - 24, 13, fill=palette["header"], stroke="none", rx=6, opacity=0.90)
+        c.rect(x, y, w, h, fill=palette["fill"], stroke=palette["stroke"], stroke_width=2.4, rx=18)
+        c.rect(x + 12, y + 11, w - 24, 13, fill=palette["header"], stroke="none", rx=6, opacity=0.90)
 
-    port_x = x + 18
-    for py in [y + 28, y + 44, y + 60]:
-        c.circle(port_x, py, 3.2, fill=palette["accent"], opacity=0.95)
-        c.line(port_x + 7, py, x + w - 22, py, color="border", width=1.4)
+        port_x = x + 18
+        for py in [y + 28, y + 44, y + 60]:
+            c.circle(port_x, py, 3.2, fill=palette["accent"], opacity=0.95)
+            c.line(port_x + 7, py, x + w - 22, py, color="border", width=1.4)
 
-    c.path(
-        f"M {x + 54} {y + h - 18} Q {x + 72} {y + h - 26} {x + 89} {y + h - 18} "
-        f"Q {x + 102} {y + h - 12} {x + 116} {y + h - 26} "
-        f"Q {x + 132} {y + h - 42} {x + 151} {y + h - 28}",
-        stroke=palette["accent"],
-        fill="none",
-        stroke_width=2.2,
-    )
+        c.path(
+            f"M {x + 54} {y + h - 18} Q {x + 72} {y + h - 26} {x + 89} {y + h - 18} "
+            f"Q {x + 102} {y + h - 12} {x + 116} {y + h - 26} "
+            f"Q {x + 132} {y + h - 42} {x + 151} {y + h - 28}",
+            stroke=palette["accent"],
+            fill="none",
+            stroke_width=2.2,
+        )
 
-    c.text(x + 46, y + 28, title, color=palette["text"], size=16, bold=True, anchor="start")
-    c.text(x + 46, y + 50, subtitle, color=palette["subtext"], size=12, anchor="start")
+        c.text(x + 46, y + 28, title, color=palette["text"], size=16, bold=True, anchor="start")
+        c.text(x + 46, y + 50, subtitle, color=palette["subtext"], size=12, anchor="start")
 
     if badge:
         badge_w = max(74, len(badge) * 6.1)
@@ -178,10 +408,10 @@ def _draw_service_module(
         c.rect(badge_x, badge_y, badge_w, 18, fill=palette["header"], stroke="none", rx=9, opacity=0.96)
         c.text(badge_x + badge_w / 2, badge_y + 12, badge.upper(), color="white", size=10, bold=True)
 
-    if status == "propagated":
+    if style != "minimal" and status == "propagated":
         _draw_anomaly_burst(c, cx=x + w - 18, cy=y + h / 2, tone="warning", scale=0.52)
 
-    if status == "root":
+    if style != "minimal" and status == "root":
         _draw_root_cause_mark(c, cx=x + w - 20, cy=y + h / 2, tone="negative", scale=0.58)
         crack = [
             (x + w - 55, y + 1),
@@ -196,8 +426,131 @@ def _draw_service_module(
         c.polygon(crack, fill=palette["header"], stroke="none", opacity=0.95)
 
 
-def icon_metrics(size: int = 80) -> SvgCanvas:
-    c = SvgCanvas(size, size, theme=THEME, bg=None)
+def _draw_path_connector(
+    c: DeckSvg,
+    *,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    tone: str = "accent",
+    status: str = "verified",
+    label: str | None = None,
+) -> None:
+    x1, y1 = start
+    x2, y2 = end
+    stroke_map = {
+        "verified": tone,
+        "candidate": "warning",
+        "context": "secondary",
+    }
+    stroke = stroke_map[status]
+    if status == "verified":
+        c.line(x1, y1, x2, y2, color=stroke, width=3.0)
+    else:
+        c.path(
+            f"M {x1} {y1} L {x2} {y2}",
+            stroke=stroke,
+            fill="none",
+            stroke_width=2.4,
+            dashed=True,
+        )
+
+    midx = (x1 + x2) / 2
+    midy = (y1 + y2) / 2
+    c.circle(midx, midy, 4.2 if status == "verified" else 3.5, fill=stroke, opacity=0.95 if status == "verified" else 0.75)
+    c.circle(x2, y2, 4.6, fill=stroke, opacity=0.95 if status == "verified" else 0.75)
+    arrow = [
+        (x2, y2),
+        (x2 - 9, y2 - 5),
+        (x2 - 7, y2),
+        (x2 - 9, y2 + 5),
+    ]
+    c.polygon(arrow, fill=stroke, stroke="none", opacity=0.95 if status == "verified" else 0.75)
+
+    if label:
+        c.text(midx, midy - 10, label, color=stroke, size=10, bold=True)
+
+
+def _draw_intervention_point(
+    c: DeckSvg,
+    *,
+    cx: float,
+    cy: float,
+    tone: str = "accent",
+    label: str | None = None,
+) -> None:
+    c.circle(cx, cy, 11, fill="bg")
+    _draw_circle_outline(c, cx=cx, cy=cy, r=11, tone=tone, stroke_width=2.5)
+    c.line(cx - 7, cy, cx + 7, cy, color=tone, width=2.6)
+    c.line(cx, cy - 7, cx, cy + 7, color=tone, width=2.6)
+    if label:
+        c.text(cx, cy + 23, label, color=tone, size=10, bold=True)
+
+
+def _draw_verification_checkpoint(
+    c: DeckSvg,
+    *,
+    cx: float,
+    cy: float,
+    tone: str = "positive",
+    label: str | None = None,
+) -> None:
+    c.circle(cx, cy, 10, fill="#EFF8F2")
+    _draw_circle_outline(c, cx=cx, cy=cy, r=10, tone=tone, stroke_width=2.2)
+    c.line(cx - 4, cy + 1, cx - 1, cy + 4, color=tone, width=2.2)
+    c.line(cx - 1, cy + 4, cx + 5, cy - 3, color=tone, width=2.2)
+    if label:
+        c.text(cx, cy + 23, label, color=tone, size=10, bold=True)
+
+
+def _draw_evidence_chip_bundle(
+    c: DeckSvg,
+    *,
+    x: float,
+    y: float,
+    chips: list[tuple[str, str]],
+) -> None:
+    glyph_map = {
+        "metrics": "m",
+        "logs": "l",
+        "traces": "t",
+    }
+    tone_map = {
+        "metrics": "primary",
+        "logs": "accent",
+        "traces": "positive",
+    }
+    for idx, (kind, label) in enumerate(chips):
+        chip_x = x + idx * 70
+        tone = tone_map.get(kind, "secondary")
+        c.rect(chip_x, y, 60, 24, fill="bg_alt", stroke=tone, stroke_width=1.8, rx=12)
+        c.circle(chip_x + 12, y + 12, 7, fill=tone, opacity=0.88)
+        c.text(chip_x + 12, y + 15, glyph_map.get(kind, "?").upper(), color="white", size=8, bold=True)
+        c.text(chip_x + 35, y + 15, label, color="text", size=9, bold=True)
+
+
+def _draw_circle_outline(
+    c: DeckSvg,
+    *,
+    cx: float,
+    cy: float,
+    r: float,
+    tone: str,
+    stroke_width: float = 2.0,
+) -> None:
+    c.path(
+        (
+            f"M {cx - r} {cy} "
+            f"A {r} {r} 0 1 0 {cx + r} {cy} "
+            f"A {r} {r} 0 1 0 {cx - r} {cy}"
+        ),
+        stroke=tone,
+        fill="none",
+        stroke_width=stroke_width,
+    )
+
+
+def icon_metrics(size: int = 80) -> DeckSvg:
+    c = DeckSvg(size, size, theme=THEME, bg=None)
     c.rect(8, 10, 64, 54, fill="bg_alt", stroke="border", rx=6)
     c.line(16, 54, 28, 40, color="primary", width=4)
     c.line(28, 40, 40, 46, color="primary", width=4)
@@ -208,8 +561,8 @@ def icon_metrics(size: int = 80) -> SvgCanvas:
     return c
 
 
-def icon_logs(size: int = 80) -> SvgCanvas:
-    c = SvgCanvas(size, size, theme=THEME, bg=None)
+def icon_logs(size: int = 80) -> DeckSvg:
+    c = DeckSvg(size, size, theme=THEME, bg=None)
     c.rect(16, 10, 48, 60, fill="bg_alt", stroke="border", rx=5)
     c.line(24, 24, 56, 24, color="accent", width=4)
     c.line(24, 34, 50, 34, color="text_mid", width=3)
@@ -218,8 +571,8 @@ def icon_logs(size: int = 80) -> SvgCanvas:
     return c
 
 
-def icon_traces(size: int = 80) -> SvgCanvas:
-    c = SvgCanvas(size, size, theme=THEME, bg=None)
+def icon_traces(size: int = 80) -> DeckSvg:
+    c = DeckSvg(size, size, theme=THEME, bg=None)
     c.circle(18, 24, 8, fill="positive", opacity=0.85)
     c.circle(40, 24, 8, fill="positive", opacity=0.85)
     c.circle(62, 24, 8, fill="positive", opacity=0.85)
@@ -230,8 +583,8 @@ def icon_traces(size: int = 80) -> SvgCanvas:
     return c
 
 
-def icon_service(size: int = 80) -> SvgCanvas:
-    c = SvgCanvas(size, size, theme=THEME, bg=None)
+def icon_service(size: int = 80) -> DeckSvg:
+    c = DeckSvg(size, size, theme=THEME, bg=None)
     _draw_service_module(
         c,
         x=10,
@@ -245,30 +598,30 @@ def icon_service(size: int = 80) -> SvgCanvas:
     return c
 
 
-def icon_warning(size: int = 80) -> SvgCanvas:
-    c = SvgCanvas(size, size, theme=THEME, bg=None)
+def icon_warning(size: int = 80) -> DeckSvg:
+    c = DeckSvg(size, size, theme=THEME, bg=None)
     _draw_anomaly_burst(c, cx=40, cy=40, tone="warning", scale=0.9)
     c.text(40, 69, "ANOM", color="warning", size=9, bold=True)
     return c
 
 
-def icon_root_cause(size: int = 80) -> SvgCanvas:
-    c = SvgCanvas(size, size, theme=THEME, bg=None)
+def icon_root_cause(size: int = 80) -> DeckSvg:
+    c = DeckSvg(size, size, theme=THEME, bg=None)
     _draw_root_cause_mark(c, cx=40, cy=36, tone="negative", scale=0.95)
     c.text(40, 69, "ROOT", color="negative", size=9, bold=True)
     return c
 
 
-def icon_magnifier(size: int = 80) -> SvgCanvas:
-    c = SvgCanvas(size, size, theme=THEME, bg=None)
+def icon_magnifier(size: int = 80) -> DeckSvg:
+    c = DeckSvg(size, size, theme=THEME, bg=None)
     c.path("M 16 34 A 18 18 0 1 0 52 34 A 18 18 0 1 0 16 34",
            stroke="primary", fill="none", stroke_width=5)
     c.line(47, 47, 62, 62, color="primary", width=6)
     return c
 
 
-def icon_path_chain(size: int = 80) -> SvgCanvas:
-    c = SvgCanvas(size, size, theme=THEME, bg=None)
+def icon_path_chain(size: int = 80) -> DeckSvg:
+    c = DeckSvg(size, size, theme=THEME, bg=None)
     c.circle(18, 50, 7, fill="highlight")
     c.circle(40, 28, 7, fill="highlight")
     c.circle(62, 48, 7, fill="highlight")
@@ -277,8 +630,92 @@ def icon_path_chain(size: int = 80) -> SvgCanvas:
     return c
 
 
+def svg_gate_node(letter: str, label: str, tone: str, *, width: float = 2.0, height: float = 1.6) -> SvgImage:
+    W, H = 220, 170
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    cx, cy = W / 2, 76
+    c.circle(cx, cy, 44, fill="bg")
+    _draw_circle_outline(c, cx=cx, cy=cy, r=44, tone=tone, stroke_width=3)
+    c.text(cx, cy - 8, letter, color=tone, size=24, bold=True)
+    c.text(cx, cy + 16, label, color=tone, size=11, bold=True)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_contract_card(title: str, body: str, tone: str, *, width: float = 3.0, height: float = 1.1) -> SvgImage:
+    W, H = 320, 112
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.rect(6, 16, 308, 88, fill="bg_alt", stroke=tone, rx=7, stroke_width=1.8)
+    c.rect(6, 16, 92, 24, fill=tone, stroke="none", rx=3)
+    c.text(52, 32, title, color="#FFFFFF", size=10, bold=True)
+    c.text(160, 68, body, color="text", size=12, bold=True)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_stage_card(title: str, body: str, tone: str, *, emphasized: bool = False, width: float = 3.0, height: float = 1.25) -> SvgImage:
+    W, H = 320, 126
+    fill = "bg_accent" if emphasized else "bg_alt"
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.rect(10, 10, 300, 108, fill=fill, stroke=tone, rx=7, stroke_width=1.8)
+    c.rect(10, 10, 300, 22, fill=tone, stroke="none", rx=3)
+    c.text(160, 25, title, color="#FFFFFF", size=10, bold=True)
+    c.text(160, 66, body, color="text", size=12, bold=True)
+    c.text(160, 88, "stage", color="text_mid", size=10)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_probe_chevron(title: str, body: str, tone: str, *, width: float = 3.0, height: float = 1.1) -> SvgImage:
+    W, H = 320, 112
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.polygon(
+        [(10, 20), (254, 20), (284, 56), (254, 92), (10, 92), (40, 56)],
+        fill="bg_alt",
+        stroke=tone,
+        stroke_width=1.8,
+    )
+    c.text(146, 45, title, color=tone, size=14, bold=True)
+    c.text(146, 69, body, color="text_mid", size=11)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_metric_stat_card(value: str, label: str, tone: str, *, width: float = 2.1, height: float = 1.6) -> SvgImage:
+    W, H = 232, 172
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.rect(10, 14, 212, 144, fill="bg_alt", stroke="border", rx=7, stroke_width=1.4)
+    c.text(116, 74, value, color=tone, size=31, bold=True)
+    c.text(116, 100, label.upper(), color="text_mid", size=10, bold=True)
+    c.rect(64, 114, 104, 22, fill=tone, stroke="none", rx=3)
+    c.text(116, 129, "regime signal", color="#FFFFFF", size=9, bold=True)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_validation_hexagon(*, width: float = 2.6, height: float = 1.7) -> SvgImage:
+    W, H = 300, 180
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    gate = [(48, 18), (170, 18), (224, 90), (170, 162), (48, 162), (102, 90)]
+    c.polygon(gate, fill="#FFF1DE", stroke="warning", stroke_width=2.0)
+    c.text(136, 74, "Validation", color="warning", size=16, bold=True)
+    c.text(136, 94, "impact > theta", color="warning", size=13, bold=True)
+    c.text(136, 113, "retain only meaningful faults", color="text_mid", size=11)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_validated_case_hexagon(*, width: float = 2.9, height: float = 1.8) -> SvgImage:
+    W, H = 300, 180
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.polygon(
+        [(26, 36), (224, 36), (244, 90), (224, 144), (26, 144), (6, 90)],
+        fill="#EAF3FC",
+        stroke="primary",
+        stroke_width=2,
+    )
+    c.text(125, 72, "Validated benchmark case", color="primary", size=15, bold=True)
+    c.text(125, 91, "fault -> user-visible impact", color="text_mid", size=11)
+    c.text(125, 110, "evaluation-worthy incident", color="text_mid", size=11)
+    return SvgImage(svg=c, width=width, height=height)
+
+
 # ---------------------------------------------------------------------------
-# Chart functions — SvgCanvas-based, high-DPI quality
+# Chart functions — DeckSvg-based, high-DPI quality
 # ---------------------------------------------------------------------------
 
 def _fmt_v(v: float) -> str:
@@ -304,7 +741,7 @@ def bar_chart_svg(
     ch = H - mt - mb
     max_v = ymax if ymax is not None else max((v for _, v, _ in items), default=1.0)
 
-    c = SvgCanvas(W, H, theme=THEME, bg="bg")
+    c = DeckSvg(W, H, theme=THEME, bg="bg")
 
     # X-axis
     c.line(ml, mt + ch, W - mr, mt + ch, color="text_mid", width=2)
@@ -355,7 +792,7 @@ def grouped_bar_svg(
     cw = W - ml - mr
     ch = H - mt - mb
 
-    c = SvgCanvas(W, H, theme=THEME, bg="bg")
+    c = DeckSvg(W, H, theme=THEME, bg="bg")
 
     # Legend
     legend_x = ml
@@ -396,7 +833,7 @@ def grouped_bar_svg(
 
 
 # ---------------------------------------------------------------------------
-# Diagram functions — SvgCanvas-based rich visuals
+# Diagram functions — DeckSvg-based rich visuals
 # ---------------------------------------------------------------------------
 
 def svg_synthesis_ladder(
@@ -406,60 +843,225 @@ def svg_synthesis_ladder(
     width: float = 10.0,
     height: float = 2.0,
 ) -> SvgImage:
-    """A/B/C three-node ladder. Core recurring identity visual."""
+    """A/B/C ladder with gate semantics and verdict-ready annotation lanes."""
     has_extra = bool(sub_labels or evidence)
-    W = 1100
-    H = 350 if (sub_labels and evidence) else 300 if has_extra else 230
-    cy_node = 108
+    W = 1120
+    H = 380 if (sub_labels and evidence) else 320 if has_extra else 250
+    cy_node = 114
 
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
 
-    centers_x = [180, 550, 920]
+    centers_x = [186, 560, 934]
     colors = ["primary", "accent", "positive"]
     letters = ["A", "B", "C"]
     node_labels = ["Realism", "Capability", "Trust"]
-    r = 62
+    r = 60
 
-    # Circles
+    c.line(120, 52, 1000, 52, color="border", width=2)
+    c.text(560, 44, "Evaluation contract: A gates B, B gates C", color="text_mid", size=12, bold=True)
+
     for cx_val, col, letter, lbl in zip(centers_x, colors, letters, node_labels):
-        c.circle(cx_val, cy_node, r, fill=col)
-        c.text(cx_val, cy_node - 16, letter, color="white", size=30, bold=True)
-        c.text(cx_val, cy_node + 18, lbl, color="white", size=15)
+        _draw_circle_outline(c, cx=cx_val, cy=cy_node, r=r + 8, tone=col, stroke_width=2.2)
+        c.circle(cx_val, cy_node, r, fill=col, opacity=0.92)
+        c.text(cx_val, cy_node - 14, letter, color="#FFFFFF", size=29, bold=True)
+        c.text(cx_val, cy_node + 18, lbl, color="#FFFFFF", size=15, bold=True)
 
-    # Connecting arrows
-    for i in range(2):
-        x1 = centers_x[i] + r + 6
-        x2 = centers_x[i + 1] - r - 6
-        c.arrow(x1, cy_node, x2, cy_node, color=colors[i + 1], width=4)
+    c.arrow(252, cy_node, 494, cy_node, color="accent", width=4)
+    c.arrow(626, cy_node, 868, cy_node, color="positive", width=4)
+
+    c.text(372, cy_node - 20, "gate", color="accent", size=11, bold=True)
+    c.text(746, cy_node - 20, "gate", color="positive", size=11, bold=True)
 
     if sub_labels:
         for cx_val, text in zip(centers_x, sub_labels):
-            c.text(cx_val, cy_node + r + 30, text, color="text_mid", size=13)
+            c.text(cx_val, cy_node + r + 34, text, color="text_mid", size=12)
 
     if evidence:
-        evidence_y = cy_node + r + (64 if sub_labels else 30)
-        for cx_val, text in zip(centers_x, evidence):
-            c.rounded_rect(
-                cx_val - 74,
-                evidence_y - 18,
-                148,
-                36,
-                text=text,
-                fill="bg_alt",
-                stroke="border",
-                text_color="text_mid",
-                font_size=12,
-                rx=8,
+        evidence_y = cy_node + r + (72 if sub_labels else 38)
+        for cx_val, text, tone in zip(centers_x, evidence, colors):
+            x = cx_val - 90
+            c.rect(x + 14, evidence_y - 18, 176, 36, fill="bg_alt", stroke="border", rx=4, stroke_width=1.4)
+            c.polygon(
+                [(x, evidence_y), (x + 14, evidence_y - 18), (x + 14, evidence_y + 18)],
+                fill=tone,
+                stroke=tone,
+                stroke_width=1.0,
             )
+            c.text(cx_val + 8, evidence_y + 4, text, color="text", size=11, bold=True)
 
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_hardness_map(*, width: float = 10.1, height: float = 3.15) -> SvgImage:
+    W, H = 1080, 350
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.arrow_markers()
+
+    # Modality deck on the left
+    c.rect(34, 46, 284, 250, fill="bg_alt", stroke="border", rx=8, stroke_width=1.6)
+    c.text(176, 72, "Telemetry modalities", color="text", size=15, bold=True)
+    _evidence_chip(c, 60, 102, "metrics: onset + magnitude", "primary", "M")
+    _evidence_chip(c, 60, 146, "logs: local semantic clues", "accent", "L")
+    _evidence_chip(c, 60, 190, "traces: cross-service hops", "positive", "T")
+    c.rect(60, 236, 232, 34, fill="bg", stroke="primary", rx=5, stroke_width=1.2)
+    c.text(176, 257, "three views, one diagnosis", color="primary", size=11, bold=True)
+
+    # Causal path center
+    _draw_service_module(c, x=388, y=112, w=154, h=86, title="Root cause", subtitle="db lock", status="root")
+    _draw_service_module(c, x=634, y=88, w=154, h=86, title="Mid service", subtitle="retry storm", status="propagated")
+    _draw_service_module(c, x=874, y=130, w=154, h=86, title="User symptom", subtitle="timeout", status="propagated")
+    c.arrow(542, 154, 632, 132, color="warning", width=2.8)
+    c.arrow(788, 132, 872, 166, color="negative", width=2.8)
+    c.path("M 540 186 C 640 250, 826 250, 906 212", stroke="primary", fill="none", stroke_width=2, dashed=True)
+    c.text(730, 272, "must preserve propagation order", color="primary", size=11, bold=True)
+
+    # Burden bars on top-right
+    c.rect(384, 36, 192, 30, fill="#EEF4FA", stroke="primary", rx=4, stroke_width=1.2)
+    c.text(480, 56, "Fuse modalities", color="primary", size=11, bold=True)
+    c.rect(602, 36, 192, 30, fill="#FFF5EA", stroke="accent", rx=4, stroke_width=1.2)
+    c.text(698, 56, "Trace hops", color="accent", size=11, bold=True)
+    c.rect(820, 36, 216, 30, fill="#EFF8F2", stroke="positive", rx=4, stroke_width=1.2)
+    c.text(928, 56, "Order events causally", color="positive", size=11, bold=True)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_shortcut_contrast_map(*, width: float = 10.1, height: float = 3.2) -> SvgImage:
+    W, H = 1080, 360
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.arrow_markers()
+
+    c.rect(24, 26, 500, 294, fill="#FFF2F2", stroke="negative", rx=10, stroke_width=1.8)
+    c.rect(556, 26, 500, 294, fill="#EEF5FC", stroke="primary", rx=10, stroke_width=1.8)
+    c.text(274, 56, "Shortcut ranking path", color="negative", size=16, bold=True)
+    c.text(806, 56, "Causal verification path", color="primary", size=16, bold=True)
+
+    # left fast path
+    c.polygon([(70, 114), (238, 114), (266, 144), (238, 174), (70, 174), (42, 144)], fill="#F3B4B4", stroke="negative", stroke_width=1.6)
+    c.text(154, 149, "largest anomaly", color="negative", size=13, bold=True)
+    c.polygon([(306, 114), (468, 114), (496, 144), (468, 174), (306, 174), (278, 144)], fill="#F6D6A8", stroke="warning", stroke_width=1.6)
+    c.text(387, 149, "rank service", color="warning", size=13, bold=True)
+    c.arrow(266, 144, 278, 144, color="negative", width=2.4)
+    c.rect(126, 232, 296, 44, fill="negative", stroke="none", rx=6)
+    c.text(274, 259, "high score possible, weak causal validity", color="#FFFFFF", size=12, bold=True)
+
+    # right audited path
+    _evidence_chip(c, 592, 96, "collect metrics/logs/traces", "secondary", "E")
+    _evidence_chip(c, 592, 132, "align across dependency graph", "accent", "A")
+    _evidence_chip(c, 592, 168, "verify propagation chain", "primary", "V")
+    c.arrow(778, 110, 936, 110, color="secondary", width=2.2)
+    c.arrow(778, 146, 936, 146, color="accent", width=2.2)
+    c.arrow(778, 182, 936, 182, color="primary", width=2.2)
+    c.rect(864, 92, 164, 108, fill="bg", stroke="primary", rx=8, stroke_width=1.8)
+    c.text(946, 124, "defensible", color="primary", size=13, bold=True)
+    c.text(946, 146, "trigger + path", color="primary", size=13, bold=True)
+    c.rect(634, 232, 352, 44, fill="primary", stroke="none", rx=6)
+    c.text(810, 259, "lower shortcut risk, stronger evaluation signal", color="#FFFFFF", size=12, bold=True)
+
+    c.rect(264, 330, 552, 24, fill="warning", stroke="none", rx=4)
+    c.text(540, 346, "Mismatch: hard task, easy benchmark -> inflated progress claims", color="#FFFFFF", size=11, bold=True)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_question_gate_map(*, width: float = 10.1, height: float = 3.0) -> SvgImage:
+    W, H = 1080, 330
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.arrow_markers()
+
+    # gate spine
+    c.line(84, 138, 996, 138, color="border", width=3)
+    gates = [
+        (180, "A", "Realism", "primary"),
+        (540, "B", "Capability", "accent"),
+        (900, "C", "Trust", "positive"),
+    ]
+    for cx, letter, label, tone in gates:
+        c.circle(cx, 138, 44, fill="bg")
+        _draw_circle_outline(c, cx=cx, cy=138, r=44, tone=tone, stroke_width=3)
+        c.text(cx, 130, letter, color=tone, size=24, bold=True)
+        c.text(cx, 154, label, color=tone, size=11, bold=True)
+
+    c.arrow(224, 138, 496, 138, color="accent", width=3.2)
+    c.arrow(584, 138, 856, 138, color="positive", width=3.2)
+    c.text(360, 121, "A gates B", color="accent", size=11, bold=True)
+    c.text(720, 121, "B gates C", color="positive", size=11, bold=True)
+
+    # contract panels
+    contracts = [
+        (56, "Q-A contract", "Benchmark must be operationally hard.", "primary"),
+        (386, "Q-B contract", "Measure LLMs on realistic telemetry.", "accent"),
+        (716, "Q-C contract", "Audit causal path, not label only.", "positive"),
+    ]
+    for x, title, body, tone in contracts:
+        c.rect(x, 200, 308, 88, fill="bg_alt", stroke=tone, rx=7, stroke_width=1.8)
+        c.rect(x, 200, 92, 24, fill=tone, stroke="none", rx=3)
+        c.text(x + 46, 216, title, color="#FFFFFF", size=10, bold=True)
+        c.text(x + 156, 252, body, color="text", size=12, bold=True)
+
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_listening_guide_map(*, width: float = 10.1, height: float = 2.9) -> SvgImage:
+    W, H = 1080, 320
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+
+    c.rect(34, 26, 1012, 56, fill="primary", stroke="none", rx=6)
+    c.text(540, 60, "Decision rule: trust progress only when A + B + C all hold", color="#FFFFFF", size=16, bold=True)
+
+    anchors = [
+        (58, "A", "Real task", "Look for propagation-aware failures.", "primary"),
+        (390, "B", "Real capability", "Look for realistic-task performance gaps.", "accent"),
+        (722, "C", "Real trust", "Look for outcome-vs-process gaps.", "positive"),
+    ]
+    for x, letter, title, body, tone in anchors:
+        c.rect(x, 116, 300, 154, fill="bg_alt", stroke=tone, rx=8, stroke_width=1.8)
+        c.circle(x + 32, 150, 16, fill=tone)
+        c.text(x + 32, 156, letter, color="#FFFFFF", size=12, bold=True)
+        c.text(x + 60, 146, title, color=tone, size=14, bold=True, anchor="start")
+        c.text(x + 60, 176, body, color="text_mid", size=11, anchor="start")
+        c.line(x + 24, 204, x + 280, 204, color="border", width=1.2, dashed=True)
+        c.text(x + 152, 230, f"watchpoint {letter}", color=tone, size=11, bold=True)
+
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_probe_logic_map(*, width: float = 10.1, height: float = 3.0) -> SvgImage:
+    W, H = 1080, 330
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.arrow_markers()
+
+    c.rect(40, 32, 1000, 74, fill="#FFF4F4", stroke="negative", rx=8, stroke_width=1.8)
+    c.text(540, 60, "Probe claim: if a simple transparent heuristic reaches SOTA, benchmark discrimination is weak", color="negative", size=13, bold=True)
+    c.text(540, 84, "SimpleRCA is a diagnostic instrument, not a proposed production method", color="text_mid", size=11)
+
+    chevrons = [
+        (70, "Hypothesis", "legacy benchmark is discriminative", "secondary"),
+        (360, "Probe", "run SimpleRCA without ML tuning", "warning"),
+        (650, "Decision", "compare against reported SOTA", "primary"),
+    ]
+    for x, title, body, tone in chevrons:
+        c.polygon(
+            [(x, 146), (x + 244, 146), (x + 274, 182), (x + 244, 218), (x, 218), (x + 30, 182)],
+            fill="bg_alt",
+            stroke=tone,
+            stroke_width=1.8,
+        )
+        c.text(x + 130, 171, title, color=tone, size=14, bold=True)
+        c.text(x + 130, 194, body, color="text_mid", size=11)
+    c.arrow(344, 182, 358, 182, color="warning", width=2.2)
+    c.arrow(634, 182, 648, 182, color="primary", width=2.2)
+
+    c.rect(68, 250, 456, 54, fill="#FFF9EF", stroke="accent", rx=6, stroke_width=1.2)
+    c.text(296, 274, "Fairness: transparent + interpretable + low-capacity baseline", color="accent", size=12, bold=True)
+    c.rect(560, 250, 452, 54, fill="#EEF4FA", stroke="primary", rx=6, stroke_width=1.2)
+    c.text(786, 274, "Falsification: if SimpleRCA clearly loses, benchmark still separates depth", color="primary", size=12, bold=True)
     return SvgImage(svg=c, width=width, height=height)
 
 
 def svg_cascade_diagram(*, width: float = 4.8, height: float = 3.25) -> SvgImage:
     """Compact symbolic RCA panel for motivation slides."""
     W, H = 560, 390
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers(colors=["negative", "warning", "primary", "text_mid"])
 
     def symptom_chip(x: float, y: float) -> None:
@@ -548,7 +1150,7 @@ def svg_cascade_diagram(*, width: float = 4.8, height: float = 3.25) -> SvgImage
 def svg_forge_pipeline(*, width: float = 9.5, height: float = 2.5) -> SvgImage:
     """FORGE forward verification pipeline: Intervention → Check → Validated Path."""
     W, H = 1050, 300
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
 
     bw, bh = 270, 100
@@ -581,7 +1183,7 @@ def svg_forge_pipeline(*, width: float = 9.5, height: float = 2.5) -> SvgImage:
 def svg_benchmark_pipeline(*, width: float = 9.5, height: float = 3.8) -> SvgImage:
     """6-stage snake pipeline: Foundation\u2192\u2192Injection \u2192 Collection\u2190\u2190Validation(highlighted)."""
     W, H = 1000, 420
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
 
     bw, bh = 220, 80
@@ -620,7 +1222,7 @@ def svg_benchmark_pipeline(*, width: float = 9.5, height: float = 3.8) -> SvgIma
 def svg_process_comparison(*, width: float = 9.5, height: float = 3.0) -> SvgImage:
     """Side-by-side: Outcome-only (left) vs Process-aware (right)."""
     W, H = 1050, 340
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
 
     # ---- Left: Outcome-only ----
@@ -667,7 +1269,7 @@ def svg_process_comparison(*, width: float = 9.5, height: float = 3.0) -> SvgIma
 def svg_metric_semantics(*, width: float = 8.0, height: float = 3.2) -> SvgImage:
     """Concentric-circle diagram showing PR \u2286 Pass@1."""
     W, H = 900, 360
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
 
     cx, cy = 240, 178
     r_out, r_in = 140, 86
@@ -716,7 +1318,7 @@ def svg_metric_semantics(*, width: float = 8.0, height: float = 3.2) -> SvgImage
     return SvgImage(svg=c, width=width, height=height)
 
 
-def _evidence_chip(c: SvgCanvas, x: float, y: float, label: str, tone: str, glyph: str) -> None:
+def _evidence_chip(c: DeckSvg, x: float, y: float, label: str, tone: str, glyph: str) -> None:
     chip_w = max(92, len(label) * 7 + 34)
     c.rounded_rect(x, y, chip_w, 28, text="", fill="bg_alt", stroke=tone, rx=14, stroke_width=1.6)
     c.circle(x + 16, y + 14, 7, fill=tone, opacity=0.92)
@@ -724,248 +1326,544 @@ def _evidence_chip(c: SvgCanvas, x: float, y: float, label: str, tone: str, glyp
     c.text(x + 32, y + 18, label, color="text", size=12, bold=True, anchor="start")
 
 
+def svg_evidence_chip(label: str, tone: str, glyph: str, *, width: float = 2.6, height: float = 0.55) -> SvgImage:
+    chip_w = max(92, len(label) * 7 + 34)
+    W, H = chip_w + 20, 48
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    _evidence_chip(c, 10, 10, label, tone, glyph)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_service_card(
+    *,
+    title: str,
+    subtitle: str,
+    status: str = "normal",
+    badge: str | None = None,
+    style: str = "rich",
+    width: float = 2.2,
+    height: float = 1.25,
+) -> SvgImage:
+    W, H = 240, 136
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    _draw_service_module(c, x=16, y=22, w=208, h=92, title=title, subtitle=subtitle, status=status, badge=badge, style=style)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def _svg_markup(obj: DeckSvg | SvgImage) -> str:
+    if isinstance(obj, SvgImage):
+        obj = obj.svg
+    return obj.render()
+
+
+def _write_svg_asset(output_dir: Path, relative_name: str, obj: DeckSvg | SvgImage) -> str:
+    path = output_dir / relative_name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_svg_markup(obj), encoding="utf-8")
+    return relative_name
+
+
+def export_svg_assets(output_dir: Path | None = None) -> Path:
+    output_dir = output_dir or SVG_ASSET_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    generated: list[tuple[str, str]] = []
+
+    def add(path: str, obj: DeckSvg | SvgImage, note: str) -> None:
+        generated.append((_write_svg_asset(output_dir, path, obj), note))
+
+    # Icons
+    add("icons/metrics.svg", icon_metrics(), "Metrics icon.")
+    add("icons/logs.svg", icon_logs(), "Logs icon.")
+    add("icons/traces.svg", icon_traces(), "Traces icon.")
+    add("icons/service.svg", icon_service(), "Healthy service icon.")
+    add("icons/warning.svg", icon_warning(), "Anomaly burst icon.")
+    add("icons/root_cause.svg", icon_root_cause(), "Root-cause marker icon.")
+    add("icons/magnifier.svg", icon_magnifier(), "Magnifier icon.")
+    add("icons/path_chain.svg", icon_path_chain(), "Causal path icon.")
+
+    # Telemetry chips
+    add("chips/metrics_onset_magnitude.svg", svg_evidence_chip("metrics: onset + magnitude", "primary", "M"), "Single telemetry chip.")
+    add("chips/logs_local_semantics.svg", svg_evidence_chip("logs: local semantic clues", "accent", "L"), "Single telemetry chip.")
+    add("chips/traces_cross_service.svg", svg_evidence_chip("traces: cross-service hops", "positive", "T"), "Single telemetry chip.")
+    add("chips/collect_metrics_logs_traces.svg", svg_evidence_chip("collect metrics/logs/traces", "secondary", "E"), "Probe pipeline chip.")
+    add("chips/align_dependency_graph.svg", svg_evidence_chip("align across dependency graph", "accent", "A"), "Probe pipeline chip.")
+    add("chips/verify_propagation_chain.svg", svg_evidence_chip("verify propagation chain", "primary", "V"), "Probe pipeline chip.")
+
+    # Gate nodes and contracts
+    add("gates/gate_a_realism.svg", svg_gate_node("A", "Realism", "primary"), "Single gate node.")
+    add("gates/gate_b_capability.svg", svg_gate_node("B", "Capability", "accent"), "Single gate node.")
+    add("gates/gate_c_trust.svg", svg_gate_node("C", "Trust", "positive"), "Single gate node.")
+    add("contracts/q_a_contract.svg", svg_contract_card("Q-A contract", "Benchmark must be operationally hard.", "primary"), "Single contract card.")
+    add("contracts/q_b_contract.svg", svg_contract_card("Q-B contract", "Measure LLMs on realistic telemetry.", "accent"), "Single contract card.")
+    add("contracts/q_c_contract.svg", svg_contract_card("Q-C contract", "Audit causal path, not label only.", "positive"), "Single contract card.")
+
+    # Service cards
+    add("services/root_cause_db_lock.svg", svg_service_card(title="Root cause", subtitle="db lock", status="root"), "Single service card.")
+    add("services/mid_service_retry_storm.svg", svg_service_card(title="Mid service", subtitle="retry storm", status="propagated"), "Single service card.")
+    add("services/user_symptom_timeout.svg", svg_service_card(title="User symptom", subtitle="timeout", status="propagated"), "Single service card.")
+    add("services/payment_fault_surface.svg", svg_service_card(title="Payment", subtitle="fault surface loud", status="root"), "Single service card.")
+    add("services/propagation_source_a.svg", svg_service_card(title="A", subtitle="source", status="root"), "Single service card.")
+    add("services/propagation_symptom_b.svg", svg_service_card(title="B", subtitle="symptom", status="propagated"), "Single service card.")
+    add("services/observed_service_seen_first.svg", svg_service_card(title="Observed service", subtitle="loud anomaly near the user", status="propagated", badge="seen first"), "Single service card.")
+    add("services/root_service_trigger.svg", svg_service_card(title="Root-cause service", subtitle="actual trigger starts the cascade", status="root", badge="trigger"), "Single service card.")
+
+    # Probe chevrons
+    add("probe/hypothesis.svg", svg_probe_chevron("Hypothesis", "legacy benchmark is discriminative", "secondary"), "Single chevron card.")
+    add("probe/simple_rca_probe.svg", svg_probe_chevron("Probe", "run SimpleRCA without ML tuning", "warning"), "Single chevron card.")
+    add("probe/decision_compare_sota.svg", svg_probe_chevron("Decision", "compare against reported SOTA", "primary"), "Single chevron card.")
+
+    # Workflow / stage cards
+    add("stages/foundation.svg", svg_stage_card("1 Foundation", "TrainTicket + observability stack", "secondary"), "Single workflow card.")
+    add("stages/workload.svg", svg_stage_card("2 Workload", "Dynamic traffic creates path variety", "accent"), "Single workflow card.")
+    add("stages/injection.svg", svg_stage_card("3 Injection", "31 layered fault types", "warning"), "Single workflow card.")
+    add("stages/collection.svg", svg_stage_card("4 Collection", "Metrics, logs, traces snapshot", "positive"), "Single workflow card.")
+    add("stages/validation.svg", svg_stage_card("5 Validation", "Retain only impact-validated cases", "primary", emphasized=True), "Single workflow card.")
+    add("stages/annotation.svg", svg_stage_card("6 Annotation", "Hierarchical RCA labels + paths", "secondary"), "Single workflow card.")
+
+    # Validation flow building blocks
+    add("validation/validation_gate.svg", svg_validation_hexagon(), "Single validation gate.")
+    add("validation/validated_case.svg", svg_validated_case_hexagon(), "Single validated-case hexagon.")
+
+    # Stats cards
+    add("stats/validated_cases.svg", svg_metric_stat_card("1,430", "validated cases", "primary"), "Single stats card.")
+    add("stats/fault_injections.svg", svg_metric_stat_card("9,152", "fault injections", "accent"), "Single stats card.")
+    add("stats/fault_types.svg", svg_metric_stat_card("25", "fault types", "positive"), "Single stats card.")
+
+    manifest = [
+        "# Talk 4.15 SVG Assets",
+        "",
+        "These SVGs are intentionally split into single reusable elements so you can regroup them manually in PowerPoint.",
+        "",
+        "| Asset | Purpose |",
+        "| --- | --- |",
+    ]
+    manifest.extend(f"| `{path}` | {note} |" for path, note in generated)
+    (output_dir / "README.md").write_text("\n".join(manifest) + "\n", encoding="utf-8")
+    return output_dir
+
+
 def svg_legacy_bias_triad(*, width: float = 10.0, height: float = 3.2) -> SvgImage:
     W, H = 1080, 360
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
-    cols = [
-        (36, "Injection bias", "Root service looks obviously abnormal right after injection.", "negative"),
-        (372, "Shallow propagation", "Symptoms stay near the source, so search depth stays low.", "warning"),
-        (708, "Signal dominance", "Telemetry exposes the answer before multi-hop reasoning is needed.", "primary"),
-    ]
-    for x, title, body, tone in cols:
-        c.rounded_rect(x, 56, 300, 230, text="", fill="bg_alt", stroke=tone, rx=18, stroke_width=2)
-        c.rounded_rect(x + 20, 26, 126, 34, text=title, fill=tone, stroke="none",
-                       text_color="white", font_size=13, bold=True, rx=16)
-        if title == "Injection bias":
-            _draw_service_module(c, x=x + 30, y=96, w=122, h=86, title="Payment svc", subtitle="fault surface is loud",
-                                 status="root", badge="obvious")
-            c.text(x + 172, 128, "largest anomaly", color="negative", size=12, bold=True, anchor="start")
-            c.text(x + 172, 149, "=> shortcut ranking wins", color="text_mid", size=11, anchor="start")
-        elif title == "Shallow propagation":
-            _draw_service_module(c, x=x + 36, y=112, w=92, h=70, title="A", subtitle="source", status="root")
-            _draw_service_module(c, x=x + 168, y=112, w=92, h=70, title="B", subtitle="symptom", status="propagated")
-            c.arrow(x + 132, 147, x + 166, 147, color="warning", width=2.8)
-            c.text(x + 36, 208, "1-2 hops only", color="warning", size=12, bold=True, anchor="start")
-            c.text(x + 36, 228, "true cause stays visually nearby", color="text_mid", size=11, anchor="start")
-        else:
-            _evidence_chip(c, x + 28, 108, "Metrics spike", "primary", "M")
-            _evidence_chip(c, x + 28, 146, "Logs mention exception", "accent", "L")
-            _evidence_chip(c, x + 28, 184, "Trace ends at culprit", "positive", "T")
-            c.text(x + 28, 228, "Answer leaks through modality cues", color="primary", size=12, bold=True, anchor="start")
-            c.text(x + 28, 248, "before causal reconstruction is necessary", color="text_mid", size=11, anchor="start")
-        c.text(x + 24, 312, body, color="text_mid", size=12, anchor="start")
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+
+    # Column 1: notched panel
+    c.polygon([(34, 58), (334, 58), (334, 288), (66, 288), (34, 258)], fill="#FFF3F3", stroke="negative", stroke_width=2)
+    c.rect(54, 30, 134, 28, fill="negative", stroke="none", rx=4)
+    c.text(121, 49, "Injection bias", color="#FFFFFF", size=12, bold=True)
+    _draw_service_module(c, x=62, y=102, w=128, h=86, title="Payment", subtitle="fault surface loud", status="root")
+    c.text(206, 136, "largest anomaly", color="negative", size=12, bold=True, anchor="start")
+    c.text(206, 156, "shortcut picks source quickly", color="text_mid", size=11, anchor="start")
+
+    # Column 2: path frame
+    c.rect(382, 58, 300, 230, fill="#FFF8EE", stroke="warning", rx=8, stroke_width=2)
+    c.rect(402, 30, 162, 28, fill="warning", stroke="none", rx=4)
+    c.text(483, 49, "Shallow propagation", color="#FFFFFF", size=12, bold=True)
+    _draw_service_module(c, x=424, y=114, w=96, h=70, title="A", subtitle="source", status="root")
+    _draw_service_module(c, x=550, y=114, w=96, h=70, title="B", subtitle="symptom", status="propagated")
+    c.arrow(522, 149, 548, 149, color="warning", width=2.8)
+    c.text(532, 220, "1-2 hops only", color="warning", size=12, bold=True)
+    c.text(532, 240, "causal search depth stays low", color="text_mid", size=11)
+
+    # Column 3: telemetry board
+    c.rect(730, 58, 316, 230, fill="#EEF4FA", stroke="primary", rx=8, stroke_width=2)
+    c.rect(752, 30, 164, 28, fill="primary", stroke="none", rx=4)
+    c.text(834, 49, "Signal dominance", color="#FFFFFF", size=12, bold=True)
+    _evidence_chip(c, 756, 108, "metrics spike", "primary", "M")
+    _evidence_chip(c, 756, 146, "logs expose clue", "accent", "L")
+    _evidence_chip(c, 756, 184, "trace lands on culprit", "positive", "T")
+    c.text(888, 238, "answer leaks before causal reconstruction", color="primary", size=11, bold=True)
+
+    c.rect(120, 322, 840, 24, fill="warning", stroke="none", rx=4)
+    c.text(540, 338, "Legacy construction leaks root-cause clues, allowing shortcut methods to score well", color="#FFFFFF", size=11, bold=True)
     return SvgImage(svg=c, width=width, height=height)
 
 
 def svg_validation_gate_pipeline(*, width: float = 10.0, height: float = 3.0) -> SvgImage:
     W, H = 1080, 320
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
 
-    c.rounded_rect(34, 104, 180, 92, text="", fill="bg_alt", stroke="secondary", rx=18, stroke_width=2)
-    c.text(124, 134, "Inject faults", color="secondary", size=17, bold=True)
-    c.text(124, 158, "31 fault types", color="text_mid", size=12)
-    c.text(124, 176, "many are silent", color="text_mid", size=12)
+    # Stage 1
+    c.rect(32, 102, 186, 96, fill="bg_alt", stroke="secondary", rx=6, stroke_width=1.8)
+    c.rect(32, 102, 186, 20, fill="secondary", stroke="none", rx=3)
+    c.text(125, 116, "Inject faults", color="#FFFFFF", size=11, bold=True)
+    c.text(125, 148, "31 fault types", color="text", size=12, bold=True)
+    c.text(125, 168, "many are operationally silent", color="text_mid", size=11)
 
-    c.rounded_rect(274, 104, 188, 92, text="", fill="bg_alt", stroke="accent", rx=18, stroke_width=2)
-    c.text(368, 134, "Measure impact", color="accent", size=17, bold=True)
-    c.text(368, 158, "SLI / user-facing degradation", color="text_mid", size=12)
-    c.text(368, 176, "not just anomaly existence", color="text_mid", size=12)
+    # Stage 2
+    c.rect(280, 102, 214, 96, fill="#FFF6EC", stroke="accent", rx=6, stroke_width=1.8)
+    c.rect(280, 102, 214, 20, fill="accent", stroke="none", rx=3)
+    c.text(387, 116, "Measure user impact", color="#FFFFFF", size=11, bold=True)
+    c.text(387, 148, "SLI degradation required", color="accent", size=12, bold=True)
+    c.text(387, 168, "anomaly alone is insufficient", color="text_mid", size=11)
 
-    gate = [(550, 76), (668, 76), (718, 150), (668, 224), (550, 224), (600, 150)]
-    c.polygon(gate, fill="#FFF4E8", stroke=THEME.colors["warning"], stroke_width=2, opacity=1.0)
-    c.text(625, 136, "Validation", color="warning", size=16, bold=True)
-    c.text(625, 158, "impact > theta", color="warning", size=13, bold=True)
-    c.text(625, 178, "keep only operational cases", color="text_mid", size=11)
+    # Gate
+    gate = [(562, 78), (684, 78), (738, 150), (684, 222), (562, 222), (616, 150)]
+    c.polygon(gate, fill="#FFF1DE", stroke="warning", stroke_width=2.0)
+    c.text(650, 134, "Validation", color="warning", size=16, bold=True)
+    c.text(650, 154, "impact > theta", color="warning", size=13, bold=True)
+    c.text(650, 173, "retain only meaningful faults", color="text_mid", size=11)
 
-    c.rounded_rect(820, 94, 220, 112, text="", fill="bg_accent", stroke="primary", rx=18, stroke_width=2)
-    c.text(930, 130, "Validated benchmark case", color="primary", size=17, bold=True)
-    c.text(930, 154, "fault -> user-visible impact", color="text_mid", size=12)
-    c.text(930, 173, "worth evaluating RCA on", color="text_mid", size=12)
+    # Valid output
+    c.polygon([(830, 96), (1028, 96), (1048, 150), (1028, 204), (830, 204), (810, 150)],
+              fill="#EAF3FC", stroke="primary", stroke_width=2)
+    c.text(930, 132, "Validated benchmark case", color="primary", size=15, bold=True)
+    c.text(930, 151, "fault -> user-visible impact", color="text_mid", size=11)
+    c.text(930, 170, "evaluation-worthy incident", color="text_mid", size=11)
 
-    c.arrow(214, 150, 274, 150, color="text_mid", width=2.8)
-    c.arrow(462, 150, 548, 150, color="text_mid", width=2.8)
-    c.arrow(718, 150, 818, 150, color="primary", width=3.2)
+    c.arrow(218, 150, 280, 150, color="text_mid", width=2.8)
+    c.arrow(494, 150, 560, 150, color="text_mid", width=2.8)
+    c.arrow(738, 150, 810, 150, color="primary", width=3.0)
 
-    c.path("M 634 150 C 688 222, 752 252, 842 256", stroke="warning", fill="none", stroke_width=2.2, dashed=True)
-    c.rounded_rect(804, 244, 180, 34, text="discard silent faults", fill="warning", stroke="none",
-                   text_color="white", font_size=12, bold=True, rx=16)
+    # Discard branch
+    c.path("M 650 222 C 692 250, 760 266, 850 270", stroke="warning", fill="none", stroke_width=2.0, dashed=True)
+    c.rect(842, 254, 186, 30, fill="warning", stroke="none", rx=4)
+    c.text(935, 273, "discard silent faults", color="#FFFFFF", size=11, bold=True)
     return SvgImage(svg=c, width=width, height=height)
 
 
 def svg_framework_grid_panel(*, width: float = 10.0, height: float = 3.5) -> SvgImage:
     W, H = 1080, 400
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
+
     cards = [
-        (40, 58, "Foundation", "TrainTicket + observability stack", "secondary"),
-        (390, 58, "Workload", "Dynamic traffic to induce varied paths", "accent"),
-        (740, 58, "Injection", "31 layered fault types", "warning"),
-        (40, 224, "Validation", "Retain only impact-validated cases", "primary"),
-        (390, 224, "Collection", "Metrics, logs, and traces snapshot", "positive"),
-        (740, 224, "Annotation", "Hierarchical RCA labels and path data", "secondary"),
+        (40, 58, "1 Foundation", "TrainTicket + observability stack", "secondary"),
+        (390, 58, "2 Workload", "Dynamic traffic creates path variety", "accent"),
+        (740, 58, "3 Injection", "31 layered fault types", "warning"),
+        (740, 224, "4 Collection", "Metrics, logs, traces snapshot", "positive"),
+        (390, 224, "5 Validation", "Retain only impact-validated cases", "primary"),
+        (40, 224, "6 Annotation", "Hierarchical RCA labels + paths", "secondary"),
     ]
     for x, y, title, body, tone in cards:
-        c.rounded_rect(x, y, 300, 108, text="", fill="bg_alt" if tone != "primary" else "bg_accent",
-                       stroke=tone, rx=18, stroke_width=2)
-        c.rounded_rect(x + 18, y + 16, 118, 26, text=title, fill=tone, stroke="none",
-                       text_color="white", font_size=12, bold=True, rx=13)
-        c.text(x + 26, y + 64, body, color="text", size=13, anchor="start")
-    c.arrow(340, 112, 390, 112, color="text_mid", width=2.6)
-    c.arrow(690, 112, 740, 112, color="text_mid", width=2.6)
-    c.arrow(890, 166, 890, 224, color="text_mid", width=2.6)
-    c.arrow(740, 278, 690, 278, color="positive", width=2.6)
-    c.arrow(390, 278, 340, 278, color="primary", width=2.6)
-    c.rounded_rect(392, 340, 296, 34, text="Scale comes from a reusable construction workflow, not hand-crafted incidents.",
-                   fill="bg_alt", stroke="border", text_color="text_mid", font_size=11, rx=14)
+        c.rect(x, y, 300, 108, fill="bg_alt" if tone != "primary" else "bg_accent", stroke=tone, rx=7, stroke_width=1.8)
+        c.rect(x, y, 300, 22, fill=tone, stroke="none", rx=3)
+        c.text(x + 150, y + 15, title, color="#FFFFFF", size=10, bold=True)
+        c.text(x + 150, y + 62, body, color="text", size=12, bold=True)
+        c.text(x + 150, y + 83, "stage", color="text_mid", size=10)
+
+    c.arrow(340, 112, 390, 112, color="text_mid", width=2.4)
+    c.arrow(690, 112, 740, 112, color="text_mid", width=2.4)
+    c.arrow(890, 166, 890, 224, color="text_mid", width=2.4)
+    c.arrow(740, 278, 690, 278, color="positive", width=2.4)
+    c.arrow(390, 278, 340, 278, color="primary", width=2.4)
+
+    c.rect(286, 338, 506, 34, fill="primary", stroke="none", rx=4)
+    c.text(539, 359, "Scale comes from a reusable workflow, not hand-crafted incidents", color="#FFFFFF", size=11, bold=True)
     return SvgImage(svg=c, width=width, height=height)
 
 
 def svg_benchmark_stats_panel(*, width: float = 6.6, height: float = 2.8) -> SvgImage:
     W, H = 760, 320
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
-    stats = [
-        (34, 42, "1,430", "validated cases", "primary"),
-        (272, 42, "9,152", "fault injections", "accent"),
-        (510, 42, "25", "fault types", "positive"),
-    ]
-    for x, y, value, label, tone in stats:
-        c.rounded_rect(x, y, 216, 106, text="", fill="bg_alt", stroke=tone, rx=18, stroke_width=2)
-        c.text(x + 108, y + 48, value, color=tone, size=28, bold=True)
-        c.text(x + 108, y + 76, label.upper(), color="text_mid", size=11, bold=True)
-    c.rounded_rect(48, 196, 188, 70, text="", fill="bg_accent", stroke="secondary", rx=14, stroke_width=1.8)
-    c.text(142, 226, "6 fault families", color="secondary", size=14, bold=True)
-    c.text(142, 246, "cross-layer coverage", color="text_mid", size=11)
-    c.rounded_rect(286, 196, 188, 70, text="", fill="bg_accent", stroke="secondary", rx=14, stroke_width=1.8)
-    c.text(380, 226, "50 services", color="secondary", size=14, bold=True)
-    c.text(380, 246, "richer topology than legacy", color="text_mid", size=11)
-    c.rounded_rect(524, 196, 188, 70, text="", fill="bg_accent", stroke="warning", rx=14, stroke_width=1.8)
-    c.text(618, 226, "Dynamic workload", color="warning", size=14, bold=True)
-    c.text(618, 246, "harder propagation patterns", color="text_mid", size=11)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+
+    # Top metric strip
+    c.rect(24, 34, 712, 136, fill="bg_alt", stroke="border", rx=7, stroke_width=1.4)
+    metrics = [("1,430", "validated cases", "primary"), ("9,152", "fault injections", "accent"), ("25", "fault types", "positive")]
+    for idx, (value, label, tone) in enumerate(metrics):
+        x = 60 + idx * 232
+        c.line(x - 32, 48, x - 32, 154, color="border", width=1.2) if idx > 0 else None
+        c.text(x + 58, 92, value, color=tone, size=31, bold=True)
+        c.text(x + 58, 118, label.upper(), color="text_mid", size=10, bold=True)
+        c.rect(x + 6, 128, 104, 22, fill=tone, stroke="none", rx=3)
+        c.text(x + 58, 143, "regime signal", color="#FFFFFF", size=9, bold=True)
+
+    # Bottom supporting dimensions
+    c.polygon([(42, 202), (236, 202), (254, 234), (236, 266), (42, 266), (24, 234)], fill="#EEF4FA", stroke="secondary", stroke_width=1.5)
+    c.text(138, 229, "6 fault families", color="secondary", size=13, bold=True)
+    c.text(138, 248, "cross-layer coverage", color="text_mid", size=10)
+    c.polygon([(282, 202), (476, 202), (494, 234), (476, 266), (282, 266), (264, 234)], fill="#EEF4FA", stroke="secondary", stroke_width=1.5)
+    c.text(378, 229, "50 services", color="secondary", size=13, bold=True)
+    c.text(378, 248, "richer topology", color="text_mid", size=10)
+    c.polygon([(522, 202), (716, 202), (734, 234), (716, 266), (522, 266), (504, 234)], fill="#FFF5EA", stroke="warning", stroke_width=1.5)
+    c.text(618, 229, "dynamic workload", color="warning", size=13, bold=True)
+    c.text(618, 248, "harder propagation", color="text_mid", size=10)
     return SvgImage(svg=c, width=width, height=height)
 
 
 def svg_dual_regime_panel(*, width: float = 10.0, height: float = 3.3) -> SvgImage:
     W, H = 1080, 360
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
-    c.text(178, 42, "Accuracy regime shift", color="text", size=16, bold=True)
-    c.text(732, 42, "Runtime regime shift", color="text", size=16, bold=True)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.rect(36, 28, 486, 292, fill="bg_alt", stroke="border", rx=8, stroke_width=1.4)
+    c.rect(558, 28, 486, 292, fill="#FFF7F2", stroke="warning", rx=8, stroke_width=1.4)
+    c.text(279, 52, "Accuracy collapse", color="text", size=16, bold=True)
+    c.text(801, 52, "Runtime escalation", color="text", size=16, bold=True)
 
     def pair(x: float, y: float, old_v: float, new_v: float, title: str) -> None:
-        max_h = 150
-        base_y = y + 172
-        for idx, (label, v, tone) in enumerate([("Legacy", old_v, "secondary"), ("Realistic", new_v, "negative")]):
-            bx = x + idx * 112
+        max_h = 136
+        base_y = y + 168
+        c.rect(x - 18, y + 24, 216, 184, fill="bg", stroke="border", rx=6, stroke_width=1.0)
+        for idx, (label, v, tone) in enumerate([("legacy", old_v, "secondary"), ("realistic", new_v, "negative")]):
+            bx = x + idx * 102
             bh = max_h * v
-            c.rounded_rect(bx, base_y - bh, 70, bh, text="", fill=tone, stroke="none", rx=8)
-            c.text(bx + 35, base_y - bh - 12, _fmt_v(v), color="text", size=16, bold=True)
-            c.text(bx + 35, base_y + 24, label, color="text_mid", size=12)
-        c.text(x + 86, y + 198, title, color="text_mid", size=12)
+            c.rect(bx, base_y - bh, 64, bh, fill=tone, stroke="none", rx=4)
+            c.text(bx + 32, max(base_y - bh - 9, y + 36), _fmt_v(v), color="text", size=14, bold=True)
+            c.text(bx + 32, base_y + 20, label, color="text_mid", size=10)
+        c.text(x + 48, y + 200, title, color="text_mid", size=11, bold=True)
 
-    pair(60, 70, 0.75, 0.21, "Avg Top@1")
-    pair(294, 70, 0.87, 0.37, "Best Top@1")
+    pair(86, 70, 0.75, 0.21, "Avg Top@1")
+    pair(300, 70, 0.87, 0.37, "Best Top@1")
+    c.rect(86, 286, 372, 24, fill="negative", stroke="none", rx=4)
+    c.text(272, 302, "verdict: legacy ranking does not transfer", color="#FFFFFF", size=11, bold=True)
 
-    c.rounded_rect(560, 88, 214, 170, text="", fill="bg_alt", stroke="warning", rx=18, stroke_width=2)
-    c.text(667, 126, "Legacy", color="secondary", size=16, bold=True)
-    c.text(667, 150, "seconds", color="text_mid", size=12)
-    c.rounded_rect(808, 62, 214, 196, text="", fill="#FCECEC", stroke="negative", rx=18, stroke_width=2)
-    c.text(915, 116, "Realistic benchmark", color="negative", size=16, bold=True)
-    c.text(915, 140, "hours", color="negative", size=22, bold=True)
-    c.text(915, 165, "~12x escalation", color="text_mid", size=12)
-    c.arrow(774, 173, 806, 173, color="negative", width=3)
-
-    c.rounded_rect(118, 300, 340, 34, text="Leaderboard ordering changes because the task regime changes.", fill="bg_alt",
-                   stroke="border", text_color="text_mid", font_size=11, rx=15)
-    c.rounded_rect(658, 300, 276, 34, text="Cost grows with realism, not just data volume.", fill="bg_alt",
-                   stroke="border", text_color="text_mid", font_size=11, rx=15)
+    # runtime runway
+    c.line(620, 210, 1000, 210, color="border", width=2.2)
+    c.polygon([(620, 194), (708, 194), (724, 210), (708, 226), (620, 226), (604, 210)], fill="#EEF4FA", stroke="secondary", stroke_width=1.8)
+    c.text(664, 208, "seconds", color="secondary", size=13, bold=True)
+    c.polygon([(782, 170), (1000, 170), (1026, 210), (1000, 250), (782, 250), (756, 210)], fill="#FCECEC", stroke="negative", stroke_width=1.8)
+    c.text(892, 202, "hours", color="negative", size=22, bold=True)
+    c.text(892, 223, "~12x runtime escalation", color="negative", size=11, bold=True)
+    c.arrow(724, 210, 756, 210, color="negative", width=2.8)
+    c.rect(620, 286, 372, 24, fill="warning", stroke="none", rx=4)
+    c.text(806, 302, "verdict: realism raises operational cost sharply", color="#FFFFFF", size=11, bold=True)
     return SvgImage(svg=c, width=width, height=height)
 
 
 def svg_failure_modes_panel(*, width: float = 10.0, height: float = 3.1) -> SvgImage:
     W, H = 1080, 350
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
-    cards = [
-        (38, "Scalability limits", "Pipelines that were acceptable on toy graphs become too slow to finish.", "negative", "RUNTIME"),
-        (374, "Observability blind spots", "Relevant signals are missing, conflicting, or buried across modalities.", "warning", "SIGNAL"),
-        (710, "Modeling bottlenecks", "Legacy assumptions fail under realistic propagation structures.", "primary", "MODEL"),
-    ]
-    for x, title, body, tone, tag in cards:
-        c.rounded_rect(x, 58, 300, 230, text="", fill="bg_alt", stroke=tone, rx=18, stroke_width=2)
-        c.rounded_rect(x + 20, 30, 94, 30, text=tag, fill=tone, stroke="none",
-                       text_color="white", font_size=11, bold=True, rx=14)
-        c.text(x + 24, 100, title, color=tone, size=17, bold=True, anchor="start")
-        if tag == "RUNTIME":
-            c.line(x + 40, 182, x + 102, 146, color="negative", width=4)
-            c.line(x + 102, 146, x + 164, 138, color="negative", width=4)
-            c.line(x + 164, 138, x + 226, 92, color="negative", width=4)
-        elif tag == "SIGNAL":
-            _evidence_chip(c, x + 24, 136, "Metrics absent", "primary", "M")
-            _evidence_chip(c, x + 24, 172, "Logs noisy", "accent", "L")
-            _evidence_chip(c, x + 24, 208, "Trace sparse", "positive", "T")
-        else:
-            _draw_service_module(c, x=x + 24, y=132, w=116, h=78, title="Assumed", subtitle="single-hop", status="normal")
-            _draw_service_module(c, x=x + 164, y=132, w=116, h=78, title="Reality", subtitle="cross-hop", status="propagated")
-        c.text(x + 24, 262, body, color="text_mid", size=12, anchor="start")
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    # Runtime panel
+    c.polygon([(28, 60), (336, 60), (336, 290), (54, 290), (28, 260)], fill="#FFF2F2", stroke="negative", stroke_width=2)
+    c.rect(48, 32, 112, 28, fill="negative", stroke="none", rx=4)
+    c.text(104, 50, "RUNTIME", color="#FFFFFF", size=11, bold=True)
+    c.text(182, 96, "Scalability limits", color="negative", size=16, bold=True)
+    c.line(74, 212, 132, 176, color="negative", width=4)
+    c.line(132, 176, 188, 162, color="negative", width=4)
+    c.line(188, 162, 246, 112, color="negative", width=4)
+    c.text(182, 248, "toy-graph pipelines do not scale", color="text_mid", size=11)
+
+    # Signal panel
+    c.rect(386, 60, 300, 230, fill="#FFF7EC", stroke="warning", rx=8, stroke_width=2)
+    c.rect(406, 32, 96, 28, fill="warning", stroke="none", rx=4)
+    c.text(454, 50, "SIGNAL", color="#FFFFFF", size=11, bold=True)
+    c.text(536, 96, "Observability blind spots", color="warning", size=16, bold=True)
+    _evidence_chip(c, 420, 132, "metrics absent", "primary", "M")
+    _evidence_chip(c, 420, 168, "logs noisy", "accent", "L")
+    _evidence_chip(c, 420, 204, "trace sparse", "positive", "T")
+    c.text(536, 248, "incomplete signals break causal tracing", color="text_mid", size=11)
+
+    # Model panel
+    c.rect(734, 60, 320, 230, fill="#EEF4FA", stroke="primary", rx=8, stroke_width=2)
+    c.rect(754, 32, 96, 28, fill="primary", stroke="none", rx=4)
+    c.text(802, 50, "MODEL", color="#FFFFFF", size=11, bold=True)
+    c.text(894, 96, "Modeling bottlenecks", color="primary", size=16, bold=True)
+    _draw_service_module(c, x=764, y=132, w=122, h=78, title="Assumed", subtitle="single-hop", status="normal")
+    _draw_service_module(c, x=910, y=132, w=122, h=78, title="Reality", subtitle="cross-hop", status="propagated")
+    c.arrow(886, 170, 906, 170, color="primary", width=2.6)
+    c.text(894, 248, "legacy assumptions fail on realistic chains", color="text_mid", size=11)
+
+    c.rect(182, 318, 716, 24, fill="negative", stroke="none", rx=4)
+    c.text(540, 334, "Collapse drivers: scalability + observability + modeling limits", color="#FFFFFF", size=11, bold=True)
     return SvgImage(svg=c, width=width, height=height)
 
 
 def svg_task_contract(*, width: float = 10.0, height: float = 3.0) -> SvgImage:
     W, H = 1080, 320
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
-    c.rounded_rect(34, 80, 240, 130, text="", fill="bg_alt", stroke="secondary", rx=18, stroke_width=2)
-    c.text(154, 112, "Natural-language query", color="secondary", size=16, bold=True)
-    c.text(154, 140, "\"Why is checkout timing out?\"", color="text", size=13)
-    c.text(154, 162, "Operator goal anchors the task", color="text_mid", size=11)
+    c.rect(34, 20, 248, 26, fill="accent", stroke="none", rx=4)
+    c.text(158, 37, "GOAL-DRIVEN RCA CONTRACT", color="white", size=11, bold=True)
+    c.rect(34, 68, 262, 186, fill="#F5F8FC", stroke="secondary", stroke_width=1.8, rx=10)
+    c.polygon(
+        [(52, 96), (252, 96), (272, 118), (252, 140), (52, 140), (32, 118)],
+        fill="bg",
+        stroke="secondary",
+        stroke_width=1.4,
+    )
+    c.text(152, 114, "Operator query", color="secondary", size=15, bold=True)
+    c.text(152, 136, "\"Why is checkout timing out?\"", color="text", size=12)
+    c.text(64, 178, "Goal anchors retrieval:", color="secondary", size=11, bold=True, anchor="start")
+    c.text(64, 198, "time of failure", color="text_mid", size=11, anchor="start")
+    c.text(64, 216, "candidate component", color="text_mid", size=11, anchor="start")
+    c.text(64, 234, "reason / causal explanation", color="text_mid", size=11, anchor="start")
 
-    c.rounded_rect(362, 60, 336, 170, text="", fill="bg_accent", stroke="accent", rx=20, stroke_width=2)
-    c.text(530, 94, "Telemetry bundle", color="accent", size=17, bold=True)
-    _evidence_chip(c, 404, 118, "metrics", "primary", "M")
-    _evidence_chip(c, 404, 156, "logs", "accent", "L")
-    _evidence_chip(c, 532, 118, "traces", "positive", "T")
-    c.rounded_rect(512, 152, 148, 32, text="68 GB context", fill="warning", stroke="none",
-                   text_color="white", font_size=12, bold=True, rx=14)
-    c.text(530, 208, "Model must reason over scale, heterogeneity, and time.", color="text_mid", size=11)
+    c.rect(356, 54, 370, 210, fill="#FFF8EF", stroke="accent", stroke_width=1.8, rx=10)
+    c.rect(382, 78, 126, 24, fill="accent", stroke="none", rx=4)
+    c.text(445, 95, "Telemetry bundle", color="white", size=11, bold=True)
+    _draw_evidence_chip_bundle(
+        c,
+        x=384,
+        y=116,
+        chips=[("metrics", "metrics"), ("logs", "logs"), ("traces", "traces")],
+    )
+    c.line(394, 180, 690, 180, color="border", width=1.2, dashed=True)
+    c.text(541, 198, "heterogeneous evidence must be fused over time", color="text_mid", size=11)
+    c.rect(408, 214, 122, 28, fill="warning", stroke="none", rx=14)
+    c.text(469, 232, "68 GB context", color="white", size=11, bold=True)
+    c.rect(548, 214, 146, 28, fill="bg", stroke="accent", stroke_width=1.3, rx=14)
+    c.text(621, 232, "multi-hop search", color="accent", size=11, bold=True)
 
-    c.rounded_rect(786, 74, 260, 142, text="", fill="#F4F8FC", stroke="primary", rx=18, stroke_width=2)
-    c.text(916, 108, "Structured RCA output", color="primary", size=16, bold=True)
-    c.text(916, 138, "(time, component, reason)", color="text", size=14, bold=True)
-    c.text(916, 162, "not just a ranked service label", color="text_mid", size=11)
-    c.text(916, 184, "goal-driven task contract", color="text_mid", size=11)
+    c.rect(786, 58, 262, 202, fill="#EEF4FA", stroke="primary", stroke_width=1.8, rx=10)
+    c.rect(804, 78, 108, 24, fill="primary", stroke="none", rx=4)
+    c.text(858, 95, "Output tuple", color="white", size=11, bold=True)
+    c.rect(816, 118, 206, 72, fill="bg", stroke="primary", stroke_width=1.4, rx=8)
+    c.text(919, 144, "(time, component,", color="text", size=14, bold=True)
+    c.text(919, 168, "reason)", color="text", size=14, bold=True)
+    c.text(917, 212, "not a generic ranked label", color="primary", size=11, bold=True)
+    c.text(917, 232, "the task is protocol-like and goal conditioned", color="text_mid", size=10)
 
-    c.arrow(274, 145, 362, 145, color="text_mid", width=2.8)
-    c.arrow(698, 145, 786, 145, color="primary", width=2.8)
+    c.arrow(296, 160, 356, 160, color="accent", width=2.6)
+    c.arrow(726, 160, 786, 160, color="primary", width=2.6)
     return SvgImage(svg=c, width=width, height=height)
 
 
 def svg_scale_pressure_panel(*, width: float = 10.0, height: float = 3.1) -> SvgImage:
     W, H = 1080, 340
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
-    cards = [
-        (38, "335", "failure cases", "primary"),
-        (202, "3", "enterprise systems", "accent"),
-        (366, "68 GB", "raw telemetry", "negative"),
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.rect(36, 28, 286, 252, fill="#F4F8FC", stroke="secondary", stroke_width=1.6, rx=10)
+    c.rect(54, 44, 126, 24, fill="negative", stroke="none", rx=4)
+    c.text(117, 61, "Scale pressure", color="white", size=11, bold=True)
+    c.text(96, 118, "335", color="primary", size=34, bold=True)
+    c.text(96, 144, "failure cases", color="text_mid", size=11, bold=True)
+    c.text(96, 196, "68 GB", color="negative", size=34, bold=True)
+    c.text(96, 222, "raw telemetry", color="text_mid", size=11, bold=True)
+    c.text(226, 118, "3", color="accent", size=30, bold=True)
+    c.text(226, 144, "systems", color="text_mid", size=11, bold=True)
+    c.line(188, 86, 188, 244, color="border", width=1.4)
+    c.text(178, 262, "size is part of the task", color="secondary", size=10, bold=True)
+
+    c.rect(368, 28, 676, 252, fill="#FFF8EF", stroke="accent", stroke_width=1.6, rx=10)
+    c.text(706, 54, "Telemetry mass arrives as a mixed reasoning load", color="accent", size=15, bold=True)
+    _draw_evidence_chip_bundle(
+        c,
+        x=406,
+        y=88,
+        chips=[("metrics", "anomaly"), ("logs", "local clues"), ("traces", "hop chain")],
+    )
+    c.rect(402, 132, 270, 86, fill="bg", stroke="border", stroke_width=1.2, rx=8)
+    c.text(537, 156, "heterogeneous signals", color="text", size=13, bold=True)
+    c.text(537, 178, "different granularity", color="text_mid", size=11)
+    c.text(537, 196, "different failure clues", color="text_mid", size=11)
+
+    c.polygon(
+        [(716, 92), (950, 92), (984, 130), (950, 168), (716, 168), (682, 130)],
+        fill="#FFF1E3",
+        stroke="warning",
+        stroke_width=1.8,
+    )
+    c.text(833, 124, "Reasoning burden", color="warning", size=15, bold=True)
+    c.text(833, 145, "long context + noisy evidence", color="text_mid", size=11)
+    c.line(556, 238, 916, 238, color="negative", width=4)
+    c.circle(634, 238, 8, fill="negative")
+    c.circle(752, 238, 8, fill="negative")
+    c.circle(870, 238, 8, fill="negative")
+    c.text(734, 226, "multi-hop causal search", color="negative", size=11, bold=True)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_capability_section_reset(*, width: float = 10.0, height: float = 2.5) -> SvgImage:
+    W, H = 1080, 280
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.rect(50, 42, 980, 22, fill="accent", stroke="none", rx=4)
+    c.rect(50, 42, 210, 22, fill="primary", stroke="none", rx=4)
+    c.text(155, 58, "ACT III", color="white", size=10, bold=True)
+    c.text(292, 58, "Question B: Capability", color="white", size=10, bold=True)
+    c.text(58, 126, "Now we ask the LLM capability question", color="accent", size=28, bold=True, anchor="start")
+    c.text(58, 162, "Can LLMs actually diagnose RCA under real telemetry?", color="text", size=18, bold=True, anchor="start")
+    c.rect(58, 204, 370, 34, fill="bg_alt", stroke="secondary", stroke_width=1.3, rx=17)
+    c.text(243, 225, "recap: realism already rules out easy benchmark wins", color="secondary", size=11, bold=True)
+    c.line(464, 221, 1012, 221, color="border", width=1.6, dashed=True)
+    c.text(738, 208, "the next slides measure real diagnostic ability, not benchmark saturation", color="text_mid", size=11, bold=True)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_capability_gap_stage(*, width: float = 10.0, height: float = 3.0) -> SvgImage:
+    W, H = 1080, 340
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.rect(44, 36, 994, 30, fill="negative", stroke="none", rx=5)
+    c.text(541, 56, "Verdict: even strong models remain in a low-usable RCA regime", color="white", size=13, bold=True)
+
+    # usable-zone band
+    chart_x, chart_y = 82, 104
+    chart_w, chart_h = 520, 174
+    c.rect(chart_x, chart_y, chart_w, chart_h, fill="bg_alt", stroke="border", stroke_width=1.2, rx=8)
+    c.rect(chart_x, chart_y, chart_w, 62, fill="#FCECEC", stroke="none", rx=8, opacity=0.85)
+    c.text(chart_x + chart_w / 2, chart_y + 38, "low-usable RCA zone", color="negative", size=16, bold=True)
+    base_y = chart_y + chart_h - 22
+    c.line(chart_x + 46, base_y, chart_x + chart_w - 32, base_y, color="text_mid", width=2)
+    bar_specs = [
+        ("Oracle", 5.37, "secondary", chart_x + 118),
+        ("Sampled", 3.88, "negative", chart_x + 300),
     ]
-    for x, value, label, tone in cards:
-        c.rounded_rect(x, 54, 142, 96, text="", fill="bg_alt", stroke=tone, rx=16, stroke_width=2)
-        c.text(x + 71, 96, value, color=tone, size=24, bold=True)
-        c.text(x + 71, 122, label.upper(), color="text_mid", size=10, bold=True)
-    c.rounded_rect(560, 48, 474, 220, text="", fill="bg_alt", stroke="border", rx=20, stroke_width=1.6)
-    c.text(797, 82, "Heterogeneous telemetry arrives together", color="text", size=16, bold=True)
-    _evidence_chip(c, 596, 114, "metrics: anomaly onset", "primary", "M")
-    _evidence_chip(c, 596, 154, "logs: local failure clues", "accent", "L")
-    _evidence_chip(c, 596, 194, "traces: cross-service hops", "positive", "T")
-    c.rounded_rect(792, 120, 192, 82, text="", fill="bg_accent", stroke="warning", rx=16, stroke_width=1.8)
-    c.text(888, 148, "Reasoning burden", color="warning", size=15, bold=True)
-    c.text(888, 170, "long context + noisy evidence", color="text_mid", size=11)
-    c.text(888, 188, "multi-hop causal search", color="text_mid", size=11)
-    c.arrow(730, 236, 852, 236, color="warning", width=2.4)
+    max_v = 12.0
+    for label, value, tone, x in bar_specs:
+        bh = (chart_h - 56) * (value / max_v)
+        y = base_y - bh
+        c.rounded_rect(x, y, 78, bh, fill=tone, stroke="none", rx=10)
+        c.text(x + 39, y - 12, _fmt_v(value), color="text", size=22, bold=True)
+        c.text(x + 39, base_y + 24, label, color="text_mid", size=13)
+    c.line(chart_x + 46, chart_y + 102, chart_x + chart_w - 32, chart_y + 102, color="warning", width=2, dashed=True)
+    c.text(chart_x + chart_w - 38, chart_y + 92, "still far from reliable", color="warning", size=11, bold=True, anchor="end")
+    c.arrow(chart_x + 208, chart_y + 124, chart_x + 292, chart_y + 146, color="negative", width=2.3)
+    c.text(chart_x + 248, chart_y + 122, "sampling hurts further", color="negative", size=11, bold=True)
+
+    c.rect(652, 94, 352, 184, fill="#EEF4FA", stroke="primary", stroke_width=1.5, rx=10)
+    c.rect(674, 114, 126, 24, fill="primary", stroke="none", rx=4)
+    c.text(737, 131, "Why this matters", color="white", size=11, bold=True)
+    c.text(826, 162, "Capability gap", color="primary", size=18, bold=True)
+    c.text(826, 190, "real RCA remains outside", color="text_mid", size=12)
+    c.text(826, 210, "current LLM comfort zones", color="text_mid", size=12)
+    c.line(696, 232, 960, 232, color="border", width=1.2, dashed=True)
+    c.text(828, 258, "focus object = the gap, not the raw score", color="primary", size=11, bold=True)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_agent_three_phase_track(*, width: float = 10.0, height: float = 3.0) -> SvgImage:
+    W, H = 1080, 340
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.arrow_markers()
+    c.rect(58, 42, 964, 26, fill="accent", stroke="none", rx=4)
+    c.text(540, 60, "Agent helps -> ceiling remains -> residual usability gap stays open", color="white", size=12, bold=True)
+
+    phases = [
+        (74, 96, 260, 182, "Phase 1", "Gain", "tool use doubles best score", "accent"),
+        (408, 96, 262, 182, "Phase 2", "Ceiling", "absolute performance still low", "warning"),
+        (744, 96, 262, 182, "Phase 3", "Residual gap", "not yet reliable for operators", "negative"),
+    ]
+    for x, y, w, h, kicker, title, body, tone in phases:
+        c.rect(x, y, w, h, fill="bg_alt", stroke=tone, stroke_width=1.7, rx=10)
+        c.rect(x + 18, y + 16, 74, 22, fill=tone, stroke="none", rx=4)
+        c.text(x + 55, y + 31, kicker, color="white", size=10, bold=True)
+        c.text(x + w / 2, y + 76, title, color=tone, size=18, bold=True)
+        c.text(x + w / 2, y + 108, body, color="text_mid", size=12)
+    c.arrow(334, 186, 408, 186, color="warning", width=2.5)
+    c.arrow(670, 186, 744, 186, color="negative", width=2.5)
+
+    # embed quantitative gain only in phase 1
+    c.rounded_rect(110, 158, 58, 86, fill="secondary", stroke="none", rx=8)
+    c.rounded_rect(194, 120, 58, 124, fill="primary", stroke="none", rx=8)
+    c.text(139, 150, "5.37", color="text", size=14, bold=True)
+    c.text(223, 112, "11.34", color="text", size=14, bold=True)
+    c.text(139, 262, "base", color="text_mid", size=11)
+    c.text(223, 262, "agent", color="text_mid", size=11)
+
+    c.line(454, 214, 620, 214, color="warning", width=2, dashed=True)
+    c.text(537, 202, "higher than base, still below useful ceiling", color="warning", size=10, bold=True)
+    c.rect(788, 224, 176, 30, fill="negative", stroke="none", rx=15)
+    c.text(876, 243, "gap not closed", color="white", size=11, bold=True)
+    return SvgImage(svg=c, width=width, height=height)
+
+
+def svg_takeaway_b_panel(*, width: float = 10.0, height: float = 2.5) -> SvgImage:
+    W, H = 1080, 280
+    c = DeckSvg(W, H, theme=THEME, bg=None)
+    c.rect(58, 58, 964, 56, fill="accent", stroke="none", rx=6)
+    c.text(540, 92, "Takeaway B: better tasks expose the true capability gap", color="white", size=19, bold=True)
+    c.rect(58, 148, 266, 44, fill="bg_alt", stroke="negative", stroke_width=1.4, rx=22)
+    c.text(191, 176, "realistic tasks remove benchmark illusion", color="negative", size=11, bold=True)
+    c.line(356, 170, 820, 170, color="border", width=1.6, dashed=True)
+    c.circle(540, 170, 18, fill="accent", opacity=0.92)
+    c.text(540, 176, "GAP", color="white", size=9, bold=True)
+    c.text(846, 174, "current LLM agents remain far from reliable RCA", color="accent", size=12, bold=True, anchor="start")
+    c.rect(58, 224, 964, 22, fill="positive", stroke="none", rx=4)
+    c.text(540, 239, "bridge: next we ask whether correct labels can still hide invalid reasoning paths", color="white", size=10, bold=True)
     return SvgImage(svg=c, width=width, height=height)
 
 
 def svg_label_reasoning_tension(*, width: float = 9.5, height: float = 3.0) -> SvgImage:
     W, H = 1030, 330
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
     c.rounded_rect(36, 46, 426, 228, text="", fill="#F4FBF7", stroke="positive", rx=20, stroke_width=2)
     c.rounded_rect(568, 46, 426, 228, text="", fill="#FFF4E8", stroke="warning", rx=20, stroke_width=2)
@@ -990,7 +1888,7 @@ def svg_label_reasoning_tension(*, width: float = 9.5, height: float = 3.0) -> S
 
 def svg_outcome_blind_spot(*, width: float = 9.5, height: float = 3.0) -> SvgImage:
     W, H = 1030, 330
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
     c.rounded_rect(36, 42, 282, 236, text="", fill="bg_alt", stroke="warning", rx=20, stroke_width=2)
     c.text(177, 78, "Outcome-only check", color="warning", size=18, bold=True)
@@ -1020,7 +1918,7 @@ def svg_outcome_blind_spot(*, width: float = 9.5, height: float = 3.0) -> SvgIma
 
 def svg_stepwise_supervision_upgrade(*, width: float = 9.5, height: float = 3.1) -> SvgImage:
     W, H = 1030, 340
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     c.arrow_markers()
     c.rounded_rect(40, 52, 388, 230, text="", fill="bg_alt", stroke="warning", rx=20, stroke_width=2)
     c.rounded_rect(602, 52, 388, 230, text="", fill="bg_accent", stroke="primary", rx=20, stroke_width=2)
@@ -1049,7 +1947,7 @@ def svg_stepwise_supervision_upgrade(*, width: float = 9.5, height: float = 3.1)
 
 def svg_future_pillars(*, width: float = 10.0, height: float = 3.0) -> SvgImage:
     W, H = 1080, 330
-    c = SvgCanvas(W, H, theme=THEME, bg=None)
+    c = DeckSvg(W, H, theme=THEME, bg=None)
     pillars = [
         (40, "Data", "Harder incidents\nconcurrent faults\npartial observability", "primary"),
         (390, "Agents", "Retrieval planning\nhypothesis revision\ntool orchestration", "accent"),
@@ -1086,6 +1984,52 @@ def callout_box(
         ],
     )
     return HStack(gap=0.12, width=width, children=[accent, text_col])
+
+
+def verdict_band(
+    title: str,
+    body: str,
+    color: str = "primary",
+    *,
+    width: float | None = None,
+) -> VStack:
+    return VStack(
+        gap=0.04,
+        width=width,
+        children=[
+            Box(text=title.upper(), color=color, border=color, text_color="white", height=0.22),
+            TextBlock(text=body, font_size="caption", color="text"),
+        ],
+    )
+
+
+def metric_chip(label: str, value: str, tone: str = "primary", *, width: float = 1.45) -> VStack:
+    return VStack(
+        gap=0.01,
+        width=width,
+        children=[
+            TextBlock(text=label.upper(), font_size="small", color=tone, bold=True),
+            TextBlock(text=value, font_size="heading", color="text", bold=True),
+        ],
+    )
+
+
+def metric_cluster(
+    items: list[tuple[str, str, str]],
+    *,
+    cols: int = 3,
+    verdict: tuple[str, str, str] | None = None,
+) -> VStack:
+    children: list = [
+        Grid(
+            cols=cols,
+            gap=0.18,
+            children=[metric_chip(label, value, tone) for label, value, tone in items],
+        )
+    ]
+    if verdict:
+        children.append(verdict_band(verdict[0], verdict[1], verdict[2]))
+    return VStack(gap=0.12, children=children)
 
 
 def metric_card(label: str, value: str, tone: str = "primary", *, width: float | None = None):
@@ -1159,6 +2103,218 @@ def modality_signal_cards():
             )
         )
     return HStack(gap=0.24, children=cards)
+
+
+def section_banner(
+    act_label: str,
+    question: str,
+    *,
+    tone: str = "accent",
+    recap: str | None = None,
+) -> VStack:
+    children: list = [
+        Box(text=act_label.upper(), color=tone, border=tone, text_color="white", height=0.24),
+        TextBlock(text=question, font_size="subtitle", bold=True, color=tone),
+    ]
+    if recap:
+        children.append(
+            HStack(
+                gap=0.10,
+                children=[
+                    Badge(text="Recap", color="secondary"),
+                    TextBlock(text=recap, font_size="caption", color="text_mid"),
+                ],
+            )
+        )
+    return VStack(gap=0.08, children=children)
+
+
+def takeaway_strip(
+    claim: str,
+    *,
+    bridge: str | None = None,
+    tone: str = "positive",
+    support: str | None = None,
+) -> VStack:
+    children: list = [callout_box("Takeaway", claim, tone)]
+    if support:
+        children.append(Box(text=support, color=tone, border=tone, text_color="white", height=0.22))
+    if bridge:
+        children.append(TextBlock(text=bridge, font_size="caption", color="text_mid"))
+    return VStack(gap=0.08, children=children)
+
+
+def triptych_panel(
+    items: list[tuple[str, str, str]],
+    *,
+    tones: list[str] | None = None,
+) -> Grid:
+    tones = tones or ["primary", "accent", "positive"]
+    panels = []
+    for idx, (title, body, kicker) in enumerate(items):
+        tone = tones[min(idx, len(tones) - 1)]
+        panels.append(
+            VStack(
+                gap=0.05,
+                children=[
+                    Box(text=title.upper(), color=tone, border=tone, text_color="white", height=0.24),
+                    TextBlock(text=body, font_size="caption", color="text"),
+                    TextBlock(text=kicker, font_size="small", color=tone, bold=True),
+                ],
+            )
+        )
+    return Grid(cols=3, gap=0.22, children=panels)
+
+
+def stage_marker(token: str, title: str, subtitle: str, tone: str = "primary", *, width: float = 1.75) -> VStack:
+    return VStack(
+        gap=0.08,
+        width=width,
+        children=[
+            Circle(text=token, color=tone, radius=0.28),
+            TextBlock(text=title, font_size="caption", bold=True, color=tone, align="center"),
+            TextBlock(text=subtitle, font_size="small", color="text_mid", align="center"),
+        ],
+    )
+
+
+def arrow_text(symbol: str = "→", tone: str = "accent", *, width: float = 0.36) -> TextBlock:
+    return TextBlock(text=symbol, font_size=18, bold=True, color=tone, width=width, align="center")
+
+
+def path_track(
+    steps: list[tuple[str, str, str, str]],
+    *,
+    arrow_tone: str = "accent",
+    width: float | None = None,
+) -> HStack:
+    children: list = []
+    for idx, (token, title, subtitle, tone) in enumerate(steps):
+        children.append(stage_marker(token, title, subtitle, tone))
+        if idx < len(steps) - 1:
+            children.append(arrow_text(tone=arrow_tone))
+    return HStack(gap=0.12, width=width, children=children)
+
+
+def insight_panel(
+    title: str,
+    body: str,
+    tone: str = "primary",
+    *,
+    width: float | None = None,
+    fill: str = "bg_alt",
+) -> VStack:
+    return VStack(
+        gap=0.06,
+        width=width,
+        children=[
+            Box(text=title.upper(), color=tone, border=tone, text_color="white", height=0.24),
+            Box(text=body, color=fill, border=tone, text_color="text", font_size="caption", bold=False),
+        ],
+    )
+
+
+def metric_track(
+    label: str,
+    value: float,
+    tone: str = "primary",
+    *,
+    max_value: float = 1.0,
+    track_width: float = 2.85,
+    value_fmt: str | None = None,
+) -> VStack:
+    frac = 0.0 if max_value <= 0 else max(0.0, min(1.0, value / max_value))
+    fill_w = max(0.22, track_width * frac)
+    rest_w = max(0.22, track_width - fill_w)
+    shown = value_fmt if value_fmt is not None else _fmt_v(value)
+    return VStack(
+        gap=0.04,
+        children=[
+            HStack(
+                gap=0.10,
+                children=[
+                    TextBlock(text=label, font_size="caption", bold=True, color="text", width=1.55),
+                    TextBlock(text=shown, font_size="caption", bold=True, color=tone),
+                ],
+            ),
+            HStack(
+                gap=0.04,
+                children=[
+                    Box(text="", color=tone, border=tone, width=fill_w, height=0.16),
+                    Box(text="", color="bg_alt", border="border", width=rest_w, height=0.16),
+                ],
+            ),
+        ],
+    )
+
+
+def roadmap_track(milestones: list[tuple[str, str, str]], *, width: float = 9.4, height: float = 1.95) -> HStack:
+    children: list = []
+    for idx, (title, subtitle, tone) in enumerate(milestones):
+        children.append(stage_marker(str(idx + 1), title, subtitle, tone, width=2.2))
+        if idx < len(milestones) - 1:
+            children.append(arrow_text("→", tone="secondary", width=0.4))
+    return HStack(gap=0.18, width=width, children=children)
+
+
+def manifesto_close(
+    title: str,
+    subtitle: str,
+    *,
+    action: str | None = None,
+    tone: str = "primary",
+) -> VStack:
+    children: list = [
+        TextBlock(text=title, font_size="title", color=tone, bold=True),
+        TextBlock(text=subtitle, font_size="body", color="text_mid"),
+    ]
+    if action:
+        children.append(Box(text=action, color=tone, border=tone, text_color="white", height=0.26))
+    return VStack(gap=0.10, children=children)
+
+
+def verification_loop_svg(*, width: float = 7.6, height: float = 2.4) -> VStack:
+    loop = path_track(
+        [
+            ("I", "Intervene", "known fault", "accent"),
+            ("F", "Forward", "cause -> effect", "primary"),
+            ("V", "Verify", "match observed path", "positive"),
+            ("J", "Judge", "faithful or not", "negative"),
+        ],
+        arrow_tone="accent",
+        width=width,
+    )
+    return VStack(
+        gap=0.10,
+        width=width,
+        children=[
+            loop,
+            HStack(
+                gap=0.12,
+                children=[
+                    Badge(text="audit loop", color="secondary"),
+                    TextBlock(
+                        text="Intervention makes trust evaluation operational: we verify the predicted forward path before granting credit.",
+                        font_size="caption",
+                        color="text_mid",
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def step_supervision_track_svg(*, width: float = 8.6, height: float = 2.0) -> HStack:
+    return path_track(
+        [
+            ("S", "Symptom", "user-visible", "secondary"),
+            ("1", "Hop 1", "service edge", "positive"),
+            ("2", "Hop 2", "service edge", "positive"),
+            ("R", "Root", "initiating fault", "negative"),
+        ],
+        arrow_tone="positive",
+        width=width,
+    )
 
 
 def flow_pipeline(
@@ -1281,263 +2437,321 @@ def build_slide(prs: Presentation, spec: dict):  # noqa: C901
     # -------- hero (slide 01) --------
     if kind == "hero":
         sb = prs.slide(background="bg_accent")
-        meta = HStack(
-            gap=0.12,
-            children=[
-                Badge(text="Research-line talk", color="primary"),
-                Badge(text="Benchmark realism", color="accent"),
-                Badge(text="Trustworthy RCA", color="positive"),
-            ],
+        stage_bar = Box(
+            text="RESEARCH-LINE THESIS  |  REALISM -> CAPABILITY -> TRUST",
+            color="primary",
+            border="primary",
+            text_color="white",
+            height=0.28,
         )
         thesis = VStack(
-            gap=0.10,
+            gap=0.08,
+            width=6.4,
             children=[
-                TextBlock(text="Building Trustworthy RCA Evaluation for LLM Agents",
-                          font_size=30, bold=True, color="primary"),
+                TextBlock(text="Building Trustworthy RCA Evaluation for LLM Agents", font_size=31, bold=True, color="primary"),
                 TextBlock(
-                    text="A research-line talk on benchmark realism, realistic LLM capability, and causal faithfulness.",
+                    text="A 45-minute evaluation contract: progress is credible only when benchmark realism, capability under telemetry scale, and causal-path trust all hold.",
                     font_size="body",
                     color="text_mid",
                 ),
-                TextBlock(
-                    text="Audience payoff: what reported RCA progress really means, and when it should not be trusted.",
-                    font_size="caption",
-                    color="text_mid",
-                ),
             ],
         )
-        payoff = VStack(
+        ladder = VStack(
             gap=0.14,
-            width=3.3,
+            width=6.6,
             children=[
-                callout_box(
-                    "Why this talk matters",
-                    "High RCA scores are not enough if the benchmark is easy or the reasoning path is invalid.",
-                    "negative",
+                Box(text="Evaluation contract: A gates B, B gates C", color="bg_alt", border="border", text_color="text_mid", height=0.22),
+                HStack(
+                    gap=0.18,
+                    children=[
+                        svg_gate_node("A", "Realism", "primary"),
+                        arrow_text(tone="accent"),
+                        svg_gate_node("B", "Capability", "accent"),
+                        arrow_text(tone="positive"),
+                        svg_gate_node("C", "Trust", "positive"),
+                    ],
                 ),
                 HStack(
-                    gap=0.10,
+                    gap=0.16,
+                    children=[
+                        verdict_band("A", "Is the task operationally real?", "primary", width=2.0),
+                        verdict_band("B", "Can agents reason over real telemetry?", "accent", width=2.0),
+                        verdict_band("C", "Can we audit the causal path?", "positive", width=2.0),
+                    ],
+                ),
+                HStack(
+                    gap=0.14,
                     children=[
                         Badge(text="FSE'26", color="primary"),
-                        Badge(text="ICLR'25", color="accent"),
-                        Badge(text="Process trust", color="positive"),
+                        Badge(text="OpenRCA", color="accent"),
+                        Badge(text="OpenRCA 2.0", color="positive"),
                     ],
                 ),
             ],
         )
-        ladder = svg_synthesis_ladder(
-            sub_labels=[
-                "Is the task\noperationally real?",
-                "Can agents reason\nover real telemetry?",
-                "Can we audit the\ncausal path?",
+        payoff = VStack(
+            gap=0.13,
+            width=3.0,
+            children=[
+                Box(text="TALK CONTRACT", color="negative", border="negative", text_color="white", height=0.24),
+                TextBlock(
+                    text="High RCA scores are not enough if tasks are easy or reasoning paths are unaudited.",
+                    font_size="caption",
+                    color="text",
+                ),
+                Box(text="FSE'26  ->  ICLR'25  ->  OpenRCA 2.0", color="bg_alt", border="border", text_color="text_mid", height=0.22),
+                Box(text="Audience payoff: when reported gains should not be trusted", color="warning", border="warning", text_color="white", height=0.24),
             ],
-            evidence=["FSE'26", "OpenRCA", "OpenRCA 2.0"],
-            width=6.1,
-            height=2.65,
         )
         body = VStack(
-            gap=0.24,
+            gap=0.20,
             children=[
-                meta,
+                stage_bar,
                 thesis,
                 HStack(gap=0.24, children=[ladder, payoff]),
             ],
         )
         sb.layout(Padding(child=body, all=0.42))
         sb.notes(notes)
-        sb.animate([[meta, thesis], [ladder, payoff]])
+        sb.animate([[stage_bar, thesis], [ladder], [payoff]])
         return sb
 
     sb = prs.slide(title=title)
 
     # -------- stakes (slide 02) --------
     if kind == "stakes":
-        metrics = stat_grid(
-            [
-                ("Downtime cost", "$23k / min", "negative"),
-                ("Ops support", "24 / 7", "warning"),
-                ("Incident cost", "billions", "accent"),
-                ("Need", "faster MTTR", "primary"),
+        metrics = HStack(
+            gap=0.12,
+            children=[
+                Box(text="Downtime  $23k/min", color="negative", border="negative", text_color="white", height=0.26),
+                Box(text="On-call  24/7", color="warning", border="warning", text_color="white", height=0.26),
+                Box(text="Major incidents  billions", color="accent", border="accent", text_color="white", height=0.26),
+                Box(text="Objective  faster MTTR", color="primary", border="primary", text_color="white", height=0.26),
             ],
-            cols=4,
         )
         right_col = VStack(
-            gap=0.16,
-            width=4.9,
+            gap=0.12,
+            width=4.6,
             children=[
-                callout_box(
-                    "Why MTTR dominates operations",
-                    "Every extra diagnostic minute compounds user impact while on-call engineers are still narrowing hypotheses.",
-                    "negative",
-                ),
-                callout_box(
-                    "Why RCA is the bottleneck",
-                    "The issue is not just detecting an anomaly; it is isolating the triggering component before the cascade grows.",
-                    "primary",
-                ),
-                BulletList(
-                    items=[
-                        "Symptoms arrive before causes become obvious",
-                        "Wrong ranking burns the narrow recovery window",
-                    ]
-                ),
+                Box(text="INCIDENT PRESSURE TRACK", color="bg_alt", border="border", text_color="text_mid", height=0.2),
+                callout_box("MTTR pressure", "Each extra minute compounds user impact and operator load.", "negative"),
+                callout_box("RCA bottleneck", "Recovery speed depends on finding trigger, not just spotting symptoms.", "primary"),
+                Box(text="Verdict: RCA quality directly controls recovery velocity", color="warning", border="warning", text_color="white", height=0.24),
             ],
         )
         body = VStack(
-            gap=0.24,
+            gap=0.18,
             children=[
                 metrics,
-                HStack(gap=0.34, children=[svg_cascade_diagram(width=4.9, height=3.7), right_col]),
-                Badge(text="RCA quality is a recovery-speed lever, not just a monitoring metric.", color="warning"),
+                HStack(
+                    gap=0.28,
+                    children=[
+                        VStack(
+                            gap=0.14,
+                            width=5.2,
+                            children=[
+                                HStack(
+                                    gap=0.12,
+                                    children=[
+                                        SvgImage(svg=icon_warning(), width=0.72, height=0.72),
+                                        Box(text="Checkout SLI degraded", color="negative", border="negative", text_color="white", height=0.26, width=2.2),
+                                        arrow_text(tone="negative"),
+                                        svg_service_card(title="Observed service", subtitle="loud anomaly near the user", status="propagated", badge="seen first", width=2.1, height=1.2),
+                                    ],
+                                ),
+                                HStack(
+                                    gap=0.12,
+                                    children=[
+                                        Spacer(width=0.70),
+                                        arrow_text("↓", tone="warning", width=0.24),
+                                        SvgImage(svg=icon_root_cause(), width=0.72, height=0.72),
+                                        svg_service_card(title="Root-cause service", subtitle="actual trigger starts the cascade", status="root", badge="trigger", width=2.4, height=1.28),
+                                    ],
+                                ),
+                                Box(text="Real RCA isolates the trigger, not the loudest symptom.", color="bg_alt", border="primary", text_color="primary", height=0.24),
+                            ],
+                        ),
+                        right_col,
+                    ],
+                ),
             ],
         )
         sb.layout(body)
         sb.notes(notes)
-        sb.animate([[metrics], [right_col], [body.children[1].children[0]], [body.children[2]]])
+        sb.animate([[metrics], [body.children[1].children[0]], [right_col]])
 
     elif kind == "hardness":
-        mods = modality_signal_cards()
-        chain = flow_pipeline(
-            ["DB deadlock\n(root cause)", "Service A\nlatency \u2191", "Service B\ntimeout", "User SLI\ndegraded"],
-            ["secondary", "warning", "warning", "negative"],
+        header = Box(
+            text="RCA is causal reconstruction: fuse modalities, trace multi-hop propagation, preserve temporal order.",
+            color="primary",
+            border="primary",
+            text_color="white",
+            height=0.28,
         )
-        burdens = triad_callout(
-            [
-                ("Fuse signals", "Correlate metrics, logs, and traces without over-trusting any single modality.", "primary"),
-                ("Trace hops", "Symptoms may appear several services away from the injected fault.", "accent"),
-                ("Order events", "The diagnostic path must respect propagation timing, not just anomaly magnitude.", "positive"),
-            ]
-        )
-        header = callout_box(
-            "Why this is intrinsically hard",
-            "RCA is a causal reconstruction task: identify the trigger, follow propagation, and explain why the user-visible symptom appeared.",
-            "primary",
-        )
-        sb.layout(VStack(gap=0.22, children=[header, mods, chain, burdens]))
-        sb.notes(notes)
-        sb.animate([[header], [mods], [chain], [burdens]])
-
-    elif kind == "shortcut_compare":
-        shortcut = VStack(
-            gap=0.16,
-            children=[
-                callout_box(
-                    "Shortcut path",
-                    "Pick the loudest symptom and stop at the service that looks most abnormal.",
-                    "negative",
-                ),
-                flow_pipeline(
-                    ["Highest anomaly", "Most abnormal service", "Predict root cause"],
-                    ["negative", "warning", "bg_alt"],
-                ),
-                BulletList(
-                    items=[
-                        "Uses symptom intensity as proxy for causality",
-                        "Needs only shallow signal ranking",
-                        "Looks good when benchmarks expose the source too directly",
-                    ]
-                ),
-            ],
-        )
-        causal = VStack(
-            gap=0.16,
-            children=[
-                callout_box(
-                    "Causal reasoning",
-                    "Verify how the failure propagates across services before naming the trigger.",
-                    "primary",
-                ),
-                flow_pipeline(
-                    ["Collect", "Align", "Verify", "Trigger"],
-                    ["bg_alt", "secondary", "accent", "primary"],
-                ),
-                BulletList(
-                    items=[
-                        "Requires multi-hop dependency tracking",
-                        "Must reconcile heterogeneous evidence",
-                        "Produces a defensible explanation, not just a label",
-                    ]
-                ),
-            ],
-        )
-        mismatch = stat_grid(
-            [
-                ("Risk", "shortcut rewarded", "warning"),
-                ("Symptom", "high scores", "negative"),
-                ("Meaning", "progress inflated", "primary"),
-            ]
-        )
-        tension = Badge(text="When shortcut methods score well, benchmark difficulty and reported progress are misaligned.", color="warning")
-        sb.layout(VStack(gap=0.20, children=[HStack(gap=0.16, children=[shortcut, causal]), mismatch, tension]))
-        sb.notes(notes)
-        sb.animate([[shortcut], [causal], [mismatch, tension]])
-
-    elif kind == "question_ladder":
-        ladder = svg_synthesis_ladder(
-            sub_labels=[
-                "Task validity",
-                "Capability under\nreal telemetry",
-                "Reasoning audit",
-            ],
-            evidence=["A gates B", "B enables C", "C makes trust visible"],
-            width=5.6,
-            height=2.95,
-        )
-        contract = VStack(
-            gap=0.16,
-            width=5.0,
-            children=[
-                callout_box("Question A", "If the benchmark is easy, later scores are not evidence of real RCA ability.", "primary"),
-                callout_box("Question B", "Once the task is credible, we can ask whether LLM agents actually solve it.", "accent"),
-                callout_box("Question C", "Even correct answers must be audited for causal-path faithfulness.", "positive"),
-            ],
-        )
-        dependency = Badge(text="Methodology contract: validate the task -> measure capability -> audit trust.", color="warning")
-        sb.layout(VStack(gap=0.22, children=[HStack(gap=0.36, children=[ladder, contract]), dependency]))
-        sb.notes(notes)
-        sb.animate([[ladder], [contract], [dependency]])
-
-    elif kind == "takeaway_grid":
-        intro = callout_box(
-            "Three anchors for the rest of the talk",
-            "The next evidence slides answer one question only: are we measuring a hard task, a capable agent, or a trustworthy diagnosis?",
-            "primary",
-        )
-        grid = Grid(
-            cols=3,
+        map_diagram = HStack(
             gap=0.24,
             children=[
-                VStack(gap=0.08, children=[Badge(text="A", color="primary"), TextBlock(text="Real task", font_size="body", bold=True, color="primary"), TextBlock(text="RCA is causal, multi-hop, and multi-modal.", font_size="caption", color="text_mid"), TextBlock(text="Watch for: propagation-aware failures.", font_size="caption", color="text")]),
-                VStack(gap=0.08, children=[Badge(text="B", color="accent"), TextBlock(text="Real capability", font_size="body", bold=True, color="accent"), TextBlock(text="Reported progress matters only on realistic telemetry.", font_size="caption", color="text_mid"), TextBlock(text="Watch for: performance drop under realistic tasks.", font_size="caption", color="text")]),
-                VStack(gap=0.08, children=[Badge(text="C", color="positive"), TextBlock(text="Real trust", font_size="body", bold=True, color="positive"), TextBlock(text="Correct labels are not enough without a valid path.", font_size="caption", color="text_mid"), TextBlock(text="Watch for: outcome vs process gap.", font_size="caption", color="text")]),
+                VStack(
+                    gap=0.12,
+                    width=3.0,
+                    children=[
+                        Box(text="Telemetry modalities", color="bg_alt", border="border", text_color="text", height=0.24),
+                        svg_evidence_chip("metrics: onset + magnitude", "primary", "M", width=2.8),
+                        svg_evidence_chip("logs: local semantic clues", "accent", "L", width=2.8),
+                        svg_evidence_chip("traces: cross-service hops", "positive", "T", width=2.8),
+                        Box(text="three views, one diagnosis", color="bg", border="primary", text_color="primary", height=0.24),
+                    ],
+                ),
+                VStack(
+                    gap=0.12,
+                    width=6.9,
+                    children=[
+                        HStack(
+                            gap=0.12,
+                            children=[
+                                Box(text="Fuse modalities", color="bg", border="primary", text_color="primary", height=0.24, width=2.05),
+                                Box(text="Trace hops", color="#FFF5EA", border="accent", text_color="accent", height=0.24, width=1.9),
+                                Box(text="Order events causally", color="#EFF8F2", border="positive", text_color="positive", height=0.24, width=2.45),
+                            ],
+                        ),
+                        HStack(
+                            gap=0.12,
+                            children=[
+                                svg_service_card(title="Root cause", subtitle="db lock", status="root", width=2.15, height=1.22),
+                                arrow_text(tone="warning"),
+                                svg_service_card(title="Mid service", subtitle="retry storm", status="propagated", width=2.15, height=1.22),
+                                arrow_text(tone="negative"),
+                                svg_service_card(title="User symptom", subtitle="timeout", status="propagated", width=2.15, height=1.22),
+                            ],
+                        ),
+                        Box(text="must preserve propagation order", color="bg_alt", border="primary", text_color="primary", height=0.22),
+                    ],
+                ),
             ],
         )
-        rule = Badge(text="Decision rule: only when A + B + C line up do we trust the progress claim.", color="warning")
-        sb.layout(VStack(gap=0.22, children=[intro, grid, rule]))
+        verdict = Box(text="Focus object: root-cause path under heterogeneous evidence", color="bg_alt", border="border", text_color="text_mid", height=0.22)
+        sb.layout(VStack(gap=0.16, children=[header, map_diagram, verdict]))
         sb.notes(notes)
-        sb.animate([[intro], [grid], [rule]])
+        sb.animate([[header], [map_diagram], [verdict]])
+
+    elif kind == "shortcut_compare":
+        diagram = HStack(
+            gap=0.26,
+            children=[
+                VStack(
+                    gap=0.14,
+                    width=4.9,
+                    children=[
+                        Box(text="Shortcut ranking path", color="negative", border="negative", text_color="white", height=0.26),
+                        HStack(gap=0.12, children=[Box(text="largest anomaly", color="#F3B4B4", border="negative", text_color="negative", height=0.5, width=2.1), arrow_text(tone="negative"), Box(text="rank service", color="#F6D6A8", border="warning", text_color="warning", height=0.5, width=2.0)]),
+                        Box(text="high score possible, weak causal validity", color="negative", border="negative", text_color="white", height=0.28),
+                    ],
+                ),
+                VStack(
+                    gap=0.12,
+                    width=4.9,
+                    children=[
+                        Box(text="Causal verification path", color="primary", border="primary", text_color="white", height=0.26),
+                        HStack(gap=0.08, children=[svg_evidence_chip("collect metrics/logs/traces", "secondary", "E", width=2.3), arrow_text(tone="secondary"), Box(text="defensible trigger + path", color="bg", border="primary", text_color="primary", height=0.5, width=2.1)]),
+                        HStack(gap=0.08, children=[svg_evidence_chip("align across dependency graph", "accent", "A", width=2.3), arrow_text(tone="accent"), Box(text="auditable alignment", color="bg", border="accent", text_color="accent", height=0.5, width=2.1)]),
+                        HStack(gap=0.08, children=[svg_evidence_chip("verify propagation chain", "primary", "V", width=2.3), arrow_text(tone="primary"), Box(text="lower shortcut risk", color="primary", border="primary", text_color="white", height=0.5, width=2.1)]),
+                    ],
+                ),
+            ],
+        )
+        tension = Box(
+            text="Implication: high benchmark score can still encode shortcut behavior.",
+            color="warning",
+            border="warning",
+            text_color="white",
+            height=0.25,
+        )
+        sb.layout(VStack(gap=0.14, children=[diagram, tension]))
+        sb.notes(notes)
+        sb.animate([[diagram], [tension]])
+
+    elif kind == "question_ladder":
+        gate_map = VStack(
+            gap=0.16,
+            children=[
+                HStack(
+                    gap=0.18,
+                    children=[
+                        svg_gate_node("A", "Realism", "primary"),
+                        arrow_text(tone="accent"),
+                        svg_gate_node("B", "Capability", "accent"),
+                        arrow_text(tone="positive"),
+                        svg_gate_node("C", "Trust", "positive"),
+                    ],
+                ),
+                HStack(
+                    gap=0.18,
+                    children=[
+                        svg_contract_card("Q-A contract", "Benchmark must be operationally hard.", "primary", width=3.1),
+                        svg_contract_card("Q-B contract", "Measure LLMs on realistic telemetry.", "accent", width=3.1),
+                        svg_contract_card("Q-C contract", "Audit causal path, not label only.", "positive", width=3.1),
+                    ],
+                ),
+            ],
+        )
+        dependency = Box(
+            text="Methodology contract: validate task realism -> measure capability -> audit trust",
+            color="warning",
+            border="warning",
+            text_color="white",
+            height=0.24,
+        )
+        sb.layout(VStack(gap=0.14, children=[gate_map, dependency]))
+        sb.notes(notes)
+        sb.animate([[gate_map], [dependency]])
+
+    elif kind == "takeaway_grid":
+        guide = HStack(
+            gap=0.20,
+            children=[
+                VStack(gap=0.10, width=3.2, children=[svg_gate_node("A", "Real task", "primary", width=1.6, height=1.3), insight_panel("Real task", "Look for propagation-aware failures.", "primary", fill="bg")]),
+                VStack(gap=0.10, width=3.2, children=[svg_gate_node("B", "Real capability", "accent", width=1.6, height=1.3), insight_panel("Real capability", "Look for realistic-task performance gaps.", "accent", fill="bg")]),
+                VStack(gap=0.10, width=3.2, children=[svg_gate_node("C", "Real trust", "positive", width=1.6, height=1.3), insight_panel("Real trust", "Look for outcome-vs-process gaps.", "positive", fill="bg")]),
+            ],
+        )
+        sb.layout(VStack(gap=0.14, children=[guide]))
+        sb.notes(notes)
+        sb.animate([[guide]])
 
     elif kind == "probe":
-        claim = callout_box(
-            "Probe logic",
-            "SimpleRCA is a diagnostic instrument: if it approaches SOTA, the benchmark is not forcing real causal reasoning.",
-            "negative",
-        )
-        flow = flow_pipeline(
-            ["Hypothesis:\npublic benchmark is discriminative", "Probe:\ntransparent SimpleRCA", "Decision:\ncheck parity vs SOTA"],
-            ["bg_alt", "warning", "primary"],
-        )
-        why_fair = HStack(
-            gap=0.28,
+        probe_board = VStack(
+            gap=0.16,
             children=[
-                callout_box("Why this is fair", "The probe is deliberately simple, interpretable, and zero-ML.", "accent"),
-                callout_box("What would falsify it", "If SimpleRCA clearly trails SOTA, the benchmark still separates shallow and deep reasoning.", "primary"),
+                Box(text="Probe claim: if a simple transparent heuristic reaches SOTA, benchmark discrimination is weak", color="negative", border="negative", text_color="white", height=0.26),
+                HStack(
+                    gap=0.18,
+                    children=[
+                        svg_probe_chevron("Hypothesis", "legacy benchmark is discriminative", "secondary"),
+                        arrow_text(tone="warning"),
+                        svg_probe_chevron("Probe", "run SimpleRCA without ML tuning", "warning"),
+                        arrow_text(tone="primary"),
+                        svg_probe_chevron("Decision", "compare against reported SOTA", "primary"),
+                    ],
+                ),
+                HStack(
+                    gap=0.20,
+                    children=[
+                        Box(text="Fairness: transparent + interpretable + low-capacity baseline", color="#FFF9EF", border="accent", text_color="accent", height=0.34, width=4.8),
+                        Box(text="Falsification: if SimpleRCA clearly loses, benchmark still separates depth", color="#EEF4FA", border="primary", text_color="primary", height=0.34, width=4.8),
+                    ],
+                ),
             ],
         )
-        criterion = Badge(text="Falsifiable criterion: simple parity or wins -> the benchmark has low discrimination.", color="warning")
-        sb.layout(VStack(gap=0.20, children=[claim, flow, why_fair, criterion]))
+        criterion = Box(
+            text="Falsifiable criterion: SimpleRCA parity/wins indicates low benchmark discrimination.",
+            color="warning",
+            border="warning",
+            text_color="white",
+            height=0.24,
+        )
+        sb.layout(VStack(gap=0.14, children=[probe_board, criterion]))
         sb.notes(notes)
-        sb.animate([[claim], [flow], [why_fair], [criterion]])
+        sb.animate([[probe_board], [criterion]])
 
     elif kind == "simplerca_chart":
         chart = grouped_bar_svg(
@@ -1550,80 +2764,108 @@ def build_slide(prs: Presentation, spec: dict):  # noqa: C901
             height=3.2,
         )
         summary = VStack(
-            gap=0.18,
+            gap=0.10,
             width=3.8,
             children=[
-                callout_box(
-                    "First empirical shock",
-                    "SimpleRCA wins on 3 of 4 public benchmarks, which means benchmark scores alone are not strong evidence of real RCA ability.",
-                    "negative",
+                Box(text="EMPIRICAL SHOCK", color="negative", border="negative", text_color="white", height=0.22),
+                TextBlock(
+                    text="SimpleRCA matches or exceeds SOTA on 3/4 public benchmarks.",
+                    font_size="caption",
+                    color="text",
                 ),
-                stat_grid(
-                    [
-                        ("Wins", "3 / 4", "negative"),
-                        ("Largest gap", "+0.33", "accent"),
-                        ("Only resistant set", "Eadro", "secondary"),
-                    ]
-                ),
-                BulletList(
-                    items=[
-                        "RE2: +0.13 over SOTA",
-                        "RE3: +0.33 over SOTA",
-                        "Nezha: +0.06 over SOTA",
-                    ]
-                ),
+                Box(text="3/4 wins  |  +0.33 max gap  |  Eadro exception", color="bg_alt", border="border", text_color="text_mid", height=0.22),
+                Box(text="Verdict: benchmark diagnosis, not model victory", color="warning", border="warning", text_color="white", height=0.24),
             ],
         )
-        take = Badge(
-            text="Interpretation: parity is a benchmark diagnosis, not a model victory.",
-            color="warning",
-        )
+        take = TextBlock(text="Implication: parity by a low-capacity probe means the benchmark is structurally easy.", font_size="caption", color="text_mid")
         sb.layout(VStack(gap=0.20, children=[HStack(gap=0.30, children=[summary, chart]), take]))
         sb.notes(notes)
         sb.animate([[summary], [chart], [take]])
 
     elif kind == "legacy_triad":
-        diag = svg_legacy_bias_triad(width=10.1, height=3.3)
-        note = Badge(text="Mechanism: shortcuts work because benchmark construction leaks the answer.", color="warning")
-        sb.layout(VStack(gap=0.16, children=[diag, note]))
+        diag = HStack(
+            gap=0.20,
+            children=[
+                VStack(gap=0.10, width=3.2, children=[Box(text="Injection bias", color="negative", border="negative", text_color="white", height=0.24), svg_service_card(title="Payment", subtitle="fault surface loud", status="root", style="minimal", width=1.95, height=1.2), TextBlock(text="largest anomaly -> shortcut picks source quickly", font_size="caption", color="text_mid")]),
+                VStack(gap=0.10, width=3.2, children=[Box(text="Shallow propagation", color="warning", border="warning", text_color="white", height=0.24), HStack(gap=0.10, children=[svg_service_card(title="A", subtitle="source", status="root", style="minimal", width=1.35, height=1.0), arrow_text(tone="warning", width=0.2), svg_service_card(title="B", subtitle="symptom", status="propagated", style="minimal", width=1.35, height=1.0)]), TextBlock(text="1-2 hops only -> causal search depth stays low", font_size="caption", color="text_mid")]),
+                VStack(gap=0.10, width=3.2, children=[Box(text="Signal dominance", color="primary", border="primary", text_color="white", height=0.24), svg_evidence_chip("metrics spike", "primary", "M", width=2.3), svg_evidence_chip("logs expose clue", "accent", "L", width=2.3), svg_evidence_chip("trace lands on culprit", "positive", "T", width=2.3)]),
+            ],
+        )
+        note = Box(
+            text="Mechanism verdict: legacy benchmark construction leaks root-cause cues.",
+            color="warning",
+            border="warning",
+            text_color="white",
+            height=0.24,
+        )
+        sb.layout(VStack(gap=0.14, children=[diag, note]))
         sb.notes(notes)
         sb.animate([[diag], [note]])
 
     elif kind == "validation_pipeline":
-        flow = svg_validation_gate_pipeline(width=10.1, height=3.05)
-        principle = callout_box(
-            "Key design decision",
-            "Only failures that produce measurable user-facing SLI degradation "
-            "have operational relevance for benchmarking.",
-            "warning",
+        flow = HStack(
+            gap=0.16,
+            children=[
+                insight_panel("Inject faults", "31 fault types; many are operationally silent.", "secondary", width=2.2, fill="bg"),
+                arrow_text(tone="secondary", width=0.24),
+                insight_panel("Measure user impact", "SLI degradation required; anomaly alone is insufficient.", "accent", width=2.4, fill="#FFF6EC"),
+                arrow_text(tone="warning", width=0.24),
+                svg_validation_hexagon(width=2.2, height=1.6),
+                arrow_text(tone="primary", width=0.24),
+                svg_validated_case_hexagon(width=2.5, height=1.7),
+            ],
         )
-        sb.layout(VStack(gap=0.18, children=[flow, principle]))
+        principle = Box(
+            text="Key design rule: retain only failures with measurable user-facing SLI impact.",
+            color="warning",
+            border="warning",
+            text_color="white",
+            height=0.24,
+        )
+        sb.layout(VStack(gap=0.14, children=[flow, principle]))
         sb.notes(notes)
         sb.animate([[flow], [principle]])
 
     elif kind == "framework":
-        pipeline = svg_framework_grid_panel(width=10.15, height=3.55)
-        sb.layout(Padding(child=pipeline, all=0.04))
+        pipeline = VStack(
+            gap=0.16,
+            children=[
+                HStack(gap=0.16, children=[svg_stage_card("1 Foundation", "TrainTicket + observability stack", "secondary"), arrow_text(tone="secondary", width=0.24), svg_stage_card("2 Workload", "Dynamic traffic creates path variety", "accent"), arrow_text(tone="warning", width=0.24), svg_stage_card("3 Injection", "31 layered fault types", "warning")]),
+                HStack(gap=0.16, children=[Spacer(width=6.52), arrow_text("↓", tone="secondary", width=0.24)]),
+                HStack(gap=0.16, children=[svg_stage_card("6 Annotation", "Hierarchical RCA labels + paths", "secondary"), arrow_text("←", tone="primary", width=0.24), svg_stage_card("5 Validation", "Retain only impact-validated cases", "primary", emphasized=True), arrow_text("←", tone="positive", width=0.24), svg_stage_card("4 Collection", "Metrics, logs, traces snapshot", "positive")]),
+            ],
+        )
+        verdict = Box(
+            text="Construction is reproducible: workflow-driven generation replaces hand-crafted incidents.",
+            color="primary",
+            border="primary",
+            text_color="white",
+            height=0.24,
+        )
+        sb.layout(VStack(gap=0.12, children=[pipeline, verdict]))
         sb.notes(notes)
-        sb.animate([[pipeline]])
+        sb.animate([[pipeline], [verdict]])
 
     elif kind == "benchmark_stats":
-        cards = svg_benchmark_stats_panel(width=6.8, height=2.8)
+        cards = VStack(
+            gap=0.14,
+            width=6.8,
+            children=[
+                HStack(gap=0.12, children=[svg_metric_stat_card("1,430", "validated cases", "primary"), svg_metric_stat_card("9,152", "fault injections", "accent"), svg_metric_stat_card("25", "fault types", "positive")]),
+                HStack(gap=0.10, children=[Badge(text="6 fault families", color="secondary"), Badge(text="50 services", color="secondary"), Badge(text="dynamic workload", color="warning")]),
+            ],
+        )
         support = VStack(
             gap=0.12,
             width=3.0,
             children=[
-                Badge(text="Regime shift", color="negative"),
+                Box(text="REGIME SHIFT", color="negative", border="negative", text_color="white", height=0.22),
                 TextBlock(
                     text="More services, more validated failures, and dynamic workloads change the difficulty regime.",
                     font_size="caption",
                     color="text_mid",
                 ),
-                callout_box(
-                    "Why these numbers matter",
-                    "Scale alone is not the point; the retained cases better reflect incidents worth diagnosing.",
-                    "accent",
-                ),
+                Box(text="Meaning: retained incidents are operationally meaningful", color="accent", border="accent", text_color="white", height=0.22),
             ],
         )
         sb.layout(HStack(gap=0.34, children=[cards, support]))
@@ -1631,211 +2873,347 @@ def build_slide(prs: Presentation, spec: dict):  # noqa: C901
         sb.animate([[cards], [support]])
 
     elif kind == "collapse":
-        diag = svg_dual_regime_panel(width=10.1, height=3.35)
-        footer = Badge(text="Result: realism breaks both accuracy and efficiency assumptions.", color="negative")
+        diag = HStack(
+            gap=0.24,
+            children=[
+                VStack(
+                    gap=0.12,
+                    width=4.8,
+                    children=[
+                        Box(text="Accuracy collapse", color="bg_alt", border="border", text_color="text", height=0.24),
+                        metric_track("Avg Top@1", 0.75, "secondary", track_width=3.0, value_fmt="legacy 0.75"),
+                        metric_track("Avg Top@1", 0.21, "negative", track_width=3.0, value_fmt="realistic 0.21"),
+                        metric_track("Best Top@1", 0.87, "secondary", track_width=3.0, value_fmt="legacy 0.87"),
+                        metric_track("Best Top@1", 0.37, "negative", track_width=3.0, value_fmt="realistic 0.37"),
+                        Box(text="verdict: legacy ranking does not transfer", color="negative", border="negative", text_color="white", height=0.24),
+                    ],
+                ),
+                VStack(
+                    gap=0.12,
+                    width=4.8,
+                    children=[
+                        Box(text="Runtime escalation", color="#FFF7F2", border="warning", text_color="text", height=0.24),
+                        HStack(gap=0.10, children=[Badge(text="seconds", color="secondary"), arrow_text(tone="negative", width=0.24), Badge(text="hours", color="negative")]),
+                        Box(text="~12x runtime escalation", color="negative", border="negative", text_color="white", height=0.30),
+                        TextBlock(text="Realism raises operational cost sharply, so retrieval and execution efficiency become first-class evaluation concerns.", font_size="caption", color="text_mid"),
+                    ],
+                ),
+            ],
+        )
+        footer = Box(
+            text="Result: realism breaks both accuracy and efficiency assumptions.",
+            color="negative",
+            border="negative",
+            text_color="white",
+            height=0.24,
+        )
         sb.layout(VStack(gap=0.14, children=[diag, footer]))
         sb.notes(notes)
         sb.animate([[diag], [footer]])
 
     elif kind == "failure_modes":
-        panel = svg_failure_modes_panel(width=10.1, height=3.1)
-        sb.layout(panel)
+        panel = HStack(
+            gap=0.18,
+            children=[
+                VStack(gap=0.10, width=3.2, children=[Box(text="RUNTIME", color="negative", border="negative", text_color="white", height=0.24), SvgImage(svg=icon_metrics(), width=0.9, height=0.9), TextBlock(text="toy-graph pipelines do not scale", font_size="caption", color="text_mid")]),
+                VStack(gap=0.10, width=3.2, children=[Box(text="SIGNAL", color="warning", border="warning", text_color="white", height=0.24), svg_evidence_chip("metrics absent", "primary", "M", width=2.2), svg_evidence_chip("logs noisy", "accent", "L", width=2.2), svg_evidence_chip("trace sparse", "positive", "T", width=2.2)]),
+                VStack(gap=0.10, width=3.2, children=[Box(text="MODEL", color="primary", border="primary", text_color="white", height=0.24), HStack(gap=0.10, children=[svg_service_card(title="Assumed", subtitle="single-hop", status="normal", width=1.45, height=1.0), arrow_text(tone="primary", width=0.20), svg_service_card(title="Reality", subtitle="cross-hop", status="propagated", width=1.45, height=1.0)]), TextBlock(text="legacy assumptions fail on realistic chains", font_size="caption", color="text_mid")]),
+            ],
+        )
+        sb.layout(VStack(gap=0.12, children=[panel]))
         sb.notes(notes)
         sb.animate([[panel]])
 
     elif kind == "takeaway_a":
-        main = callout_box(
-            "Takeaway A",
-            "Without realistic failures, algorithmic progress claims are weak. "
-            "Benchmark design determines what 'progress' means.",
-            "primary",
+        headline = Box(
+            text="TAKEAWAY A  |  Benchmark realism determines what progress means",
+            color="primary",
+            border="primary",
+            text_color="white",
+            height=0.3,
         )
-        bridge = Badge(text="Next: capability under realistic telemetry  ->", color="accent")
-        kicker = TextBlock(
-            text="Question A answered: realism is the prerequisite for meaningful RCA evaluation.",
-            font_size="caption",
-            color="text_mid",
+        body = TextBlock(
+            text="Without realistic failures, leaderboard gains are weak evidence. First fix the task, then measure capability.",
+            font_size="subtitle",
+            bold=True,
+            color="primary",
             align="center",
         )
-        sb.layout(VStack(gap=0.36, children=[Spacer(height=0.42), main, kicker, bridge]))
+        kicker = Box(
+            text="Question A answered: realism is the prerequisite for meaningful RCA evaluation.",
+            color="bg_alt",
+            border="border",
+            text_color="text_mid",
+            height=0.24,
+        )
+        bridge = Box(text="NEXT -> Question B: capability under real telemetry", color="accent", border="accent", text_color="white", height=0.24)
+        sb.layout(VStack(gap=0.26, children=[Spacer(height=0.40), headline, body, kicker, bridge]))
         sb.notes(notes)
-        sb.animate([[main], [kicker, bridge]])
+        sb.animate([[headline, body], [kicker, bridge]])
 
     elif kind == "transition_b":
-        act_label = Badge(text="Question B: Capability", color="accent")
-        question = TextBlock(
-            text="Can LLMs Actually Diagnose RCA Under Real Telemetry?",
-            font_size=24, bold=True, color="accent", align="center",
+        reset = section_banner(
+            "Act III",
+            "Question B: Can LLMs actually diagnose RCA under real telemetry?",
+            tone="accent",
+            recap="Realism already rules out easy benchmark wins.",
         )
-        recap = RoundedBox(
-            text="Realism established: new benchmark reveals realistic challenge",
-            color="bg_accent", border="primary",
-            text_color="primary", font_size="caption", bold=False,
-            height=0.7, size_mode_x="fit",
-        )
-        sb.layout(Padding(
-            child=VStack(gap=0.26, children=[act_label, question, recap]),
-            all=0.55,
-        ))
+        sb.layout(Padding(child=VStack(gap=0.18, children=[reset, Box(text="The next slides measure real diagnostic ability, not benchmark saturation.", color="bg_alt", border="secondary", text_color="text_mid", height=0.26)]), all=0.28))
         sb.notes(notes)
-        sb.animate([[act_label, question], [recap]])
+        sb.animate([[reset]])
 
     elif kind == "task_contract":
-        pipeline = svg_task_contract(width=10.15, height=3.0)
-        contract = callout_box(
-            "Task contract",
-            "RCA is framed as a goal-driven retrieval task: the model must produce "
-            "a structured triple, not just a single ranked label.",
-            "primary",
+        pipeline = HStack(
+            gap=0.20,
+            children=[
+                insight_panel("Operator query", "\"Why is checkout timing out?\"\nGoal anchors retrieval in time, component, and explanation.", "secondary", width=3.0, fill="bg"),
+                VStack(gap=0.10, width=3.2, children=[Box(text="Telemetry bundle", color="accent", border="accent", text_color="white", height=0.24), HStack(gap=0.08, children=[SvgImage(svg=icon_metrics(), width=0.68, height=0.68), SvgImage(svg=icon_logs(), width=0.68, height=0.68), SvgImage(svg=icon_traces(), width=0.68, height=0.68)]), Box(text="68 GB context  |  multi-hop search", color="#FFF8EF", border="accent", text_color="accent", height=0.28)]),
+                insight_panel("Output tuple", "(time, component, reason)\nnot a generic ranked label.", "primary", width=3.0, fill="bg_accent"),
+            ],
         )
-        sb.layout(VStack(gap=0.28, children=[pipeline, contract]))
+        contract = Box(
+            text="Task contract: goal-conditioned retrieval -> telemetry fusion -> structured RCA tuple",
+            color="primary",
+            border="primary",
+            text_color="white",
+            height=0.26,
+        )
+        sb.layout(VStack(gap=0.18, children=[pipeline, contract]))
         sb.notes(notes)
         sb.animate([[pipeline], [contract]])
 
     elif kind == "openrca_scale":
-        cards = svg_scale_pressure_panel(width=10.1, height=3.1)
-        burden = callout_box(
-            "Why scale matters",
-            "Real telemetry is noisy, long-context, and heterogeneous - exactly the reasoning load missing from legacy benchmarks.",
-            "primary",
+        cards = HStack(
+            gap=0.22,
+            children=[
+                VStack(gap=0.10, width=2.8, children=[Box(text="Scale pressure", color="negative", border="negative", text_color="white", height=0.24), stat_grid([("failure cases", "335", "primary"), ("raw telemetry", "68 GB", "negative"), ("systems", "3", "accent")], cols=1), TextBlock(text="size is part of the task", font_size="small", color="secondary", bold=True)]),
+                VStack(gap=0.12, width=6.8, children=[Box(text="Telemetry mass arrives as a mixed reasoning load", color="accent", border="accent", text_color="white", height=0.24), HStack(gap=0.10, children=[svg_evidence_chip("anomaly", "primary", "M", width=1.7), svg_evidence_chip("local clues", "accent", "L", width=1.8), svg_evidence_chip("hop chain", "positive", "T", width=1.8)]), insight_panel("Heterogeneous signals", "Different granularity and different failure clues must be fused before causal search can even begin.", "accent", fill="bg"), path_track([("1", "Collect", "mixed evidence", "secondary"), ("2", "Fuse", "temporal context", "accent"), ("3", "Trace", "multi-hop cause", "negative")], arrow_tone="negative", width=5.5)]),
+            ],
         )
-        sb.layout(VStack(gap=0.18, children=[cards, burden]))
+        burden = Box(
+            text="Scale burden: realistic RCA forces long-context, heterogeneous, multi-hop reasoning.",
+            color="negative",
+            border="negative",
+            text_color="white",
+            height=0.26,
+        )
+        sb.layout(VStack(gap=0.16, children=[cards, burden]))
         sb.notes(notes)
         sb.animate([[cards], [burden]])
 
     elif kind == "llm_scores":
-        chart = bar_chart_svg(
-            [("Oracle\ntelemetry", 5.37, "secondary"), ("Sampled\ntelemetry", 3.88, "negative")],
-            ymax=12.0, width=5.0, height=2.8,
-        )
-        label = VStack(
-            gap=0.12,
-            width=3.6,
+        chart = HStack(
+            gap=0.24,
             children=[
-                Badge(text="Still near the floor", color="negative"),
-                callout_box(
-                    "Capability gap",
-                    "Even with oracle telemetry, the best score is only 5.37. Sampling hurts further.",
-                    "negative",
-                ),
-                TextBlock(
-                    text="Interpretation: realistic RCA remains far outside current frontier-model comfort zones.",
-                    font_size="caption",
-                    color="text_mid",
-                ),
+                VStack(gap=0.12, width=5.6, children=[Box(text="Verdict: even strong models remain in a low-usable RCA regime", color="negative", border="negative", text_color="white", height=0.26), metric_track("Oracle", 5.37, "secondary", max_value=12.0, track_width=4.0, value_fmt="5.37"), metric_track("Sampled", 3.88, "negative", max_value=12.0, track_width=4.0, value_fmt="3.88"), Box(text="still far from reliable", color="warning", border="warning", text_color="white", height=0.24)]),
+                VStack(gap=0.12, width=4.0, children=[insight_panel("Why this matters", "Real RCA remains outside current LLM comfort zones.", "primary", fill="bg"), TextBlock(text="Focus object = the gap, not the raw score.", font_size="caption", color="text_mid")]),
             ],
         )
-        sb.layout(HStack(gap=0.38, children=[chart, label]))
+        sb.layout(chart)
         sb.notes(notes)
-        sb.animate([[chart], [label]])
+        sb.animate([[chart]])
 
     elif kind == "agent_gain":
-        chart = bar_chart_svg(
-            [("Base LLM\n(best)", 5.37, "secondary"), ("RCA-agent\n(best)", 11.34, "primary")],
-            ymax=15.0,
-            width=5.0,
-            height=2.8,
-            threshold=11.34,
-            threshold_label="still far from reliable",
-        )
-        gap = VStack(
-            gap=0.12,
-            width=3.6,
+        chart = VStack(
+            gap=0.16,
             children=[
-                Badge(text="Agent helps, gap remains", color="accent"),
-                callout_box(
-                    "Interpretation",
-                    "Tool use roughly doubles best performance, but the absolute level is still low.",
-                    "accent",
+                Box(text="Agent helps -> ceiling remains -> residual usability gap stays open", color="accent", border="accent", text_color="white", height=0.24),
+                HStack(gap=0.18, children=[insight_panel("Phase 1 · Gain", "Tool use doubles best score.", "accent", width=3.1, fill="bg"), insight_panel("Phase 2 · Ceiling", "Absolute performance still stays low.", "warning", width=3.1, fill="bg_alt"), insight_panel("Phase 3 · Residual gap", "Not yet reliable for operators.", "negative", width=3.1, fill="bg")]),
+                HStack(gap=0.16, children=[metric_track("base", 5.37, "secondary", max_value=12.0, track_width=2.2, value_fmt="5.37"), metric_track("agent", 11.34, "primary", max_value=12.0, track_width=2.2, value_fmt="11.34"), Box(text="gap not closed", color="negative", border="negative", text_color="white", height=0.30, width=2.0)]),
+            ],
+        )
+        sb.layout(chart)
+        sb.notes(notes)
+        sb.animate([[chart]])
+
+    elif kind == "takeaway_b":
+        panel = VStack(
+            gap=0.16,
+            children=[
+                Box(text="Takeaway B: better tasks expose the true capability gap", color="accent", border="accent", text_color="white", height=0.42),
+                HStack(gap=0.14, children=[Box(text="realistic tasks remove benchmark illusion", color="bg_alt", border="negative", text_color="negative", height=0.30, width=3.0), Circle(text="GAP", color="accent", radius=0.26), TextBlock(text="current LLM agents remain far from reliable RCA", font_size="body", bold=True, color="accent")]),
+                Box(text="bridge: next we ask whether correct labels can still hide invalid reasoning paths", color="positive", border="positive", text_color="white", height=0.24),
+            ],
+        )
+        sb.layout(Padding(child=panel, all=0.16))
+        sb.notes(notes)
+        sb.animate([[panel]])
+
+    elif kind == "label_vs_reasoning":
+        shallow = VStack(
+            gap=0.16,
+            width=5.05,
+            children=[
+                insight_panel(
+                    "Correct label only",
+                    "The model lands on the right component by following the loudest symptom, not the true causal path.",
+                    "warning",
                 ),
-                TextBlock(
-                    text="Useful takeaway: execution support matters, yet evaluation still reveals a large usability gap.",
-                    font_size="caption",
-                    color="text_mid",
+                path_track(
+                    [
+                        ("S", "Symptom", "largest anomaly", "warning"),
+                        ("R", "Rank", "most visible service", "warning"),
+                        ("L", "Label", "root guessed right", "primary"),
+                    ],
+                    arrow_tone="warning",
+                ),
+                verdict_band(
+                    "Looks correct",
+                    "Outcome credit is easy to over-grant when the path is never inspected.",
+                    "warning",
                 ),
             ],
         )
-        sb.layout(HStack(gap=0.38, children=[chart, gap]))
-        sb.notes(notes)
-        sb.animate([[chart], [gap]])
-
-    elif kind == "takeaway_b":
-        main = callout_box(
-            "Takeaway B",
-            "Realistic tasks expose a substantial diagnostic gap. "
-            "Current LLM agents are far from reliable RCA performance.",
-            "accent",
+        faithful = VStack(
+            gap=0.16,
+            width=5.05,
+            children=[
+                insight_panel(
+                    "Faithful reasoning",
+                    "The diagnosis earns trust only after the propagation chain is reconstructed and each hop is defensible.",
+                    "positive",
+                ),
+                path_track(
+                    [
+                        ("E", "Evidence", "multi-modal clues", "secondary"),
+                        ("T", "Trace", "verified path", "positive"),
+                        ("RC", "Root", "causal origin", "negative"),
+                    ],
+                    arrow_tone="positive",
+                ),
+                verdict_band(
+                    "Actually trustworthy",
+                    "Correct label plus auditable path makes the answer usable in operations.",
+                    "positive",
+                ),
+            ],
         )
-        bridge = Badge(text="Next: trustworthiness beyond outcome labels  ->", color="positive")
-        kicker = TextBlock(
-            text="Question B answered: stronger tasks reveal a real capability deficit, not just leaderboard reshuffling.",
-            font_size="caption",
-            color="text_mid",
-            align="center",
-        )
-        sb.layout(VStack(gap=0.36, children=[Spacer(height=0.42), main, kicker, bridge]))
-        sb.notes(notes)
-        sb.animate([[main], [kicker, bridge]])
-
-    elif kind == "label_vs_reasoning":
-        diagram = svg_label_reasoning_tension(width=9.65, height=3.0)
         question = Badge(text="Question C: can we verify the causal reasoning path?", color="positive")
-        sb.layout(VStack(gap=0.18, children=[diagram, question]))
+        sb.layout(VStack(gap=0.18, children=[question, HStack(gap=0.24, children=[shallow, faithful])]))
         sb.notes(notes)
-        sb.animate([[diagram], [question]])
+        sb.animate([[question], [shallow], [faithful]])
 
     elif kind == "outcome_only":
-        diagram = svg_outcome_blind_spot(width=9.65, height=3.0)
-        note = callout_box(
-            "The blind spot",
-            "Outcome-only evaluation does not penalise correct answers "
-            "reached via spurious or unsupported reasoning paths.",
+        top = insight_panel(
+            "Outcome-only evaluation",
+            "Checks whether the final answer matches the label. Fast and useful, but shallow.",
+            "secondary",
+            width=10.2,
+        )
+        middle = Padding(
+            left=0.55,
+            right=0.55,
+            child=insight_panel(
+                "Process-aware audit",
+                "Checks whether the explanation can survive path-level scrutiny, intervention logic, and causal consistency.",
+                "accent",
+                fill="bg",
+            ),
+        )
+        bottom = Padding(
+            left=1.15,
+            right=1.15,
+            child=insight_panel(
+                "Trust verdict",
+                "Only this lower layer can distinguish lucky labels from faithful reasoning.",
+                "positive",
+                fill="bg_accent",
+            ),
+        )
+        note = verdict_band(
+            "Blind spot",
+            "Outcome-only evaluation misses the process failures that matter most once RCA is delegated to an agent.",
             "warning",
         )
-        sb.layout(VStack(gap=0.18, children=[diagram, note]))
+        sb.layout(VStack(gap=0.14, children=[top, middle, bottom, note]))
         sb.notes(notes)
-        sb.animate([[diagram], [note]])
+        sb.animate([[top], [middle], [bottom, note]])
 
     elif kind == "forge_pipeline":
-        pipeline = svg_forge_pipeline(width=9.5, height=2.5)
+        gate_row = verification_loop_svg(width=9.5)
         why = callout_box(
             "Why FORGE matters",
             "Backward inference is intractable. "
             "FORGE converts it into a tractable cause-to-effect forward verification.",
             "primary",
         )
-        sb.layout(VStack(gap=0.24, children=[pipeline, why]))
+        audit = verdict_band(
+            "Verification loop",
+            "The trusted answer is the one whose forward causal consequences line up with the observed telemetry.",
+            "positive",
+        )
+        sb.layout(VStack(gap=0.24, children=[gate_row, audit, why]))
         sb.notes(notes)
-        sb.animate([[pipeline], [why]])
+        sb.animate([[gate_row], [audit], [why]])
 
     elif kind == "stepwise_supervision":
-        after_flow = svg_stepwise_supervision_upgrade(width=9.65, height=3.1)
+        before = insight_panel(
+            "Answer-only supervision",
+            "One final label can look correct even if all intermediate hops are unsupported.",
+            "warning",
+            width=3.1,
+        )
+        after_flow = step_supervision_track_svg(width=6.9)
         upgrade = callout_box(
             "OpenRCA 2.0 upgrade",
             "500 instances now annotated with step-wise causal supervision - each propagation hop is independently verifiable.",
             "positive",
         )
-        sb.layout(VStack(gap=0.18, children=[after_flow, upgrade]))
+        sb.layout(VStack(gap=0.18, children=[HStack(gap=0.26, children=[before, after_flow]), upgrade]))
         sb.notes(notes)
-        sb.animate([[after_flow], [upgrade]])
+        sb.animate([[before], [after_flow], [upgrade]])
 
     elif kind == "metrics_panel":
-        diagram = svg_metric_semantics(width=8.2, height=3.2)
-        note = Badge(text="Containment view: PR is the faithful subset of correct answers.", color="primary")
-        sb.layout(VStack(gap=0.16, children=[diagram, note]))
+        ring = VStack(
+            gap=0.10,
+            width=3.0,
+            children=[
+                Circle(text="PR", color="primary", radius=0.78),
+                TextBlock(text="faithful subset", font_size="caption", color="primary", bold=True, align="center"),
+                TextBlock(text="Path Reachability counts only answers whose causal chain survives verification.", font_size="caption", color="text_mid", align="center"),
+            ],
+        )
+        metrics = VStack(
+            gap=0.16,
+            width=6.5,
+            children=[
+                insight_panel(
+                    "Metric decomposition",
+                    "Pass@1 asks 'did the model identify the right component?' PR asks 'did it earn that answer with a valid path?'",
+                    "primary",
+                    fill="bg",
+                ),
+                metric_track("Pass@1", 0.76, "secondary", max_value=1.0, value_fmt="0.76"),
+                metric_track("Path Reachability", 0.63, "primary", max_value=1.0, value_fmt="0.63"),
+                metric_track("Unfaithful residue", 0.13, "negative", max_value=0.30, value_fmt="0.13"),
+            ],
+        )
+        note = verdict_band("Containment view", "PR is the faithful subset of correct answers; it is necessarily bounded by Pass@1.", "primary")
+        sb.layout(VStack(gap=0.18, children=[HStack(gap=0.40, children=[ring, metrics]), note]))
         sb.notes(notes)
-        sb.animate([[diagram], [note]])
+        sb.animate([[ring, metrics], [note]])
 
     elif kind == "best_gap":
-        chart = bar_chart_svg(
-            [("Pass@1", 0.76, "primary"), ("Path Reachability", 0.63, "negative")],
-            ymax=1.0, width=5.0, height=2.8,
+        chart = VStack(
+            gap=0.16,
+            width=6.1,
+            children=[
+                metric_track("Pass@1", 0.76, "primary", max_value=1.0, value_fmt="0.76"),
+                HStack(
+                    gap=0.14,
+                    children=[
+                        Box(text="FRACTURE", color="negative", border="negative", text_color="white", width=1.6, height=0.28),
+                        TextBlock(text="0.13 hidden process gap", font_size="caption", bold=True, color="negative"),
+                    ],
+                ),
+                metric_track("Path Reachability", 0.63, "negative", max_value=1.0, value_fmt="0.63"),
+            ],
         )
         text = VStack(
             gap=0.12,
             width=3.6,
             children=[
-                Badge(text="0.13 hidden gap", color="negative"),
+                Badge(text="Best model still breaks trust", color="negative"),
                 callout_box(
                     "Best-model trust gap",
                     "Even the strongest model loses substantial credit once the path must be verified.",
@@ -1853,14 +3231,35 @@ def build_slide(prs: Presentation, spec: dict):  # noqa: C901
         sb.animate([[chart], [text]])
 
     elif kind == "avg_gap":
-        chart = grouped_bar_svg(
-            ["Average", "Best", "Weakest"],
-            ["Pass@1", "Path Reachability"],
-            [[0.52, 0.43], [0.76, 0.63], [0.22, 0.18]],
-            ["primary", "negative"],
-            ymax=1.0,
-            width=6.1,
-            height=3.0,
+        facets = Grid(
+            cols=3,
+            gap=0.22,
+            children=[
+                VStack(
+                    gap=0.10,
+                    children=[
+                        Badge(text="Average", color="primary"),
+                        metric_track("Pass@1", 0.52, "primary", max_value=1.0, track_width=1.35, value_fmt="0.52"),
+                        metric_track("PR", 0.43, "negative", max_value=1.0, track_width=1.35, value_fmt="0.43"),
+                    ],
+                ),
+                VStack(
+                    gap=0.10,
+                    children=[
+                        Badge(text="Best", color="accent"),
+                        metric_track("Pass@1", 0.76, "primary", max_value=1.0, track_width=1.35, value_fmt="0.76"),
+                        metric_track("PR", 0.63, "negative", max_value=1.0, track_width=1.35, value_fmt="0.63"),
+                    ],
+                ),
+                VStack(
+                    gap=0.10,
+                    children=[
+                        Badge(text="Weakest", color="secondary"),
+                        metric_track("Pass@1", 0.22, "primary", max_value=1.0, track_width=1.35, value_fmt="0.22"),
+                        metric_track("PR", 0.18, "negative", max_value=1.0, track_width=1.35, value_fmt="0.18"),
+                    ],
+                ),
+            ],
         )
         summary = VStack(
             gap=0.12,
@@ -1879,69 +3278,121 @@ def build_slide(prs: Presentation, spec: dict):  # noqa: C901
                 ),
             ],
         )
-        sb.layout(HStack(gap=0.28, children=[chart, summary]))
+        sb.layout(HStack(gap=0.28, children=[facets, summary]))
         sb.notes(notes)
-        sb.animate([[chart], [summary]])
+        sb.animate([[facets], [summary]])
 
     elif kind == "takeaway_c":
-        main = callout_box(
-            "Takeaway C",
-            "Trustworthy RCA requires both correct outcomes and verifiable causal-path faithfulness. "
-            "PR <= Pass@1 always - outcome accuracy alone is insufficient.",
+        trust_mark = HStack(
+            gap=0.16,
+            children=[
+                Circle(text="C", color="positive", radius=0.34),
+                VStack(
+                    gap=0.04,
+                    children=[
+                        TextBlock(text="Trust now has a visible criterion", font_size="body", bold=True, color="positive"),
+                        TextBlock(text="Reliable RCA needs causal-path faithfulness, not only correct final labels.", font_size="caption", color="text_mid"),
+                    ],
+                ),
+            ],
+        )
+        claim = Box(
+            text="Outcome accuracy is necessary; audited causal reasoning is what makes the diagnosis trustworthy.",
+            color="bg_accent",
+            border="positive",
+            text_color="text",
+            font_size="body",
+            bold=True,
+            height=0.95,
+        )
+        support = verdict_band(
+            "Question C answered",
+            "PR exposes the process failures hidden behind good labels.",
             "positive",
         )
-        bridge = Badge(text="Synthesizing all three questions  ->", color="primary")
-        kicker = TextBlock(
-            text="Question C answered: reliable RCA demands auditable process, not just correct final labels.",
-            font_size="caption",
-            color="text_mid",
-            align="center",
-        )
-        sb.layout(VStack(gap=0.36, children=[Spacer(height=0.42), main, kicker, bridge]))
+        bridge = HStack(gap=0.12, children=[Badge(text="Next", color="primary"), TextBlock(text="Synthesize realism, capability, and trust.", font_size="caption", color="text_mid")])
+        sb.layout(VStack(gap=0.22, children=[Spacer(height=0.26), trust_mark, claim, support, bridge]))
         sb.notes(notes)
-        sb.animate([[main], [kicker, bridge]])
+        sb.animate([[trust_mark], [claim], [support, bridge]])
 
     elif kind == "synthesis":
         ladder = svg_synthesis_ladder(
             evidence=[
-                "avg 0.21 vs 0.75\non legacy",
-                "best 11.34\nfar from reliable",
+                "legacy 0.75\nvs realistic 0.21",
+                "best agent\n11.34",
                 "0.76 Pass@1\nvs 0.63 PR",
             ],
-            width=10.2,
-            height=2.5,
+            width=6.3,
+            height=2.7,
         )
-        thesis = callout_box(
+        rail = VStack(
+            gap=0.14,
+            width=3.7,
+            children=[
+                Badge(text="Research-line synthesis", color="primary"),
+                insight_panel(
+                    "Dependency chain",
+                    "These studies are sequenced on purpose: realism makes capability claims meaningful, and trust auditing tells us what part of that capability is actually deployable.",
+                    "primary",
+                    fill="bg",
+                ),
+                HStack(gap=0.10, children=[Badge(text="Realism", color="primary"), Badge(text="Capability", color="accent"), Badge(text="Trust", color="positive")]),
+            ],
+        )
+        thesis = verdict_band(
             "One research line",
-            "The three studies form one coherent evaluation program: "
-            "fix the task first, measure capability honestly, then verify the reasoning chain.",
+            "This is not a stitched paper summary; it is one evaluation program with explicit methodological dependencies.",
             "primary",
         )
-        sb.layout(VStack(gap=0.20, children=[ladder, thesis]))
+        sb.layout(VStack(gap=0.20, children=[HStack(gap=0.26, children=[ladder, rail]), thesis]))
         sb.notes(notes)
-        sb.animate([[ladder], [thesis]])
+        sb.animate([[ladder], [rail], [thesis]])
 
     elif kind == "future_agenda":
-        grid = svg_future_pillars(width=10.1, height=3.0)
-        sb.layout(grid)
+        roadmap = roadmap_track(
+            [
+                ("Data", "process-aware traces", "primary"),
+                ("Agents", "verification-first tooling", "accent"),
+                ("Training", "path-supervised reasoning", "positive"),
+            ],
+            width=10.1,
+        )
+        support = verdict_band(
+            "Agenda",
+            "The next step is not just stronger models; it is tighter coupling between data realism, tool-using agents, and process-aware supervision.",
+            "accent",
+        )
+        sb.layout(VStack(gap=0.26, children=[roadmap, support]))
         sb.notes(notes)
-        sb.animate([[grid]])
+        sb.animate([[roadmap], [support]])
 
     elif kind == "closing":
         close = VStack(
-            gap=0.20,
+            gap=0.18,
             children=[
-                Badge(text="Realism  ->  Capability  ->  Trust", color="primary"),
+                Box(text="REALISM -> CAPABILITY -> TRUST", color="primary", border="primary", text_color="white", height=0.24),
                 TextBlock(
                     text="Build Evaluations That Make Reliable AI Operations Possible",
-                    font_size=26, bold=True, color="primary",
+                    font_size=26,
+                    bold=True,
+                    color="primary",
                 ),
                 TextBlock(
-                    text="Evaluation quality is both the bottleneck and the lever "
-                         "for trustworthy RCA automation.",
-                    font_size="body", color="text_mid",
+                    text="Evaluation quality is both the bottleneck and the lever for trustworthy RCA automation.",
+                    font_size="body",
+                    color="text_mid",
                 ),
-                Badge(text="Questions?", color="accent"),
+                HStack(
+                    gap=0.18,
+                    children=[
+                        stage_marker("1", "Fix the task", "benchmark realism", "primary", width=2.2),
+                        arrow_text(tone="accent"),
+                        stage_marker("2", "Measure honestly", "capability under pressure", "accent", width=2.5),
+                        arrow_text(tone="positive"),
+                        stage_marker("3", "Trust carefully", "audit the causal path", "positive", width=2.4),
+                    ],
+                ),
+                Box(text="Questions?", color="warning", border="warning", text_color="white", height=0.28, width=1.7),
             ],
         )
         sb.layout(Padding(child=close, all=0.55))
@@ -1963,145 +3414,193 @@ def build_backup_slide(prs: Presentation, slide_no: str, title: str):  # noqa: C
     notes = f"Backup slide {slide_no}: use during Q&A as needed."
 
     if slide_no == "B1":
-        # Why SimpleRCA wins
-        left = callout_box(
-            "Shortcut mechanism",
-            "On RE2 and RE3, the injected faults produce large anomaly spikes "
-            "in the root-cause service's metrics. "
-            "SimpleRCA wins by picking the highest-anomaly node — no topology needed.",
-            "negative",
+        case = VStack(
+            gap=0.18,
+            children=[
+                HStack(
+                    gap=0.18,
+                    children=[
+                        insight_panel(
+                            "Case pattern",
+                            "In RE2 / RE3 the root-cause service often shows the largest anomaly spike, so ranking by magnitude is already enough.",
+                            "negative",
+                            width=3.3,
+                            fill="bg",
+                        ),
+                        path_track(
+                            [
+                                ("A", "Anomaly", "top spike", "warning"),
+                                ("R", "Rank", "pick top node", "warning"),
+                                ("W", "Win", "root recovered", "primary"),
+                            ],
+                            arrow_tone="warning",
+                            width=4.3,
+                        ),
+                    ],
+                ),
+                insight_panel(
+                    "Probe meaning",
+                    "SimpleRCA wins without topology or causal reasoning, so the benchmark is exposing the answer through shortcut signals.",
+                    "primary",
+                    fill="bg_accent",
+                ),
+            ],
         )
-        right = VStack(gap=0.14, children=[
-            callout_box("Fair probe?",
-                        "Yes — SimpleRCA uses only anomaly scores, no domain knowledge. "
-                        "Its parity with SOTA is the evidence of benchmark saturation.",
-                        "primary"),
-            Badge(text="Conclusion: benchmarks that reward heuristics need redesign", color="warning"),
-        ])
-        sb.layout(HStack(gap=0.40, children=[left, right]))
+        verdict = verdict_band(
+            "Shortcut mechanism",
+            "Its parity with SOTA is evidence of benchmark saturation, not a case for heuristic RCA in production.",
+            "warning",
+        )
+        sb.layout(VStack(gap=0.22, children=[case, verdict]))
         sb.notes(notes)
-        sb.animate([[left], [right]])
+        sb.animate([[case], [verdict]])
 
     elif slide_no == "B2":
-        # Benchmark construction details
-        pipeline = svg_benchmark_pipeline(width=9.8, height=3.4)
-        table = Table(
-            headers=["Stage", "Key design choice", "Why it matters"],
-            rows=[
-                ["Foundation", "TrainTicket + open-telemetry stack",    "Reproducible, real-world topology"],
-                ["Workload",   "State-machine dynamic traffic",          "Avoids static injection artifacts"],
-                ["Injection",  "31 fault types, stratified sampling",    "Covers diverse failure modes"],
-                ["Collection", "Metrics + logs + traces aligned",        "Heterogeneous telemetry fidelity"],
-                ["Annotation", "Hierarchical service \u2192 instance labels", "Supports multi-granularity eval"],
-                ["Validation", "SLI degradation threshold \u03b8=5%",   "Discards silent / unobservable faults"],
+        pipeline = VStack(
+            gap=0.14,
+            width=5.7,
+            children=[
+                HStack(gap=0.12, children=[svg_stage_card("Foundation", "TrainTicket + observability", "secondary", width=1.8), arrow_text(tone="secondary", width=0.2), svg_stage_card("Workload", "Dynamic execution paths", "secondary", width=1.8), arrow_text(tone="secondary", width=0.2), svg_stage_card("Injection", "31 fault types, layered", "secondary", width=1.8)]),
+                HStack(gap=0.12, children=[Spacer(width=4.92), arrow_text("↓", tone="secondary", width=0.2)]),
+                HStack(gap=0.12, children=[svg_stage_card("Validation", "User-facing impact filter", "primary", emphasized=True, width=1.8), arrow_text("←", tone="primary", width=0.2), svg_stage_card("Annotation", "Hierarchical RCA labels", "secondary", width=1.8), arrow_text("←", tone="secondary", width=0.2), svg_stage_card("Collection", "Metrics + logs + traces", "secondary", width=1.8)]),
             ],
-            header_color="primary",
         )
-        sb.layout(VStack(gap=0.20, children=[pipeline, table]))
+        criteria = VStack(
+            gap=0.14,
+            width=4.1,
+            children=[
+                insight_panel(
+                    "Validation gate",
+                    "Only failures with measurable user-facing degradation are retained, removing silent injections from the dataset.",
+                    "primary",
+                    fill="bg",
+                ),
+                insight_panel(
+                    "Construction discipline",
+                    "Dynamic workloads plus aligned metrics, logs, and traces keep the benchmark realistic and reproducible.",
+                    "accent",
+                    fill="bg_alt",
+                ),
+                verdict_band(
+                    "Why this matters",
+                    "The six-stage pipeline matters because of its retention rule: it filters raw faults into diagnostically meaningful incidents.",
+                    "warning",
+                ),
+            ],
+        )
+        sb.layout(HStack(gap=0.26, children=[pipeline, criteria]))
         sb.notes(notes)
-        sb.animate([[pipeline], [table]])
+        sb.animate([[pipeline], [criteria]])
 
     elif slide_no == "B3":
-        # OpenRCA task granularity
-        left = VStack(gap=0.16, children=[
-            TextBlock(text="Task decomposition (7 sub-tasks)", font_size="body", bold=True, color="primary"),
-            BulletList(
-                items=[
-                    "Anomaly detection (is anything wrong?)",
-                    "Root-cause localisation (which service?)",
-                    "Root-cause identification (which component?)",
-                    "Failure time estimation",
-                    "Failure reason classification",
-                    "Impact scope estimation",
-                    "End-to-end structured report generation",
-                ],
-                font_size="caption",
-            ),
-        ])
-        right = Table(
-            headers=["Metric", "Measures", "Formula"],
-            rows=[
-                ["Pass@1",             "Correct root cause named",      "top-1 exact match"],
-                ["Path Reachability",   "Valid causal path exists",      "PR \u2264 Pass@1"],
-                ["Edge Precision",      "Fraction of valid causal edges","TP / (TP+FP)"],
-                ["Time Accuracy",       "Failure time within \u00b15 min","binary"],
-                ["F1-Composite",        "Weighted combination",          "see paper"],
+        taxonomy = triptych_panel(
+            [
+                ("Detect", "Decide whether an incident exists and is worth diagnosing.", "entry into RCA"),
+                ("Locate", "Recover the triggering service / component under noisy telemetry.", "root-cause target"),
+                ("Report", "Produce timing, reason, and impact in structured form.", "operator-facing output"),
             ],
-            header_color="accent",
+            tones=["secondary", "accent", "primary"],
         )
-        sb.layout(HStack(gap=0.38, children=[left, right]))
+        rules = VStack(
+            gap=0.12,
+            children=[
+                insight_panel(
+                    "Metric rule panel",
+                    "Pass@1 captures answer correctness; PR and edge-level checks determine whether the model's causal story is valid.",
+                    "accent",
+                    width=3.4,
+                    fill="bg",
+                ),
+                metric_track("Pass@1", 1.0, "secondary", max_value=1.0, value_fmt="top-1 exact"),
+                metric_track("PR", 0.82, "primary", max_value=1.0, value_fmt="PR <= Pass@1"),
+                metric_track("Edge precision", 0.68, "warning", max_value=1.0, value_fmt="TP/(TP+FP)"),
+            ],
+        )
+        support = verdict_band(
+            "Task granularity",
+            "OpenRCA evaluates more than naming a service: it asks whether the incident can be reconstructed into a usable diagnostic report.",
+            "primary",
+        )
+        sb.layout(VStack(gap=0.22, children=[taxonomy, HStack(gap=0.24, children=[rules, support])]))
         sb.notes(notes)
-        sb.animate([[left], [right]])
+        sb.animate([[taxonomy], [rules, support]])
 
     elif slide_no == "B4":
-        # RCA-agent details
-        agent_flow = flow_pipeline(
-            ["NL Query\n+ telemetry", "Tool calls:\nfilter / rank", "Hypothesis\nrevision", "Structured\noutput"],
-            ["bg_alt", "accent", "accent", "primary"],
+        gain = path_track(
+            [
+                ("Q", "Query", "incident prompt", "secondary"),
+                ("T", "Tooling", "filter + retrieve", "accent"),
+                ("O", "Output", "structured RCA", "positive"),
+            ],
+            arrow_tone="accent",
+            width=4.6,
         )
-        failures = triad_callout([
-            ("Context overflow",
-             "68 GB telemetry exceeds context window; retrieval errors cascade.", "negative"),
-            ("Tool misuse",
-             "Agent issues incorrect filter parameters, pruning relevant evidence.", "warning"),
-            ("Premature termination",
-             "Agent stops after partial hop, missing the real root-cause service.", "secondary"),
-        ])
-        sb.layout(VStack(gap=0.28, children=[agent_flow, failures]))
+        failures = VStack(
+            gap=0.10,
+            width=4.9,
+            children=[
+                insight_panel("Context overflow", "68 GB telemetry can still exceed the agent's search and memory budget.", "negative", fill="bg"),
+                insight_panel("Tool misuse", "Incorrect filters or ranking calls prune the evidence the agent most needs.", "warning", fill="bg_alt"),
+                insight_panel("Premature stop", "The agent may stop after a partial hop and never reach the initiating component.", "secondary", fill="bg"),
+            ],
+        )
+        support = verdict_band(
+            "Agent profile",
+            "Agents help because RCA is interactive, but tool use alone does not solve retrieval quality or stopping-policy failures.",
+            "accent",
+        )
+        sb.layout(VStack(gap=0.20, children=[HStack(gap=0.24, children=[gain, failures]), support]))
         sb.notes(notes)
-        sb.animate([[agent_flow], [failures]])
+        sb.animate([[gain], [failures], [support]])
 
     elif slide_no == "B5":
-        # FORGE details + metrics
-        pipeline = svg_forge_pipeline(width=9.5, height=2.4)
-        table = Table(
-            headers=["Metric", "Definition", "Range"],
-            rows=[
-                ["Pass@1",              "Root cause named correctly (outcome)",          "[0, 1]"],
-                ["Path Reachability",   "Claimed cause \u2192 symptom path is valid",    "[0, Pass@1]"],
-                ["Edge Precision",      "Fraction of predicted edges that are correct",  "[0, 1]"],
-                ["Step Coverage",       "Fraction of ground-truth hops recovered",       "[0, 1]"],
+        pipeline = svg_forge_pipeline(width=5.2, height=2.15)
+        formulas = VStack(
+            gap=0.12,
+            width=4.0,
+            children=[
+                insight_panel(
+                    "Metric math",
+                    "Pass@1 asks whether the root cause is named correctly; PR asks whether the claimed cause can actually reach the symptom through a valid path.",
+                    "primary",
+                    fill="bg",
+                ),
+                metric_track("Pass@1", 1.0, "secondary", value_fmt="[0, 1]"),
+                metric_track("PR", 0.82, "primary", value_fmt="[0, Pass@1]"),
+                metric_track("Edge precision", 0.68, "accent", value_fmt="[0, 1]"),
+                metric_track("Step coverage", 0.74, "positive", value_fmt="[0, 1]"),
             ],
-            header_color="primary",
         )
-        note = TextBlock(
-            text="PR \u2264 Pass@1 always: a model cannot have a valid causal path "
-                 "without first naming the correct root cause.",
-            font_size="caption", color="text_mid", italic=True,
+        note = verdict_band(
+            "Key invariant",
+            "PR <= Pass@1 always: a model cannot earn path faithfulness without first identifying the correct root cause.",
+            "warning",
         )
-        sb.layout(VStack(gap=0.18, children=[pipeline, table, note]))
+        sb.layout(VStack(gap=0.18, children=[HStack(gap=0.28, children=[pipeline, formulas]), note]))
         sb.notes(notes)
-        sb.animate([[pipeline], [table], [note]])
+        sb.animate([[pipeline], [formulas], [note]])
 
     elif slide_no == "B6":
-        # Threats to validity
-        table = Table(
-            headers=["Threat", "Expected impact", "Mitigation direction"],
-            rows=[
-                ["Single platform (TrainTicket)",
-                 "May not generalise to proprietary stacks",
-                 "Add industry partner datasets"],
-                ["Oracle telemetry assumption",
-                 "Over-estimates agent capability",
-                 "Sampled-telemetry track already added"],
-                ["Synthetic fault injection",
-                 "Miss compound / cascading faults",
-                 "Concurrent-fault injection in agenda"],
-                ["Ground-truth from injector",
-                 "Annotation may not match operator intent",
-                 "Human validation on subset"],
-                ["English-only task prompts",
-                 "Limits multilingual applicability",
-                 "Out of scope; language is orthogonal"],
-                ["FORGE closed-world assumption",
-                 "Validation requires known injection point",
-                 "Unknown-fault track planned for v3"],
+        board = Grid(
+            cols=2,
+            gap=0.18,
+            children=[
+                insight_panel("Single platform", "Impact: limited stack diversity.\nMitigation: add partner datasets.", "highlight", fill="bg"),
+                insight_panel("Oracle telemetry", "Impact: capability may be overstated.\nMitigation: sampled-telemetry track already added.", "warning", fill="bg"),
+                insight_panel("Synthetic injection", "Impact: compound cascades remain under-covered.\nMitigation: concurrent-fault agenda.", "negative", fill="bg"),
+                insight_panel("Ground truth source", "Impact: labels may diverge from operator intent.\nMitigation: human validation subset.", "primary", fill="bg"),
+                insight_panel("English-only prompts", "Impact: multilingual applicability unknown.\nMitigation: orthogonal to current claim.", "secondary", fill="bg"),
+                insight_panel("FORGE closed world", "Impact: verification assumes known intervention.\nMitigation: unknown-fault track planned.", "accent", fill="bg"),
             ],
-            header_color="highlight",
         )
-        sb.layout(table)
+        footer = verdict_band(
+            "Threat profile",
+            "These limitations mostly define the next expansion frontier of the evaluation program rather than invalidating its current conclusions.",
+            "highlight",
+        )
+        sb.layout(VStack(gap=0.20, children=[board, footer]))
         sb.notes(notes)
-        sb.animate([[table]])
+        sb.animate([[board], [footer]])
 
     else:
         body = VStack(gap=0.24, children=[
@@ -2121,6 +3620,7 @@ def build_backup_slide(prs: Presentation, slide_no: str, title: str):  # noqa: C
 
 def build_presentation(output_path: Path | None = None, render_preview: bool = False):
     prs = Presentation(theme=THEME)
+    asset_dir = export_svg_assets()
 
     for spec in SLIDE_DATA:
         build_slide(prs, spec)
@@ -2131,6 +3631,7 @@ def build_presentation(output_path: Path | None = None, render_preview: bool = F
     save_path = output_path or OUTPUT_FILE
     prs.save(str(save_path))
     print(f"Saved: {save_path}  ({len(SLIDE_DATA)} main + {len(BACKUP_DATA)} backup slides)")
+    print(f"SVG assets: {asset_dir}")
 
     report = prs.review()
     if report["total_issues"]:

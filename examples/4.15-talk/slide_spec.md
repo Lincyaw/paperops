@@ -54,19 +54,19 @@ main_slides:
 
   - slide_no: "05"
     title_en: "Our Evaluation Ladder Uses Three Questions"
-    message: "We evaluate RCA progress with realism, capability, and trustworthiness in sequence."
+    message: "Question A/B/C form a dependency chain: realism first, then capability, then trustworthiness."
     visual_type: "pipeline"
-    build_order: ["Show the three-question ladder", "Make the A->B->C dependency explicit", "Translate each question into an evaluation contract"]
+    build_order: ["Define Question A/B/C as research questions", "Show why B depends on A and C depends on B", "Translate each question into an explicit evaluation contract"]
     asset_or_figure_needs: ["Dependency ladder graphic", "Three contract callouts for A/B/C", "Methodology contract badge"]
-    notes_zh: "明确方法论：先确认题目是否真实，再测能力，最后测推理是否可信。"
+    notes_zh: "这页只做研究问题框架：A/B/C 三问和依赖关系，不提前讲记忆点。"
 
   - slide_no: "06"
     title_en: "What You Should Remember in 45 Minutes"
-    message: "Reported gains are reliable only when all three layers are satisfied."
+    message: "Use one decision rule for the whole talk: reported gains are reliable only when all three layers are satisfied."
     visual_type: "takeaway"
-    build_order: ["State the three anchors for the audience", "Show what evidence to watch for under A/B/C", "Lock the decision rule for the rest of the talk"]
+    build_order: ["State three audience memory anchors", "Map each anchor to the evidence to watch for", "Lock one decision rule for interpreting all later results"]
     asset_or_figure_needs: ["Anchor callout", "Three watch-for cards", "Decision-rule footer"]
-    notes_zh: "先给听众“记忆钩子”，后面所有证据都回扣这三句话。"
+    notes_zh: "这页只做记忆锚点和判断规则，作为后续所有证据的统一尺子。"
 
   - slide_no: "07"
     title_en: "If a Simple Heuristic Wins, the Benchmark Is Too Easy"
@@ -96,25 +96,25 @@ main_slides:
     title_en: "Realism Needs Impact-Validated Failures, Not Raw Injections"
     message: "Operationally relevant failures must show user-facing SLI degradation."
     visual_type: "pipeline"
-    build_order: ["Inject faults", "Validate with SLI impact", "Retain operationally relevant cases only"]
+    build_order: ["State the realism principle", "Contrast raw injections vs impact-validated failures", "Define retention rule: keep only user-impactful cases"]
     asset_or_figure_needs: ["Injection->validation->retention pipeline"]
-    notes_zh: "点出关键原则：并非注入就算故障，必须对用户指标产生影响才有评测价值。"
+    notes_zh: "这页只讲原则：impact-validated 才算有效样本。"
 
   - slide_no: "11"
     title_en: "Fault-Propagation-Aware Benchmarking at Scale"
-    message: "Systematic generation creates more realistic and diverse RCA difficulty."
+    message: "A systematic generation framework operationalizes the realism principle at scale."
     visual_type: "pipeline"
-    build_order: ["Show six-stage framework", "Emphasize dynamic workload + fault diversity", "Emphasize hierarchical labels"]
+    build_order: ["Show the six-stage construction framework", "Explain how it enforces impact validation and propagation realism", "Highlight reproducible scaling: workload, fault diversity, hierarchical labels"]
     asset_or_figure_needs: ["Six-stage framework graphic"]
-    notes_zh: "这页强调“可复现的大规模构建能力”，不是一次性手工造数据。"
+    notes_zh: "这页只讲方法实现：如何把第10页原则系统化落地。"
 
   - slide_no: "12"
     title_en: "New Benchmark Stats Show a Different Difficulty Regime"
     message: "The new benchmark is larger and structurally harder (1,430 validated cases from 9,152 injections, 25 fault types)."
     visual_type: "chart"
-    build_order: ["Present key counts", "Map counts to difficulty shift", "Summarize why this changes evaluation meaning"]
+    build_order: ["Present benchmark outcome stats (1430/9152/25/6/50)", "Interpret these stats as a difficulty-regime shift", "State why this changes the meaning of evaluation scores"]
     asset_or_figure_needs: ["KPI cards for 1430/9152/25/6/50"]
-    notes_zh: "只保留改变结论的数字，让听众看到“难度分布已经变了”。"
+    notes_zh: "这页只讲结果态：构建后形成了新的难度分布。"
 
   - slide_no: "13"
     title_en: "Performance Collapses Under Realistic Conditions"
@@ -142,11 +142,11 @@ main_slides:
 
   - slide_no: "16"
     title_en: "Now We Ask the LLM Capability Question"
-    message: "With a realistic task definition, we can test whether LLMs can actually diagnose RCA."
+    message: "Only after fixing the realism contract can Question B validly test whether LLMs can diagnose RCA."
     visual_type: "transition"
-    build_order: ["Recap realism outcome", "Introduce Question B", "State evaluation contract for capability"]
+    build_order: ["Recap Takeaway A: realism first", "Make explicit that B depends on A being fixed", "Introduce the capability evaluation contract"]
     asset_or_figure_needs: ["Act transition strip with Question B"]
-    notes_zh: "过渡语义：不是“LLM 万能论”，而是在真实任务上做能力测量。"
+    notes_zh: "明确桥接句：先修正真实性合同，再进入能力测量。"
 
   - slide_no: "17"
     title_en: "OpenRCA Defines RCA as a Goal-Driven Task"
@@ -190,19 +190,19 @@ main_slides:
 
   - slide_no: "22"
     title_en: "Correct Labels Can Still Hide Wrong Reasoning"
-    message: "Outcome accuracy alone cannot guarantee trustworthy diagnosis."
+    message: "A model can output the correct root-cause label yet still rely on an invalid causal story."
     visual_type: "transition"
-    build_order: ["State label-vs-reasoning tension", "Show quick contrast example", "Open Question C"]
+    build_order: ["State the intuitive tension (answer correct, path wrong)", "Show one fast contrast example", "Open Question C on trustworthiness"]
     asset_or_figure_needs: ["Contrast graphic: correct label vs invalid path"]
-    notes_zh: "关键转折页：引出第三问，为什么“答对”不等于“可托付”。"
+    notes_zh: "这页偏直觉冲击：先让听众接受“答对不等于推理对”。"
 
   - slide_no: "23"
     title_en: "Outcome-Only Evaluation Misses Process Failures"
-    message: "Existing labels usually check what the answer is, not how the answer was derived."
+    message: "Formally, outcome-only labels evaluate what answer is given, but not whether the causal derivation process is valid."
     visual_type: "comparison"
-    build_order: ["Define outcome-only check", "Expose process blind spot", "State consequence for trust"]
+    build_order: ["Define the current outcome-only evaluation contract", "Identify the process-level blind spot", "State the trust consequence and why Question C is needed"]
     asset_or_figure_needs: ["Outcome-only limitation diagram"]
-    notes_zh: "把问题说清：缺的是过程可验证性，不是再多一个最终标签。"
+    notes_zh: "这页偏形式化诊断：不是直觉例子，而是评测合同缺口。"
 
   - slide_no: "24"
     title_en: "FORGE Uses Forward Verification from Known Interventions"
@@ -222,11 +222,11 @@ main_slides:
 
   - slide_no: "26"
     title_en: "Process Metrics Separate Identification from Reasoning"
-    message: "Pass@1 and Path Reachability measure different properties and should be reported together."
+    message: "Use two complementary metrics: Pass@1 asks whether the root cause was identified; PR asks whether that claimed cause can reach symptoms through a valid path."
     visual_type: "comparison"
-    build_order: ["Define Pass@1", "Define Path Reachability", "Show why dual reporting is required"]
+    build_order: ["Define Pass@1 in plain language: identified root cause or not", "Define PR in plain language: valid cause-to-symptom path or not", "Show why both are needed and why PR <= Pass@1"]
     asset_or_figure_needs: ["Metric semantics panel with PR <= Pass@1"]
-    notes_zh: "把指标解释成“会不会找对”和“能不能讲对因果链”两层能力。"
+    notes_zh: "低术语解释：Pass@1 看“找没找对”，PR 看“路径是否成立”。"
 
   - slide_no: "27"
     title_en: "Best-Model Gap Shows Hidden Reasoning Defects"
