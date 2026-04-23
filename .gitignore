@@ -15,3 +15,4 @@ dist
 *.png
 *.pptx
 !examples/fse26/assets/*.png
+.workbuddy/
