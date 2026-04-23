@@ -17,18 +17,46 @@ prompt: |
   Body:
   {{.Issue.Body}}
 
+  ## What to do
+
   Read the issue's `## Acceptance Criteria` section (or the Chinese
-  equivalent `## 验收标准`) AND the artifact (PR, comment, or report linked
-  to the issue).
+  equivalent `## 验收标准`) AND the artifact (find the PR linked in the
+  issue's comments via `gh issue view {{.Issue.Number}} --repo {{.Repo}}
+  --json comments`).
+
+  Check out the PR's branch into the worktree you're running in:
+  ```
+  gh pr checkout <pr-number> --repo {{.Repo}}
+  ```
+  Then run the tests / commands the issue lists as acceptance criteria.
 
   Evaluate EACH criterion as pass / fail / cannot-judge, with concrete
-  evidence (file:line, test name, or quoted text).
+  evidence (file:line, test name, or quoted output).
 
-  - If every criterion passes: remove `status:reviewing`, add `status:done`,
-    and post a comment with the criterion-by-criterion verdict.
-  - If any criterion fails: remove `status:reviewing`, add
-    `status:developing`, and post a comment listing the failing criteria plus
-    what the dev agent needs to address on the next pass.
+  ## MANDATORY handoff (DO NOT SKIP)
+
+  You MUST run one of the two paths below before exiting. Exiting without
+  a label change will cause workbuddy to re-dispatch you.
+
+  Path A — all criteria pass:
+  ```
+  gh issue comment {{.Issue.Number}} --repo {{.Repo}} --body "<verdict with evidence per criterion>"
+  gh issue edit {{.Issue.Number}} --repo {{.Repo}} \
+    --remove-label status:reviewing \
+    --add-label status:done
+  gh pr review <pr-number> --repo {{.Repo}} --approve --body "All acceptance criteria satisfied."
+  ```
+
+  Path B — any criterion fails:
+  ```
+  gh issue comment {{.Issue.Number}} --repo {{.Repo}} --body "<list of failing criteria + what to fix>"
+  gh issue edit {{.Issue.Number}} --repo {{.Repo}} \
+    --remove-label status:reviewing \
+    --add-label status:developing
+  gh pr review <pr-number> --repo {{.Repo}} --request-changes --body "See issue #{{.Issue.Number}} for the failing criteria."
+  ```
+
+  Do NOT merge the PR yourself — the human supervisor merges after review.
 
   Use the repo's own CLAUDE.md / skills for project-specific review conventions.
 ---
