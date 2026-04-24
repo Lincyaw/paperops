@@ -1,0 +1,136 @@
+{
+  "$schema": "paperops-slide-1.0",
+  "theme": "minimal",
+  "slides": [
+    {
+      "type": "slide",
+      "class": "cover",
+      "children": [
+        { "type": "title", "text": "HKU Talk: AI Diagnosis for Operators" },
+        { "type": "subtitle", "text": "gallery deck for style-sheet variants" }
+      ]
+    },
+    {
+      "type": "slide",
+      "class": "content",
+      "children": [
+        { "type": "heading", "text": "Executive Snapshot" },
+        {
+          "type": "grid",
+          "style": { "cols": "1fr 1fr 1fr", "gap": "lg" },
+          "children": [
+            { "type": "kpi", "props": { "label": "DAU", "value": "125k", "delta": "+56%", "trend": "positive" } },
+            { "type": "kpi", "props": { "label": "Retention", "value": "42%", "delta": "+8p", "trend": "positive" } },
+            { "type": "kpi", "props": { "label": "Churn", "value": "3.2%", "delta": "-1p", "trend": "negative" } }
+          ]
+        },
+        { "type": "callout", "props": { "kind": "Insight", "text": "Core problem: root-cause evidence is delayed in production traces." } }
+      ]
+    },
+    {
+      "type": "slide",
+      "children": [
+        { "type": "heading", "text": "Story & Visual Grammar" },
+        {
+          "type": "quote",
+          "props": {
+            "text": "A good diagnosis loop is not just faster, but more reliable.",
+            "author": "Ops Research Team"
+          }
+        },
+        {
+          "type": "pullquote",
+          "props": {
+            "text": "Data volume alone does not imply scientific rigor.",
+            "author": "Field notes"
+          }
+        },
+        {
+          "type": "keypoint",
+          "props": {
+            "number": "01",
+            "title": "Instrument every boundary",
+            "body": "Capture failures and context consistently."
+          }
+        }
+      ]
+    },
+    {
+      "type": "slide",
+      "children": [
+        { "type": "heading", "text": "Process" },
+        {
+          "type": "stepper",
+          "props": {
+            "steps": [
+            { "label": "Collect traces", "desc": "normalize events & sessions" },
+            { "label": "Infer structure", "desc": "build causal graph candidates" },
+            { "label": "Prioritize actions", "desc": "recommend repair experiment" }
+            ]
+          }
+        },
+        {
+          "type": "timeline",
+          "props": {
+            "items": [
+              { "date": "2026-01", "title": "Pilot", "desc": "1 platform onboarded" },
+              { "date": "2026-02", "title": "Scale", "desc": "3 teams joined" },
+              { "date": "2026-03", "title": "Review", "desc": "confidence improved" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "slide",
+      "children": [
+        { "type": "heading", "text": "Evidence Pack" },
+        { "type": "card", "children": [{ "type": "text", "text": "Card container proof." }]},
+        {
+          "type": "figure",
+          "props": {
+            "chart_type": "line",
+            "caption": "System recovery trend over rollout windows",
+            "source": "Synthetic source set"
+          }
+        },
+        {
+          "type": "table",
+          "props": {
+            "headers": ["Region", "Pass Rate", "Cost / Test"],
+            "rows": [
+              ["EMEA", "88%", "$124"],
+              ["APAC", "92%", "$108"],
+              ["AMER", "95%", "$93"]
+            ]
+          }
+        },
+        {
+          "type": "chart",
+          "props": {
+            "chart_type": "bar",
+            "title": "Recovery speed",
+            "data": {}
+          }
+        },
+        {
+          "type": "image",
+          "props": {
+            "src": "missing.png",
+            "alt": "ops dashboard placeholder"
+          }
+        },
+        { "type": "text", "text": "Shape primitives" },
+        { "type": "line", "text": "line primitive" },
+        { "type": "arrow", "text": "arrow primitive" },
+        { "type": "badge", "text": "badge" },
+        { "type": "circle", "text": "◉" },
+        { "type": "roundedbox", "text": "rounded box" },
+        { "type": "divider", "props": { "orientation": "horizontal", "thickness": 1 } },
+        { "type": "icon", "props": { "name": "spark", "size": "md", "color": "primary" } },
+        { "type": "spacer", "props": { "size": "lg" } },
+        { "type": "note", "children": ["Use this deck as gallery source for six style sheets."] }
+      ]
+    }
+  ]
+}

@@ -6,8 +6,10 @@ from typing import Any
 
 from paperops.slides.core.constants import CONTENT_REGION, Region, SLIDE_HEIGHT, SLIDE_WIDTH
 from paperops.slides.ir.node import Node
+from paperops.slides.components.table import Table as LayoutTable
 from paperops.slides.components.text import TextBlock
 from paperops.slides.components.shapes import Box as ShapeBox
+from paperops.slides.components.shapes import RoundedBox
 from paperops.slides.layout.containers import Absolute, AbsoluteItem, Flex, Grid, GridItem, HStack, Layer, LayoutNode, Padding
 from paperops.slides.layout.types import Constraints, IntrinsicSize, LayoutIssue, TrackSpec
 
@@ -124,6 +126,12 @@ def _as_float(layout_node: LayoutNode, attr: str, value: Any, *, fallback: float
     return number
 
 
+def _as_text(value: Any, fallback: str = "") -> str:
+    if value is None:
+        return fallback
+    return str(value)
+
+
 def _parse_grid_tracks(raw: Any) -> list[TrackSpec] | None:
     if raw is None:
         return None
@@ -200,6 +208,7 @@ def _build_layout_leaf(node: Node, theme) -> LayoutNode:
     style = _resolve_layout_metrics_from_style(node)
     text = _extract_node_text(node)
     node_type = node.type
+    props = dict(node.props or {})
 
     if node_type in {"box", "kpi"}:
         props = dict(node.props or {})
@@ -223,6 +232,110 @@ def _build_layout_leaf(node: Node, theme) -> LayoutNode:
             bold=_is_bold(style.get("font-weight")),
             align=_build_style_text_align(style),
         )
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "roundedbox":
+        text = text or _as_text(props.get("text"), "")
+        raw_radius = style.get("radius")
+        if isinstance(raw_radius, (int, float)):
+            radius = float(raw_radius)
+        else:
+            radius = _safe_float(raw_radius)
+        if radius is None:
+            radius = 0.08
+        layout = RoundedBox(
+            text=text,
+            color=str(style.get("bg", "bg_alt")),
+            text_color=str(style.get("color", "text")),
+            font_size=_build_style_font_size(style, theme),
+            bold=_is_bold(style.get("font-weight")),
+            align=_build_style_text_align(style),
+            radius=radius,
+        )
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type in {"image", "svg", "icon"}:
+        text = (
+            text
+            or _as_text(props.get("name"), "")
+            or _as_text(props.get("body"), "")
+            or _as_text(props.get("src"), "")
+            or f"{node_type}"
+        )
+        layout = TextBlock(
+            text=_as_text(f"[{node_type}] ") + text,
+            font_size=_build_style_font_size(style, theme),
+            color=str(style.get("color", "text")),
+            align=_build_style_text_align(style),
+            bold=False,
+            italic=False,
+            line_spacing=float(style.get("line-height", 1.25)),
+            margin_x=float(style.get("padding-left", 0.0) or 0.0),
+            margin_y=float(style.get("padding-top", 0.0) or 0.0),
+        )
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "chart":
+        title = _as_text(props.get("title"), "")
+        chart_type = _as_text(props.get("chart_type"), "chart")
+        text = title or f"{chart_type} chart"
+        layout = TextBlock(
+            text=text,
+            font_size=_build_style_font_size(style, theme),
+            color=str(style.get("color", "text")),
+            align=_build_style_text_align(style),
+            bold=True,
+            italic=False,
+            line_spacing=float(style.get("line-height", 1.25)),
+            margin_x=float(style.get("padding-left", 0.0) or 0.0),
+            margin_y=float(style.get("padding-top", 0.0) or 0.0),
+        )
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "table":
+        rows = props.get("rows", [])
+        headers = props.get("headers", [])
+        layout = LayoutTable(
+            headers=headers if isinstance(headers, list) else [],
+            rows=rows if isinstance(rows, list) else [],
+        )
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type in {"line", "arrow", "divider"}:
+        text = "—" if text == "" else text
+        layout = TextBlock(
+            text=_as_text(text),
+            font_size=_build_style_font_size(style, theme),
+            color=str(style.get("color", "text")),
+            align=_build_style_text_align(style),
+            bold=False,
+            italic=False,
+            line_spacing=float(style.get("line-height", 1.25)),
+            margin_x=float(style.get("padding-left", 0.0) or 0.0),
+            margin_y=float(style.get("padding-top", 0.0) or 0.0),
+        )
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "spacer":
+        layout = LayoutNode()
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "note":
+        layout = LayoutNode()
         _apply_style_to_layout_node(layout, node)
         _attach_source(layout, node)
         return layout
@@ -367,10 +480,7 @@ def _ir_node_to_layout(node: Node, theme) -> LayoutNode:
     if node_type == "box" or node_type == "kpi":
         return _build_layout_leaf(node, theme)
 
-    layout = LayoutNode(
-        children=_build_layout_children(node, theme),
-    )
-    _apply_style_to_layout_node(layout, node)
+    layout = _build_layout_leaf(node, theme)
     _attach_source(layout, node)
     return layout
 
@@ -413,6 +523,17 @@ def _to_float(value: Any, *, fallback: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return fallback
+
+
+def _safe_float(value: Any) -> float | None:
+    if value in {"auto", "inherit", "none", None}:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 

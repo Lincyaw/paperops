@@ -4,8 +4,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from paperops.slides.components.registry import register_component
 from paperops.slides.layout.containers import LayoutNode
 from paperops.slides.layout.types import Constraints, IntrinsicSize
+
+
+@register_component(
+    "table",
+    props_schema={
+        "properties": {
+            "headers": {"type": "array"},
+            "rows": {"type": "array"},
+            "header_color": {"type": "string"},
+            "header_text_color": {"type": "string"},
+            "font_size": {"type": ["number", "string"]},
+            "row_height": {"type": ["number", "string"]},
+        }
+    },
+    default_classes=["table"],
+)
+class _TableDefinition:
+    pass
 
 
 @dataclass

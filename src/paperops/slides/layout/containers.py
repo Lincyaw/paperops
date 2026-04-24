@@ -79,13 +79,13 @@ class Flex(LayoutNode):
 
     def main_gap(self) -> float:
         if self.direction == "column":
-            return self.row_gap if self.row_gap is not None else self.gap
-        return self.column_gap if self.column_gap is not None else self.gap
+            return float(self.row_gap) if self.row_gap is not None else float(self.gap or 0.0)
+        return float(self.column_gap) if self.column_gap is not None else float(self.gap or 0.0)
 
     def cross_gap(self) -> float:
         if self.direction == "column":
-            return self.column_gap if self.column_gap is not None else self.gap
-        return self.row_gap if self.row_gap is not None else self.gap
+            return float(self.column_gap) if self.column_gap is not None else float(self.gap or 0.0)
+        return float(self.row_gap) if self.row_gap is not None else float(self.gap or 0.0)
 
     def measure(self, constraints: Constraints, theme) -> IntrinsicSize:
         if not self.children:

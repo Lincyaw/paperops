@@ -12,13 +12,15 @@ import tempfile
 from pptx import Presentation as PptxPresentation
 from pptx.util import Inches
 
+from paperops.slides import components  # noqa: F401
 from paperops.slides.codegen import render_styled_layout
 from paperops.slides.core.constants import CONTENT_REGION, SLIDE_HEIGHT, SLIDE_WIDTH
 from paperops.slides.core.theme import Theme, themes
 from paperops.slides.dsl.json_loader import Document
 from paperops.slides.dsl.json_loader import load_json_document
 from paperops.slides.layout.engine import build_layout_tree, compute_layout
-from paperops.slides.style import resolve_computed_styles
+from paperops.slides.components.registry import expand_nodes
+from paperops.slides.style import get_sheet, resolve_computed_styles
 from paperops.slides.style.stylesheet import StyleSheet
 from paperops.slides.preview import review_deck_artifacts
 
@@ -54,16 +56,27 @@ def parse_stage(
     return load_json_document(source, strict=strict)
 
 
+def expand_stage(document: Document, *, strict: bool = False) -> list[Node]:
+    """Expand semantic components and return expanded slide roots."""
+    return expand_nodes(document.slides, strict=strict)
+
+
 def style_stage(
     document: Document,
     *,
     theme: Theme | str | None = None,
-    sheet: Mapping[str, Mapping[str, Any]] | None = None,
+    sheet: Mapping[str, Mapping[str, Any]] | str | None = None,
     strict: bool = False,
 ) -> tuple[Node, dict[int, Any]]:
     """Resolve computed styles and attach them to every styled node."""
+    if sheet is None and document.sheet is not None:
+        sheet = document.sheet
+    if isinstance(sheet, str):
+        sheet = get_sheet(sheet)
+
     style_theme = _coerce_theme(theme or document.theme)
-    root = Node(type="deck", children=list(document.slides))
+    expanded_slides = expand_stage(document, strict=strict)
+    root = Node(type="deck", children=expanded_slides)
     resolved = resolve_computed_styles(
         root,
         theme=style_theme,

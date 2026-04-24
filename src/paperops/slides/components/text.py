@@ -1,14 +1,67 @@
-"""Text components — TextBlock, BulletList."""
+"""Text components and text-only measurements."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from paperops.slides.components.shapes import _resolve_font_pt
+from paperops.slides.components.registry import register_component
 from paperops.slides.core.constants import Align
 from paperops.slides.layout.autofit import TextStyle, build_intrinsic_size, measure_text_intrinsic
 from paperops.slides.layout.containers import LayoutNode
 from paperops.slides.layout.types import Constraints, IntrinsicSize
+
+
+@register_component(
+    "text",
+    props_schema={
+        "properties": {
+            "text": {"type": "string"},
+        }
+    },
+    default_classes=["text"],
+)
+@register_component(
+    "prose",
+    props_schema={
+        "properties": {
+            "text": {"type": "string"},
+        }
+    },
+    default_classes=["prose"],
+)
+class _TextDefinition:
+    pass
+
+
+@register_component(
+    "title",
+    props_schema={
+        "properties": {
+            "text": {"type": "string"},
+        }
+    },
+    default_classes=["title"],
+)
+@register_component(
+    "subtitle",
+    props_schema={
+        "properties": {
+            "text": {"type": "string"},
+        }
+    },
+    default_classes=["subtitle"],
+)
+@register_component(
+    "heading",
+    props_schema={
+        "properties": {
+            "text": {"type": "string"},
+        }
+    },
+    default_classes=["heading"],
+)
+class _TextStyleDefinition:
+    pass
 
 
 @dataclass
@@ -103,9 +156,9 @@ class BulletList(LayoutNode):
             style = TextStyle(
                 font_family=font_family,
                 font_size_pt=pt,
-                line_spacing=self.line_spacing,
-                margin_x=self.margin_x,
-                margin_y=0.0,
+                bold=False,
+                margin_x=self.margin_x * 2,
+                margin_y=self.margin_y * 2,
             )
             item_intrinsic = measure_text_intrinsic(text, style, max_width_inches=usable_width)
             min_width = max(min_width, item_intrinsic.min_width + indent_width)
@@ -124,3 +177,9 @@ class BulletList(LayoutNode):
     def preferred_size(self, theme, available_width: float) -> tuple[float, float]:
         intrinsic = self.measure(Constraints(max_width=max(available_width, 0.0)), theme)
         return intrinsic.preferred_width, intrinsic.preferred_height
+
+
+def _resolve_font_pt(theme, size: str | float) -> float:
+    if theme is not None:
+        return theme.resolve_font_size(size)
+    return float(size) if isinstance(size, (int, float)) else 18.0
