@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from paperops.slides.core.constants import Align, Direction
-from paperops.slides.layout.auto_size import TextStyle, build_intrinsic_size, measure_text_intrinsic
+from paperops.slides.layout.autofit import TextStyle, build_intrinsic_size, measure_text_intrinsic
 from paperops.slides.layout.containers import LayoutNode
 from paperops.slides.layout.types import Constraints, IntrinsicSize
 

@@ -22,6 +22,7 @@ class Node:
     class_: str | None = None
     id: str | None = None
     style: dict[str, Any] | None = None
+    text: str | None = None
     props: dict[str, Any] | None = None
     children: list[NodeChild] | None = None
 
@@ -46,6 +47,8 @@ class Node:
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {"type": self.type}
+        if self.text is not None:
+            payload["text"] = self.text
         if self.class_ is not None:
             payload["class"] = self.class_
         if self.id is not None:
@@ -64,12 +67,15 @@ class Node:
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "Node":
         schema.validate_node(raw)
+        text = raw.get("text")
+        props = raw.get("props")
         return cls(
             type=raw["type"],
             class_=raw.get("class"),
             id=raw.get("id"),
             style=raw.get("style"),
-            props=raw.get("props"),
+            text=text,
+            props=dict(props) if props is not None else None,
             children=(
                 [
                     item if isinstance(item, str) else cls.from_dict(item)

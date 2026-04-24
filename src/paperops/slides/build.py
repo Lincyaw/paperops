@@ -1,6 +1,9 @@
-"""Presentation class — main entry point for creating presentations."""
+"""Pipeline entrypoint for IR-based deck rendering and legacy Presentation API."""
 
 from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Mapping
 
 import os
 import sys
@@ -9,23 +12,152 @@ import tempfile
 from pptx import Presentation as PptxPresentation
 from pptx.util import Inches
 
-from paperops.slides.core.constants import SLIDE_HEIGHT, SLIDE_WIDTH
+from paperops.slides.codegen import render_styled_layout
+from paperops.slides.core.constants import CONTENT_REGION, SLIDE_HEIGHT, SLIDE_WIDTH
 from paperops.slides.core.theme import Theme, themes
+from paperops.slides.dsl.json_loader import Document
+from paperops.slides.dsl.json_loader import load_json_document
+from paperops.slides.layout.engine import build_layout_tree, compute_layout
+from paperops.slides.style import resolve_computed_styles
+from paperops.slides.style.stylesheet import StyleSheet
 from paperops.slides.preview import review_deck_artifacts
-from paperops.slides.slides.base import SlideBuilder
+
+from paperops.slides.ir.node import Node
+
+
+def _coerce_theme(value: Theme | str | None) -> Theme:
+    if value is None:
+        return themes.minimal
+    if isinstance(value, Theme):
+        return value
+    if isinstance(value, str):
+        try:
+            candidate = getattr(themes, value)
+        except AttributeError as exc:
+            raise ValueError(f"Unknown theme: {value!r}") from exc
+        if not isinstance(candidate, Theme):
+            raise TypeError(f"Theme {value!r} did not resolve to a Theme instance")
+        return candidate
+    raise TypeError(f"theme must be a Theme or string, got {type(value)!r}")
+
+
+def parse_stage(
+    source: str | Path | Mapping[str, Any] | Document,
+    *,
+    strict: bool = False,
+) -> Document:
+    """Parse JSON or IR document into a canonical :class:`Document`."""
+    if isinstance(source, Document):
+        return source
+    if isinstance(source, Mapping):
+        return load_json_document(dict(source), strict=strict)
+    return load_json_document(source, strict=strict)
+
+
+def style_stage(
+    document: Document,
+    *,
+    theme: Theme | str | None = None,
+    sheet: Mapping[str, Mapping[str, Any]] | None = None,
+    strict: bool = False,
+) -> tuple[Node, dict[int, Any]]:
+    """Resolve computed styles and attach them to every styled node."""
+    style_theme = _coerce_theme(theme or document.theme)
+    root = Node(type="deck", children=list(document.slides))
+    resolved = resolve_computed_styles(
+        root,
+        theme=style_theme,
+        style_sheet=sheet,
+        deck_style=StyleSheet(document.styles or {}),
+        strict=strict,
+    )
+    return root, resolved.computed
+
+
+def layout_stage(
+    styled_root: Node,
+    *,
+    theme: Theme | str | None = None,
+    region=CONTENT_REGION,
+    slide: int | None = None,
+) -> tuple[list[tuple[Node, Any]], list[dict[str, Any]]]:
+    """Compute regions for each slide node."""
+    layout_theme = _coerce_theme(theme)
+    slide_layouts: list[tuple[Node, Any]] = []
+    issues: list[dict[str, Any]] = []
+
+    for index, slide_node in enumerate(styled_root.children or []):
+        if not isinstance(slide_node, Node):
+            continue
+        layout_root = build_layout_tree(slide_node, layout_theme, region=region)
+        slide_layouts.append((slide_node, layout_root))
+        issues.extend(
+            compute_layout(layout_root, region, layout_theme, slide=index + 1, root_path=f"slide[{index}]")
+        )
+    return slide_layouts, issues
+
+
+def autofit_stage(
+    slide_layouts: list[tuple[Node, Any]],
+    *,
+    theme: Theme | str | None = None,
+) -> list[tuple[Node, Any]]:
+    """Placeholder autofit stage for Phase 2 (currently identity)."""
+    return slide_layouts
+
+
+def codegen_stage(
+    slide_layouts: list[tuple[Node, Any]],
+    *,
+    theme: Theme | str | None = None,
+    out: str | Path,
+) -> Path:
+    resolved_theme = _coerce_theme(theme)
+    return render_styled_layout(resolved_theme, slide_layouts, out_path=out)
+
+
+def render_json(
+    source: str | Path | Mapping[str, Any] | Document,
+    *,
+    out: str | Path,
+    strict: bool = False,
+) -> Path:
+    """Run parse → style → layout → codegen and write a PPTX file."""
+    document = parse_stage(source, strict=strict)
+    styled_root, _ = style_stage(document, theme=document.theme, strict=strict)
+    layout_roots = autofit_stage(layout_stage(styled_root, theme=document.theme)[0], theme=document.theme)
+    return codegen_stage(layout_roots, theme=document.theme, out=out)
+
+
+def _normalize_issue(issue: dict, slide_number: int) -> dict[str, Any]:
+    normalized = dict(issue)
+    normalized.setdefault("slide", slide_number)
+    normalized.setdefault("source", "layout")
+    normalized.setdefault("code", normalized.get("type", "layout_issue"))
+    normalized.setdefault("message", normalized.get("detail", normalized.get("code", "layout issue")))
+    normalized.setdefault("detail", normalized["message"])
+    normalized.setdefault("severity", "warning")
+    return normalized
+
+
+# ---------------------------------------------------------------------------
+# Legacy API compatibility
+# ---------------------------------------------------------------------------
 
 
 class Presentation:
-    """Main entry point for creating presentations."""
+    """Main entry point for the original imperative component builder API."""
 
     def __init__(self, theme: Theme | None = None):
         self._theme = theme if theme is not None else themes.professional
         self._pptx = PptxPresentation()
         self._pptx.slide_width = Inches(SLIDE_WIDTH)
         self._pptx.slide_height = Inches(SLIDE_HEIGHT)
-        self._builders: list[SlideBuilder] = []
+        self._builders: list[object] = []
 
-    def slide(self, title=None, reference=None, background=None) -> SlideBuilder:
+    def slide(self, title=None, reference=None, background=None):
+        from paperops.slides.slides.base import SlideBuilder
+
         layout = self._pptx.slide_layouts[6]
         pptx_slide = self._pptx.slides.add_slide(layout)
         sb = SlideBuilder(
@@ -70,9 +202,9 @@ class Presentation:
 
         issue_counts = {
             "total": len(issues),
-            "error": sum(1 for issue in issues if issue.get("severity") == "error"),
-            "warning": sum(1 for issue in issues if issue.get("severity") == "warning"),
-            "info": sum(1 for issue in issues if issue.get("severity") == "info"),
+            "error": sum(issue.get("severity") == "error" for issue in issues),
+            "warning": sum(issue.get("severity") == "warning" for issue in issues),
+            "info": sum(issue.get("severity") == "info" for issue in issues),
         }
         return {
             "schema_version": "2026-04-09",
@@ -84,7 +216,12 @@ class Presentation:
             "slides": slides,
         }
 
-    def review_deck(self, output_path: str, render_preview: bool = True, output_dir: str | None = None) -> dict:
+    def review_deck(
+        self,
+        output_path: str,
+        render_preview: bool = True,
+        output_dir: str | None = None,
+    ) -> dict:
         layout_review = self.review()
         self.save(output_path)
         preview_paths: list[str] = []
@@ -124,12 +261,12 @@ class Presentation:
         return sorted(paths)
 
 
-def _normalize_issue(issue: dict, slide_number: int) -> dict:
-    normalized = dict(issue)
-    normalized.setdefault("slide", slide_number)
-    normalized.setdefault("source", "layout")
-    normalized.setdefault("code", normalized.get("type", "layout_issue"))
-    normalized.setdefault("message", normalized.get("detail", normalized.get("code", "layout issue")))
-    normalized.setdefault("detail", normalized["message"])
-    normalized.setdefault("severity", "warning")
-    return normalized
+__all__ = [
+    "Presentation",
+    "autofit_stage",
+    "codegen_stage",
+    "layout_stage",
+    "parse_stage",
+    "render_json",
+    "style_stage",
+]

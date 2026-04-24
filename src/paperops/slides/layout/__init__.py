@@ -17,7 +17,7 @@ from paperops.slides.layout.containers import (
 )
 from paperops.slides.layout.engine import compute_layout
 from paperops.slides.layout.types import Constraints, IntrinsicSize, LayoutIssue, auto, fixed, fr
-from paperops.slides.layout.auto_size import measure_text
+from paperops.slides.layout.autofit import measure_text
 
 __all__ = [
     "Column",

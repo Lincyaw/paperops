@@ -107,6 +107,7 @@ IR_NODE_SCHEMA: dict[str, Any] = {
         "type": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"},
         "class": {"type": "string"},
         "id": {"type": "string"},
+        "text": {"type": "string"},
         "style": {"$ref": "#/definitions/style"},
         "props": {"type": "object", "additionalProperties": True},
         "children": {
@@ -241,6 +242,8 @@ def validate_node(raw: Any, *, path: str = "node") -> None:
         raise TypeError(f"{path}: id must be string")
     if "style" in raw:
         _validate_style(raw["style"], f"{path}.style")
+    if "text" in raw and raw["text"] is not None and not isinstance(raw["text"], str):
+        raise TypeError(f"{path}: text must be a string when present")
     if "props" in raw and not isinstance(raw["props"], dict):
         raise TypeError(f"{path}: props must be an object")
     if "children" in raw:
