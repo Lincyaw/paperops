@@ -4,8 +4,50 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from paperops.slides.components.registry import register_component
 from paperops.slides.layout.containers import LayoutNode
 from paperops.slides.layout.types import Constraints, IntrinsicSize
+
+
+@register_component(
+    "image",
+    props_schema={
+        "properties": {
+            "src": {"type": "string"},
+            "fit": {"type": "boolean"},
+            "width": {"type": ["number", "string"]},
+            "height": {"type": ["number", "string"]},
+            "alt": {"type": "string"},
+        }
+    },
+    default_classes=["image"],
+)
+@register_component(
+    "svg",
+    props_schema={
+        "properties": {
+            "src": {"type": "string"},
+            "body": {"type": "string"},
+            "fit": {"type": "boolean"},
+            "width": {"type": ["number", "string"]},
+            "height": {"type": ["number", "string"]},
+        }
+    },
+    default_classes=["svg"],
+)
+@register_component(
+    "icon",
+    props_schema={
+        "properties": {
+            "name": {"type": "string"},
+            "size": {"type": ["number", "string"]},
+            "color": {"type": "string"},
+        }
+    },
+    default_classes=["icon"],
+)
+class _ImageDefinition:
+    pass
 
 
 @dataclass

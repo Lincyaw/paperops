@@ -12,6 +12,8 @@ from paperops.slides.style.cascade import (
 )
 from paperops.slides.style.selector import ParsedSelector, parse_selector, specificity
 from paperops.slides.style.stylesheet import StyleSheet
+from paperops.slides.style.sheet_registry import UnknownSheetError, clear_sheets, get_sheet, list_sheets, register_sheet
+from paperops.slides.style import sheets  # type: ignore  # noqa: F401
 
 __all__ = [
     "CascadeResult",
@@ -22,4 +24,9 @@ __all__ = [
     "parse_selector",
     "resolve_computed_styles",
     "specificity",
+    "UnknownSheetError",
+    "clear_sheets",
+    "get_sheet",
+    "list_sheets",
+    "register_sheet",
 ]

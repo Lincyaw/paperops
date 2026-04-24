@@ -4,10 +4,89 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from paperops.slides.components.registry import register_component
+
 from paperops.slides.core.constants import Align, Direction
 from paperops.slides.layout.autofit import TextStyle, build_intrinsic_size, measure_text_intrinsic
 from paperops.slides.layout.containers import LayoutNode
 from paperops.slides.layout.types import Constraints, IntrinsicSize
+
+
+@register_component(
+    "box",
+    props_schema={
+        "properties": {
+            "text": {"type": "string"},
+            "style": {"type": "object"},
+        }
+    },
+    default_classes=["box"],
+)
+@register_component(
+    "roundedbox",
+    props_schema={
+        "properties": {
+            "text": {"type": "string"},
+        }
+    },
+    default_classes=["rounded-box"],
+)
+class _ShapeBoxDefinition:
+    pass
+
+
+@register_component(
+    "circle",
+    props_schema={
+        "properties": {
+            "text": {"type": "string"},
+            "radius": {"type": "number"},
+        }
+    },
+    default_classes=["circle"],
+)
+@register_component(
+    "badge",
+    props_schema={"text": {"type": "string"}},
+    default_classes=["badge"],
+)
+class _ShapeMarkerDefinition:
+    pass
+
+
+@register_component(
+    "line",
+    props_schema={
+        "from": {"type": "string"},
+        "to": {"type": "string"},
+        "style": {"type": "object"},
+        "color": {"type": "string"},
+        "weight": {"type": ["number", "string"]},
+    },
+    default_classes=["line"],
+)
+@register_component(
+    "arrow",
+    props_schema={
+        "from": {"type": "string"},
+        "to": {"type": "string"},
+        "head": {"type": "string"},
+        "color": {"type": "string"},
+        "weight": {"type": ["number", "string"]},
+    },
+    default_classes=["arrow"],
+)
+@register_component(
+    "divider",
+    props_schema={
+        "orientation": {"type": "string", "enum": ["horizontal", "vertical"]},
+        "thickness": {"type": "number"},
+        "length": {"type": "number"},
+    },
+    default_classes=["divider"],
+)
+class _ShapeLineDefinition:
+    pass
 
 
 def _resolve_font_pt(theme, size: str | float) -> float:

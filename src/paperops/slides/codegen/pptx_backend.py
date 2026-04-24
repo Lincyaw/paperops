@@ -56,11 +56,41 @@ def render_styled_layout(
     for source_slide, layout_root in slide_layout_roots:
         pptx_slide = prs.slides.add_slide(prs.slide_layouts[6])
         _render_slide_background(pptx_slide, source_slide, theme)
+        _render_slide_notes(pptx_slide, source_slide)
         _render_layout_node(pptx_slide, layout_root, theme)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(out))
     return out
+
+
+def _render_slide_notes(slide, source_node: Node | None) -> None:
+    """Render semantic `<note>` nodes into speaker notes."""
+    notes = _collect_note_texts(source_node)
+    if not notes:
+        return
+
+    notes_slide = slide.notes_slide
+    if notes_slide is None:
+        return
+    notes_slide.notes_text_frame.text = "\n\n".join(notes)
+
+
+def _collect_note_texts(node: Node | None) -> list[str]:
+    if node is None:
+        return []
+    notes: list[str] = []
+
+    if node.type == "note":
+        text = _extract_text(node, None).strip()
+        if text:
+            notes.append(text)
+
+    for child in node.children or []:
+        if isinstance(child, Node):
+            notes.extend(_collect_note_texts(child))
+
+    return notes
 
 
 def _render_slide_background(slide, source_node: Node | None, theme: Theme) -> None:
@@ -221,7 +251,9 @@ def _render_box(
         _apply_text_frame_style(tf, style, theme=theme)
         paragraph = tf.paragraphs[0]
         paragraph.text = text
-    paragraph.alignment = _ALIGN_MAP.get(_style_value(style, "text-align", "center"), PP_ALIGN.LEFT)
+        paragraph.alignment = _ALIGN_MAP.get(
+            _style_value(style, "text-align", "center"), PP_ALIGN.LEFT
+        )
 
 
 def _theme_default_color(theme: Theme, key: str) -> str:
