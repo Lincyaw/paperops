@@ -1,0 +1,35 @@
+{
+  "theme": "minimal",
+  "slides": [
+    {
+      "type": "slide",
+      "children": [
+        {
+          "type": "title",
+          "text": "Gallery"
+        },
+        {
+          "type": "heading",
+          "text": "Overview"
+        },
+        {
+          "type": "grid",
+          "style": {
+            "cols": "1fr 1fr",
+            "gap": "md"
+          },
+          "children": [
+            {
+              "type": "heading",
+              "text": "Cell A"
+            },
+            {
+              "type": "heading",
+              "text": "Cell B"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
