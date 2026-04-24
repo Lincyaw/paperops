@@ -42,3 +42,5 @@ def test_render_all_atomic_components_via_single_deck(tmp_path: Path):
 
     prs = Presentation(str(out))
     assert len(prs.slides) == 1
+    slide = prs.slides[0]
+    assert any(shape.has_table for shape in slide.shapes)

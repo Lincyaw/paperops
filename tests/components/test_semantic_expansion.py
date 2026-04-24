@@ -36,6 +36,17 @@ def test_missing_required_kpi_prop_raises_mapped_error():
         expand_node(node)
 
 
+def test_kpi_node_merges_default_and_user_classes_without_duplicates():
+    node = Node(
+        type="kpi",
+        class_="value kpi",
+        props={"label": "DAU", "value": "125k"},
+    )
+    expanded = expand_node(node)
+    classes = [token for token in (expanded.class_ or "").split() if token]
+    assert classes == ["card", "kpi", "value"], classes
+
+
 def test_unknown_kpi_prop_raises_mapped_error():
     node = Node(
         type="kpi",

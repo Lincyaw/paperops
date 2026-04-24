@@ -26,6 +26,7 @@ from paperops.slides.layout.containers import (
     Padding,
 )
 from paperops.slides.components.shapes import Box as ShapeBox
+from paperops.slides.components.table import Table as LayoutTable
 from paperops.slides.components.text import TextBlock
 
 
@@ -237,6 +238,17 @@ def _render_leaf(
     if node_type in {"image", "svg", "icon"}:
         if _render_image_like(slide, node_type, source_node, style, theme, (left, top, width, height), text):
             return
+
+    if node_type == "table":
+        if isinstance(layout_node, LayoutTable):
+            _render_table(
+                slide=slide,
+                region=(left, top, width, height),
+                style=style,
+                layout_node=layout_node,
+                theme=theme,
+            )
+        return
 
     if _is_textual_node(node_type) or text:
         _render_text_box(
@@ -578,6 +590,85 @@ def _render_image_like(
         text=label,
     )
     return True
+
+
+def _render_table(
+    slide,
+    region: tuple[float, float, float, float],
+    style: dict[str, Any],
+    layout_node: LayoutTable,
+    theme: Theme,
+) -> None:
+    left, top, width, height = region
+
+    rows = list(getattr(layout_node, "rows", []))
+    headers = list(getattr(layout_node, "headers", []))
+
+    if not rows and not headers:
+        rows = [[""]]
+
+    row_count = len(rows) + (1 if headers else 0)
+    row_count = max(row_count, 1)
+
+    column_count = max(len(headers), 1)
+    for row in rows:
+        column_count = max(column_count, len(row))
+
+    table_shape = slide.shapes.add_table(
+        row_count,
+        column_count,
+        Inches(left),
+        Inches(top),
+        Inches(max(width, 0.1)),
+        Inches(max(height, 0.1)),
+    )
+    table = table_shape.table
+
+    if headers:
+        header_row = table.rows[0]
+        for column_index, value in enumerate(headers):
+            if column_index >= len(header_row.cells):
+                break
+            header_cell = header_row.cells[column_index]
+            header_cell.text = _as_text_safe(value)
+            paragraph = header_cell.text_frame.paragraphs[0]
+            paragraph.font.bold = True
+            paragraph.font.name = theme.font_family
+            paragraph.font.color.rgb = _text_color(style, theme)
+            paragraph.alignment = PP_ALIGN.CENTER
+        start_row = 1
+        if len(table.rows) > 0:
+            table.rows[0].height = Pt(_resolve_font_size(theme, "body", "body"))
+    else:
+        start_row = 0
+
+    for row_offset, row_data in enumerate(rows):
+        if start_row + row_offset >= len(table.rows):
+            break
+        target_row = table.rows[start_row + row_offset]
+        for column_index, value in enumerate(row_data):
+            if column_index >= len(target_row.cells):
+                break
+            target_cell = target_row.cells[column_index]
+            target_cell.text = _as_text_safe(value)
+
+    cell_bg = _style_value(style, "cell-bg")
+    if cell_bg is not None:
+        try:
+            bg = _resolve_color(theme, cell_bg)
+        except Exception:
+            bg = _resolve_color(theme, "bg")
+        for row in table.rows:
+            for cell in row.cells:
+                if getattr(cell, "fill", None) is not None:
+                    cell.fill.solid()
+                    cell.fill.fore_color.rgb = bg
+
+
+def _as_text_safe(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value)
 
 
 def _render_text_box(
