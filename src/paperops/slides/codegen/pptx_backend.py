@@ -8,7 +8,9 @@ from typing import Any
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.text import PP_ALIGN
+from pptx.chart.data import ChartData
 from pptx.util import Inches, Pt
 
 from paperops.slides.core.constants import SLIDE_HEIGHT, SLIDE_WIDTH
@@ -172,7 +174,7 @@ def _render_leaf(
     width = float(region.width)
     height = float(region.height)
 
-    if node_type in {"box", "kpi"} or isinstance(layout_node, ShapeBox):
+    if node_type in {"box", "kpi"}:
         _render_box(
             slide=slide,
             region=(left, top, width, height),
@@ -181,7 +183,7 @@ def _render_leaf(
             text=text,
         )
         return
-    if node_type == "roundedbox" and not isinstance(layout_node, ShapeBox):
+    if node_type == "roundedbox":
         _render_rounded_box(
             slide=slide,
             region=(left, top, width, height),
@@ -238,6 +240,15 @@ def _render_leaf(
     if node_type in {"image", "svg", "icon"}:
         if _render_image_like(slide, node_type, source_node, style, theme, (left, top, width, height), text):
             return
+    if node_type == "chart":
+        _render_chart(
+            slide=slide,
+            region=(left, top, width, height),
+            style=style,
+            theme=theme,
+            source_node=source_node,
+        )
+        return
 
     if node_type == "table":
         if isinstance(layout_node, LayoutTable):
@@ -248,6 +259,9 @@ def _render_leaf(
                 layout_node=layout_node,
                 theme=theme,
             )
+        return
+
+    if node_type == "note":
         return
 
     if _is_textual_node(node_type) or text:
@@ -705,6 +719,211 @@ def _render_text_box(
         numeric = _to_float(line_height)
         if numeric is not None:
             paragraph.line_spacing = numeric
+
+
+def _chart_type_to_xl(chart_type: str) -> XL_CHART_TYPE:
+    normalized = str(chart_type or "").strip().lower()
+    mapping = {
+        "line": XL_CHART_TYPE.LINE,
+        "line_markers": XL_CHART_TYPE.LINE_MARKERS,
+        "bar": XL_CHART_TYPE.BAR_CLUSTERED,
+        "bar_clustered": XL_CHART_TYPE.BAR_CLUSTERED,
+        "bar_stacked": XL_CHART_TYPE.BAR_STACKED,
+        "column": XL_CHART_TYPE.COLUMN_CLUSTERED,
+        "column_clustered": XL_CHART_TYPE.COLUMN_CLUSTERED,
+        "column_stacked": XL_CHART_TYPE.COLUMN_STACKED,
+        "pie": XL_CHART_TYPE.PIE,
+        "area": XL_CHART_TYPE.AREA,
+        "stacked_area": XL_CHART_TYPE.AREA_STACKED,
+    }
+    return mapping.get(normalized, XL_CHART_TYPE.LINE)
+
+
+def _coerce_chart_values(raw_values: object) -> list[float]:
+    if isinstance(raw_values, (int, float, str)):
+        return [_safe_float(raw_values)]
+    if not isinstance(raw_values, (list, tuple)):
+        return []
+    values: list[float] = []
+    for raw_value in raw_values:
+        value = _safe_float(raw_value)
+        if value is not None:
+            values.append(value)
+    return values
+
+
+def _safe_float(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        numeric = float(str(value))
+        return numeric
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_chart_series(payload: object) -> list[tuple[str, list[float]]]:
+    if payload is None:
+        return []
+
+    if isinstance(payload, dict):
+        series: list[tuple[str, list[float]]] = []
+        for name, values in payload.items():
+            values_list = _coerce_chart_values(values)
+            if values_list:
+                series.append((str(name), values_list))
+        return series
+
+    if not isinstance(payload, (list, tuple)):
+        return []
+
+    series: list[tuple[str, list[float]]] = []
+    for item in payload:
+        if isinstance(item, dict):
+            name = item.get("name") or item.get("label") or item.get("title")
+            if "data" in item and name is None:
+                name = "Series"
+            values = item.get("values") if isinstance(item, dict) else None
+            if name is None:
+                name = f"Series {len(series) + 1}"
+            values_list = _coerce_chart_values(values if values is not None else item.get("data", []))
+            if values_list:
+                series.append((str(name), values_list))
+            continue
+        if isinstance(item, (list, tuple)):
+            values = [value for value in item if _safe_float(value) is not None]
+            if values:
+                series.append((f"Series {len(series) + 1}", _coerce_chart_values(values)))
+    return series
+
+
+def _resolve_chart_payload(
+    source_node: Node | None,
+    props: dict[str, object],
+) -> tuple[str, list[str], list[tuple[str, list[float]]]]:
+    chart_type = ""
+    if isinstance(props.get("chart_type"), str):
+        chart_type = str(props["chart_type"])
+
+    labels: list[str] | None = None
+    raw_labels = props.get("labels")
+    if isinstance(raw_labels, (list, tuple)):
+        labels = [str(label) for label in raw_labels]
+
+    series: list[tuple[str, list[float]]] = []
+    if isinstance(props.get("series"), (list, tuple, dict)):
+        series = _coerce_chart_series(props["series"])
+
+    data = props.get("data")
+    if isinstance(data, dict):
+        if not series and isinstance(data.get("series"), (list, tuple, dict)):
+            series = _coerce_chart_series(data.get("series"))
+
+        if not labels and "labels" in data and isinstance(data["labels"], (list, tuple)):
+            labels = [str(label) for label in data["labels"]]
+
+        if isinstance(data.get("values"), (list, tuple)):
+            values = _coerce_chart_values(data["values"])
+            if values and not series:
+                series = [("Series", values)]
+
+        if not series:
+            flat_data: list[float] = []
+            flat_labels: list[str] = []
+            for key, value in data.items():
+                maybe_value = _safe_float(value)
+                if maybe_value is not None:
+                    flat_labels.append(str(key))
+                    flat_data.append(maybe_value)
+            if flat_data:
+                if labels is None:
+                    labels = flat_labels
+                series = [("Series", flat_data)]
+
+    if not labels and source_node is not None and source_node.text:
+        labels = [str(source_node.text)]
+
+    if not series:
+        series = [("Series", [0.0])]
+        if labels is None:
+            labels = ["Point 1"]
+    elif labels is None and series:
+        labels = [f"Point {idx + 1}" for idx in range(max(len(values) for _, values in series))]
+
+    normalized_labels: list[str] = []
+    if labels:
+        normalized_labels = [str(item) for item in labels]
+
+    max_len = max(len(values) for _, values in series) if series else 0
+    if normalized_labels and len(normalized_labels) < max_len:
+        normalized_labels.extend(f"Point {idx + 1}" for idx in range(len(normalized_labels) + 1, max_len + 1))
+    elif not normalized_labels and max_len:
+        normalized_labels = [f"Point {idx + 1}" for idx in range(1, max_len + 1)]
+
+    return chart_type, normalized_labels, series
+
+
+def _render_chart(
+    *,
+    slide,
+    region: tuple[float, float, float, float],
+    style: dict[str, Any],
+    theme: Theme,
+    source_node: Node | None,
+) -> None:
+    left, top, width, height = region
+    props = source_node.props if source_node is not None and source_node.props is not None else {}
+    if not isinstance(props, dict):
+        props = {}
+
+    chart_type, labels, series = _resolve_chart_payload(source_node, props)
+    title = _style_value(style, "title", None)
+    if title is None and source_node is not None and source_node.text:
+        title = source_node.text
+    if not props.get("title"):
+        props["title"] = title
+
+    chart_data = ChartData()
+    chart_data.categories = list(labels)
+    for name, values in series:
+        chart_data.add_series(str(name), values)
+
+    try:
+        chart_shape = slide.shapes.add_chart(
+            _chart_type_to_xl(chart_type),
+            Inches(left),
+            Inches(top),
+            Inches(width),
+            Inches(height),
+            chart_data,
+        )
+    except TypeError:
+        chart_shape = slide.shapes.add_chart(
+            XL_CHART_TYPE.LINE,
+            Inches(left),
+            Inches(top),
+            Inches(width),
+            Inches(height),
+            chart_data,
+        )
+
+    chart = chart_shape.chart
+    if props.get("title") or props.get("caption"):
+        chart.has_title = True
+        caption = props.get("title") or props.get("caption")
+        chart.chart_title.text_frame.text = str(caption)
+
+    if len(series) <= 1:
+        chart.has_legend = False
+
+    if not chart_data.categories:
+        return
+
+    for plot in chart.plots:
+        for series_idx in range(len(plot.series)):
+            plot.series[series_idx].has_data_labels = False
 
 
 def _apply_text_frame_style(text_frame, style: dict[str, Any], *, theme: Theme) -> None:

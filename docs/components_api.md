@@ -13,8 +13,8 @@
 | `roundedbox` | `rounded-box` | `text` | `{"type":"roundedbox","text":"Chip"}` |
 | `circle` | `circle` | `text` | `{"type":"circle","text":"1"}` |
 | `badge` | `badge` | `text` | `{"type":"badge","text":"New"}` |
-| `line` | `line` | `from`, `to`, `style`, `color`, `weight` | `{"type":"line","text":"divider"}` |
-| `arrow` | `arrow` | `from`, `to`, `head`, `color`, `weight` | `{"type":"arrow","text":"Flow"}` |
+| `line` | `line` | `from`, `to`, `style`, `color`, `weight` | `{"type":"line","props":{"from":"left","to":"right","weight":1.5}}` |
+| `arrow` | `arrow` | `from`, `to`, `head`, `color`, `weight` | `{"type":"arrow","props":{"from":"left","to":"right","head":"end"}}` |
 | `divider` | `divider` | `orientation`, `thickness`, `length` | `{"type":"divider","props":{"orientation":"horizontal"}}` |
 | `image` | `image` | `src`, `fit`, `width`, `height`, `alt` | `{"type":"image","props":{"src":"path/to/file.png"}}` |
 | `svg` | `svg` | `src`, `body`, `fit`, `width`, `height` | `{"type":"svg","props":{"body":"<svg/>"}}` |

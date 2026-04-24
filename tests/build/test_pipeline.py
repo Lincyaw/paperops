@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from pptx import Presentation
 
 from paperops.slides.build import (
@@ -13,6 +14,7 @@ from paperops.slides.build import (
     render_json,
     style_stage,
 )
+from paperops.slides.components.registry import ComponentError
 from paperops.slides.ir.node import Node
 
 
@@ -149,3 +151,43 @@ def test_render_json_stage_wires_the_full_pipeline(tmp_path: Path):
     assert returned == out
     prs = Presentation(str(out))
     assert len(prs.slides) == 2
+
+
+def test_render_json_enforces_semantic_prop_requirements(tmp_path: Path):
+    with pytest.raises(ComponentError, match="MISSING_REQUIRED_PROP"):
+        render_json(
+            {
+                "theme": "minimal",
+                "slides": [
+                    {
+                        "type": "slide",
+                        "children": [{"type": "kpi", "props": {"label": "DAU"}}],
+                    }
+                ],
+            },
+            out=tmp_path / "missing-prop.pptx",
+        )
+
+    with pytest.raises(ComponentError, match="UNKNOWN_PROP"):
+        render_json(
+            {
+                "theme": "minimal",
+                "slides": [
+                    {
+                        "type": "slide",
+                        "children": [
+                            {
+                                "type": "kpi",
+                                "props": {
+                                    "label": "DAU",
+                                    "value": "125k",
+                                    "delta": "+56%",
+                                    "unknown": "x",
+                                },
+                            }
+                        ],
+                    }
+                ],
+            },
+            out=tmp_path / "unknown-prop.pptx",
+        )

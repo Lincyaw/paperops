@@ -9,6 +9,7 @@ from paperops.slides.ir.node import Node
 from paperops.slides.components.table import Table as LayoutTable
 from paperops.slides.components.text import TextBlock
 from paperops.slides.components.shapes import Box as ShapeBox
+from paperops.slides.components.shapes import RoundedBox
 from paperops.slides.layout.containers import Absolute, AbsoluteItem, Flex, Grid, GridItem, HStack, Layer, LayoutNode, Padding
 from paperops.slides.layout.types import Constraints, IntrinsicSize, LayoutIssue, TrackSpec
 
@@ -230,6 +231,28 @@ def _build_layout_leaf(node: Node, theme) -> LayoutNode:
             font_size=_build_style_font_size(style, theme),
             bold=_is_bold(style.get("font-weight")),
             align=_build_style_text_align(style),
+        )
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "roundedbox":
+        text = text or _as_text(props.get("text"), "")
+        raw_radius = style.get("radius")
+        if isinstance(raw_radius, (int, float)):
+            radius = float(raw_radius)
+        else:
+            radius = _safe_float(raw_radius)
+        if radius is None:
+            radius = 0.08
+        layout = RoundedBox(
+            text=text,
+            color=str(style.get("bg", "bg_alt")),
+            text_color=str(style.get("color", "text")),
+            font_size=_build_style_font_size(style, theme),
+            bold=_is_bold(style.get("font-weight")),
+            align=_build_style_text_align(style),
+            radius=radius,
         )
         _apply_style_to_layout_node(layout, node)
         _attach_source(layout, node)
@@ -500,6 +523,17 @@ def _to_float(value: Any, *, fallback: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return fallback
+
+
+def _safe_float(value: Any) -> float | None:
+    if value in {"auto", "inherit", "none", None}:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 

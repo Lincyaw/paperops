@@ -12,6 +12,7 @@ import tempfile
 from pptx import Presentation as PptxPresentation
 from pptx.util import Inches
 
+from paperops.slides import components  # noqa: F401
 from paperops.slides.codegen import render_styled_layout
 from paperops.slides.core.constants import CONTENT_REGION, SLIDE_HEIGHT, SLIDE_WIDTH
 from paperops.slides.core.theme import Theme, themes
