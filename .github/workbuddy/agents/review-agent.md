@@ -33,6 +33,14 @@ prompt: |
   Evaluate EACH criterion as pass / fail / cannot-judge, with concrete
   evidence (file:line, test name, or quoted output).
 
+  IMPORTANT: `cannot-judge` results caused by environment limitations
+  (missing binary, no GPU, no WPS/LibreOffice, no network, no display)
+  must NOT block Path A. If a criterion cannot be verified because a
+  tool is not installed in this runtime, treat it as cannot-judge and
+  still take Path A — just note the environmental gap in the verdict
+  comment. Only take Path B when a criterion has a concrete failure
+  (test failed, wrong output, missing file, incorrect behavior).
+
   ## MANDATORY handoff (DO NOT SKIP)
 
   You MUST run one of the two paths below before exiting. Exiting without
