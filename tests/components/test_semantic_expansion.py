@@ -75,8 +75,8 @@ def test_all_semantic_components_expand():
 
     for name, raw in cards.items():
         expanded = expand_node(Node.from_dict(raw))
-        if name == "note":
-            assert expanded.type == "note"
+        if name in {"note", "spacer"}:
+            assert expanded.type == name
         else:
             assert expanded.type != name, f"{name} should expand into a different node type"
 
@@ -100,5 +100,5 @@ def test_all_semantic_components_expand():
 
     # card-like nodes should resolve into a box-shaped subtree in at least one level
     card_tree = expand_node(Node.from_dict({"type": "card", "children": [{"type": "text", "text": "x"}]}))
-    box_types = {"box", "_spacer", "text", "icon", "svg", "image", "chart", "note", "table", "line", "arrow", "divider", "card", "callout", "quote", "pullquote", "keypoint", "stepper", "timeline", "figure", "caption"}
+    box_types = {"box", "spacer", "text", "icon", "svg", "image", "chart", "note", "table", "line", "arrow", "divider", "card", "callout", "quote", "pullquote", "keypoint", "stepper", "timeline", "figure", "caption"}
     assert any(isinstance(child, Node) and child.type in box_types for child in card_tree.children or [])

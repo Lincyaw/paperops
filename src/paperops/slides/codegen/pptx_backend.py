@@ -166,10 +166,10 @@ def _render_leaf(
     text = _extract_text(source_node, layout_node)
     node_type = source_node.type if source_node is not None else None
     style = _style_snapshot(source_node)
-    left = Inches(float(region.left))
-    top = Inches(float(region.top))
-    width = Inches(float(region.width))
-    height = Inches(float(region.height))
+    left = float(region.left)
+    top = float(region.top)
+    width = float(region.width)
+    height = float(region.height)
 
     if node_type in {"box", "kpi"} or isinstance(layout_node, ShapeBox):
         _render_box(
@@ -180,6 +180,63 @@ def _render_leaf(
             text=text,
         )
         return
+    if node_type == "roundedbox" and not isinstance(layout_node, ShapeBox):
+        _render_rounded_box(
+            slide=slide,
+            region=(left, top, width, height),
+            style=style,
+            theme=theme,
+            text=text,
+        )
+        return
+    if node_type == "circle":
+        _render_circle(
+            slide=slide,
+            region=(left, top, width, height),
+            style=style,
+            theme=theme,
+            text=text,
+        )
+        return
+    if node_type == "badge":
+        _render_badge(
+            slide=slide,
+            region=(left, top, width, height),
+            style=style,
+            theme=theme,
+            text=text,
+        )
+        return
+    if node_type == "divider":
+        _render_divider(
+            slide=slide,
+            region=(left, top, width, height),
+            style=style,
+            theme=theme,
+            text=text,
+        )
+        return
+    if node_type == "line":
+        _render_connector(
+            slide=slide,
+            region=(left, top, width, height),
+            style=style,
+            theme=theme,
+            node_type="line",
+        )
+        return
+    if node_type == "arrow":
+        _render_connector(
+            slide=slide,
+            region=(left, top, width, height),
+            style=style,
+            theme=theme,
+            node_type="arrow",
+        )
+        return
+    if node_type in {"image", "svg", "icon"}:
+        if _render_image_like(slide, node_type, source_node, style, theme, (left, top, width, height), text):
+            return
 
     if _is_textual_node(node_type) or text:
         _render_text_box(
@@ -217,7 +274,7 @@ def _text_color(style: dict[str, Any], theme: Theme) -> RGBColor:
 def _render_box(
     *,
     slide,
-    region: tuple,
+    region: tuple[float, float, float, float],
     style: dict[str, Any],
     theme: Theme,
     text: str,
@@ -225,10 +282,10 @@ def _render_box(
     left, top, width, height = region
     shape = slide.shapes.add_shape(
         MSO_SHAPE.RECTANGLE,
-        left,
-        top,
-        width,
-        height,
+        Inches(left),
+        Inches(top),
+        Inches(width),
+        Inches(height),
     )
 
     fill = shape.fill
@@ -242,7 +299,8 @@ def _render_box(
             theme,
             _style_value(style, "border", _theme_default_color(theme, "border")),
         )
-        shape.line.width = Pt(_to_float(_style_value(style, "line-width", 1.0)))
+        line_width = _to_float(_style_value(style, "line-width", 1.0))
+        shape.line.width = Pt(line_width if line_width is not None else 1.0)
     else:
         shape.line.fill.background()
 
@@ -260,6 +318,268 @@ def _theme_default_color(theme: Theme, key: str) -> str:
     return str(theme.colors.get(key, "#FFFFFF"))
 
 
+def _render_rounded_box(
+    *,
+    slide,
+    region: tuple[float, float, float, float],
+    style: dict[str, Any],
+    theme: Theme,
+    text: str,
+) -> None:
+    left, top, width, height = region
+    shape = slide.shapes.add_shape(
+        MSO_SHAPE.ROUNDED_RECTANGLE,
+        Inches(left),
+        Inches(top),
+        Inches(width),
+        Inches(height),
+    )
+
+    fill = shape.fill
+    fill.solid()
+    fill.fore_color.rgb = _resolve_color(
+        theme, _style_value(style, "bg", _theme_default_color(theme, "bg_alt"))
+    )
+
+    shape.line.fill.background()
+    if _style_value(style, "border", "none") not in {"none", None, "inherit"}:
+        shape.line.color.rgb = _resolve_color(
+            theme,
+            _style_value(style, "border", _theme_default_color(theme, "border")),
+        )
+        line_width = _to_float(_style_value(style, "line-width", 1.0))
+        shape.line.width = Pt(line_width if line_width is not None else 1.0)
+
+    if text:
+        tf = shape.text_frame
+        _apply_text_frame_style(tf, style, theme=theme)
+        paragraph = tf.paragraphs[0]
+        paragraph.text = text
+        paragraph.alignment = _ALIGN_MAP.get(
+            _style_value(style, "text-align", "center"), PP_ALIGN.LEFT
+        )
+
+
+def _render_circle(
+    *,
+    slide,
+    region: tuple[float, float, float, float],
+    style: dict[str, Any],
+    theme: Theme,
+    text: str,
+) -> None:
+    left, top, width, height = region
+    diameter = max(width, height)
+    cx = left + (width - diameter) / 2.0
+    cy = top + (height - diameter) / 2.0
+    shape = slide.shapes.add_shape(
+        MSO_SHAPE.OVAL,
+        Inches(cx),
+        Inches(cy),
+        Inches(diameter),
+        Inches(diameter),
+    )
+
+    fill = shape.fill
+    fill.solid()
+    fill.fore_color.rgb = _resolve_color(
+        theme, _style_value(style, "bg", _theme_default_color(theme, "primary"))
+    )
+    shape.line.fill.background()
+
+    if text:
+        tf = shape.text_frame
+        _apply_text_frame_style(tf, style, theme=theme)
+        paragraph = tf.paragraphs[0]
+        paragraph.text = text
+        paragraph.alignment = PP_ALIGN.CENTER
+
+
+def _render_badge(
+    *,
+    slide,
+    region: tuple[float, float, float, float],
+    style: dict[str, Any],
+    theme: Theme,
+    text: str,
+) -> None:
+    left, top, width, height = region
+    shape = slide.shapes.add_shape(
+        MSO_SHAPE.ROUNDED_RECTANGLE,
+        Inches(left),
+        Inches(top),
+        Inches(width),
+        Inches(height),
+    )
+    fill = shape.fill
+    fill.solid()
+    fill.fore_color.rgb = _resolve_color(
+        theme, _style_value(style, "bg", _theme_default_color(theme, "accent"))
+    )
+    shape.line.fill.background()
+
+    if text:
+        tf = shape.text_frame
+        _apply_text_frame_style(tf, style, theme=theme)
+        paragraph = tf.paragraphs[0]
+        paragraph.text = text
+        paragraph.alignment = PP_ALIGN.CENTER
+
+
+def _render_divider(
+    *,
+    slide,
+    region: tuple[float, float, float, float],
+    style: dict[str, Any],
+    theme: Theme,
+    text: str,
+)-> None:
+    style_orientation = _style_value(style, "orientation", _style_value(style, "direction", "horizontal"))
+    is_vertical = str(style_orientation).lower() in {"vertical", "v"}
+
+    left, top, width, height = region
+    if is_vertical:
+        x1 = Inches(left + width / 2.0)
+        y1 = Inches(top)
+        x2 = Inches(left + width / 2.0)
+        y2 = Inches(top + height)
+    else:
+        x1 = Inches(left)
+        y1 = Inches(top + height / 2.0)
+        x2 = Inches(left + width)
+        y2 = Inches(top + height / 2.0)
+
+    shape = slide.shapes.add_connector(1, x1, y1, x2, y2)
+    shape.line.color.rgb = _resolve_color(
+        theme, _style_value(style, "color", _theme_default_color(theme, "border"))
+    )
+    line_width = _to_float(_style_value(style, "line-width", 1.0))
+    shape.line.width = Pt(line_width if line_width is not None else 1.0)
+
+
+def _render_connector(
+    *,
+    slide,
+    region: tuple[float, float, float, float],
+    style: dict[str, Any],
+    theme: Theme,
+    node_type: str,
+) -> None:
+    left, top, width, height = region
+    is_vertical = str(_style_value(style, "orientation", "horizontal")).lower() in {"vertical", "v"}
+
+    x1 = left + 0.0
+    y1 = top + height / 2.0
+    x2 = left + width
+    y2 = top + height / 2.0
+    if is_vertical:
+        x1 = left + width / 2.0
+        y1 = top
+        x2 = left + width / 2.0
+        y2 = top + height
+
+    connector = slide.shapes.add_connector(1, Inches(x1), Inches(y1), Inches(x2), Inches(y2))
+    connector.line.color.rgb = _resolve_color(
+        theme, _style_value(style, "color", _theme_default_color(theme, "border"))
+    )
+    line_width = _to_float(_style_value(style, "line-width", 1.0))
+    connector.line.width = Pt(line_width if line_width is not None else 1.0)
+
+    if node_type == "arrow" and width > 0.0 and height > 0.0:
+        line_color = _resolve_color(
+            theme, _style_value(style, "color", _theme_default_color(theme, "border"))
+        )
+        connector.line.color.rgb = line_color
+        from pptx.oxml.ns import qn
+
+        line_element = connector.line._ln
+        arrow_tip = line_element.makeelement(qn("a:headEnd"), {})
+        arrow_tip.set("type", "triangle")
+        arrow_tip.set("w", "med")
+        arrow_tip.set("len", "med")
+        line_element.append(arrow_tip)
+
+
+def _render_image_like(
+    slide,
+    node_type: str,
+    source_node: Node | None,
+    style: dict[str, Any],
+    theme: Theme,
+    region: tuple[float, float, float, float],
+    extracted_text: str,
+) -> bool:
+    props = source_node.props if source_node is not None else {}
+    left, top, width, height = region
+    if node_type == "icon":
+        text = props.get("name")
+        if text:
+            _render_text_box(
+                slide=slide,
+                region=(left, top, width, height),
+                node=source_node,
+                style=style,
+                theme=theme,
+                text=f"[icon] {text}",
+            )
+            return True
+        if extracted_text:
+            _render_text_box(
+                slide=slide,
+                region=(left, top, width, height),
+                node=source_node,
+                style=style,
+                theme=theme,
+                text=extracted_text,
+            )
+            return True
+        return False
+
+    src = ""
+    if isinstance(props, dict):
+        src = str(props.get("src", "") or "")
+
+    if node_type == "svg" and not src:
+        src = str(props.get("body", "") or "")
+        if src.startswith("<") and src.endswith(">"):
+            placeholder = extracted_text or "svg"
+            _render_text_box(
+                slide=slide,
+                region=(left, top, width, height),
+                node=source_node,
+                style=style,
+                theme=theme,
+                text=placeholder,
+            )
+            return True
+        return False
+
+    if src and src != "missing.png" and Path(src).is_file():
+        path = Path(src)
+        try:
+            slide.shapes.add_picture(
+                str(path),
+                Inches(left),
+                Inches(top),
+                Inches(width),
+                Inches(height),
+            )
+            return True
+        except Exception:
+            pass
+
+    label = extracted_text or node_type
+    _render_text_box(
+        slide=slide,
+        region=(left, top, width, height),
+        node=source_node,
+        style=style,
+        theme=theme,
+        text=label,
+    )
+    return True
+
+
 def _render_text_box(
     *,
     slide,
@@ -270,7 +590,12 @@ def _render_text_box(
     text: str,
 ) -> None:
     left, top, width, height = region
-    tb = slide.shapes.add_textbox(left, top, width, height)
+    tb = slide.shapes.add_textbox(
+        Inches(left),
+        Inches(top),
+        Inches(width),
+        Inches(height),
+    )
     tf = tb.text_frame
     _apply_text_frame_style(tf, style, theme=theme)
     paragraph = tf.paragraphs[0]

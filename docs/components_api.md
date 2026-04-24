@@ -38,6 +38,7 @@
 | `figure` | `figure` | `src` / `body` / `chart_type`, `caption`, `source` | `{"type":"figure","props":{"chart_type":"bar","caption":"Recovery trend"}}` |
 | `caption` | `caption` | `text` | `{"type":"caption","props":{"text":"Chart source: Internal"}}` |
 | `spacer` | `spacer` | `size`, `orientation`, `width`, `height` | `{"type":"spacer","props":{"size":"lg"}}` |
+| `note` | `note` | *(none)* | `{"type":"note","children":["Speaker note goes here"]}` |
 
-> `note` is a semantic component in this phase so speaker-only text is captured by
-> `codegen` into PPT speaker notes and does not create a visible shape.
+> `note` is a semantic component in this phase, so speaker-only text is captured
+> by `codegen` into PPT speaker notes and does not create a visible shape.

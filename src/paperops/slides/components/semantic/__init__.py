@@ -436,7 +436,8 @@ class Spacer:
                 style_payload["width"] = size
 
         return {
-            "type": "_spacer",
+            "type": "spacer",
+            "class": "spacer",
             "style": style_payload,
             "children": [],
         }
