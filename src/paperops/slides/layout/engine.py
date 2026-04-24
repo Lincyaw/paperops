@@ -2,13 +2,29 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from paperops.slides.core.constants import CONTENT_REGION, Region, SLIDE_HEIGHT, SLIDE_WIDTH
+from paperops.slides.ir.node import Node
+from paperops.slides.components.text import TextBlock
+from paperops.slides.components.shapes import Box as ShapeBox
 from paperops.slides.layout.containers import Absolute, AbsoluteItem, Flex, Grid, GridItem, HStack, Layer, LayoutNode, Padding
 from paperops.slides.layout.types import Constraints, IntrinsicSize, LayoutIssue, TrackSpec
 
 
+def build_layout_tree(
+    node: Node,
+    theme,
+    *,
+    region: Region = CONTENT_REGION,
+) -> LayoutNode:
+    """Convert an IR node tree into a layout node tree."""
+    layout_root = _ir_node_to_layout(node, theme)
+    return layout_root
+
+
 def compute_layout(
-    root: LayoutNode,
+    root: Node | LayoutNode,
     region: Region,
     theme,
     *,
@@ -16,9 +32,388 @@ def compute_layout(
     root_path: str = "root",
 ) -> list[dict]:
     """Resolve a component tree into absolute regions and return layout issues."""
+    layout_root = root
+    if isinstance(root, Node):
+        layout_root = _ir_node_to_layout(root, theme)
+    if not isinstance(layout_root, LayoutNode):
+        raise TypeError("compute_layout expects a Node or LayoutNode")
+
     issues: list[LayoutIssue] = []
-    _layout(root, region, theme, issues, root_path, slide)
+    _layout(layout_root, region, theme, issues, root_path, slide)
     return [issue.to_dict() for issue in issues]
+
+
+def _resolve_layout_metrics_from_style(node: Node) -> dict[str, Any]:
+    style = {}
+    if getattr(node, "computed_style", None) is not None:
+        style = dict(node.computed_style.snapshot())
+    if style is None:
+        style = {}
+    for key, value in (node.style or {}).items():
+        style.setdefault(key, value)
+    return style
+
+
+def _apply_style_to_layout_node(
+    layout_node: LayoutNode,
+    source_node: Node | None,
+) -> None:
+    if source_node is None:
+        return
+    style = _resolve_layout_metrics_from_style(source_node)
+
+    if "width" in style:
+        _as_float(layout_node, "width", style.get("width"))
+    if "height" in style:
+        _as_float(layout_node, "height", style.get("height"))
+    if "min-width" in style:
+        _as_float(layout_node, "min_width", style.get("min-width"))
+    if "min-height" in style:
+        _as_float(layout_node, "min_height", style.get("min-height"))
+    if "max-width" in style:
+        _as_float(layout_node, "max_width", style.get("max-width"))
+    if "max-height" in style:
+        _as_float(layout_node, "max_height", style.get("max-height"))
+
+    if "grow" in style:
+        _as_float(layout_node, "grow", style.get("grow"))
+    if "shrink" in style:
+        _as_float(layout_node, "shrink", style.get("shrink"))
+    if "basis" in style:
+        _as_float(layout_node, "basis", style.get("basis"))
+    if "wrap" in style:
+        layout_node.wrap = bool(style["wrap"])
+
+    if isinstance(layout_node, Flex):
+        if "justify" in style:
+            layout_node.justify = str(style["justify"])
+        if "align" in style:
+            layout_node.align = str(style["align"])
+        layout_node.gap = _as_float(layout_node, "gap", style.get("gap"), fallback=layout_node.gap)
+        if layout_node.gap is not None:
+            layout_node.gap = float(layout_node.gap)
+        row_gap = style.get("row-gap")
+        col_gap = style.get("column-gap")
+        if row_gap is not None:
+            layout_node.row_gap = float(row_gap) if isinstance(row_gap, (int, float)) else None
+        if col_gap is not None:
+            layout_node.column_gap = float(col_gap) if isinstance(col_gap, (int, float)) else None
+
+    if isinstance(layout_node, Grid):
+        layout_node.columns = _parse_grid_tracks(style.get("cols"))
+        layout_node.rows = _parse_grid_tracks(style.get("rows"))
+        if isinstance(style.get("cols"), int):
+            layout_node.cols = int(style["cols"])
+
+
+def _as_float(layout_node: LayoutNode, attr: str, value: Any, *, fallback: float | None = None) -> float | None:
+    if value is None:
+        if fallback is not None:
+            setattr(layout_node, attr, fallback)
+        return None
+    if value in {"auto", "inherit", "none", None}:
+        return None
+    if isinstance(value, (int, float)):
+        setattr(layout_node, attr, float(value))
+        return float(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    setattr(layout_node, attr, number)
+    return number
+
+
+def _parse_grid_tracks(raw: Any) -> list[TrackSpec] | None:
+    if raw is None:
+        return None
+    if isinstance(raw, list):
+        values = raw
+    elif isinstance(raw, tuple):
+        values = list(raw)
+    elif isinstance(raw, (int, float)):
+        count = int(raw)
+        if count <= 0:
+            return None
+        return [TrackSpec("fr", 1.0) for _ in range(count)]
+    elif isinstance(raw, str):
+        values = raw.split()
+    else:
+        return None
+
+    tracks: list[TrackSpec] = []
+    for token in values:
+        if token in {"auto", "inherit", "none"}:
+            tracks.append(TrackSpec("auto", 0.0))
+            continue
+        text = str(token).strip()
+        if not text:
+            continue
+        if text.endswith("fr"):
+            number = text[:-2]
+            try:
+                tracks.append(TrackSpec("fr", float(number) if number else 1.0))
+            except ValueError:
+                tracks.append(TrackSpec("auto", 0.0))
+            continue
+        try:
+            tracks.append(TrackSpec("fixed", float(text)))
+            continue
+        except ValueError:
+            tracks.append(TrackSpec("auto", 0.0))
+    return tracks or None
+
+
+def _extract_node_text(node: Node) -> str:
+    if node.props and isinstance(node.props.get("text"), str):
+        return str(node.props["text"])
+    if node.text is not None:
+        return str(node.text)
+    if not node.children:
+        return ""
+    chunks: list[str] = []
+    for child in node.children:
+        if isinstance(child, str):
+            chunks.append(child)
+        elif isinstance(child, Node):
+            chunks.append(_extract_node_text(child))
+    return "".join(chunks)
+
+
+def _build_style_font_size(style: dict[str, Any], theme) -> float:
+    value = style.get("font")
+    if value is None:
+        return float(theme.fonts.get("body", 18))
+    if isinstance(value, (int, float)):
+        return float(value)
+    return float(theme.resolve_font_size(value))
+
+
+def _build_style_text_align(style: dict[str, Any]) -> str:
+    value = style.get("text-align", "left")
+    if value in {"left", "center", "right"}:
+        return str(value)
+    return "left"
+
+
+def _build_layout_leaf(node: Node, theme) -> LayoutNode:
+    style = _resolve_layout_metrics_from_style(node)
+    text = _extract_node_text(node)
+    node_type = node.type
+
+    if node_type in {"box", "kpi"}:
+        props = dict(node.props or {})
+        if text:
+            props.setdefault("text", text)
+        if node_type == "kpi":
+            label = props.get("label", "")
+            value = props.get("value", "")
+            delta = props.get("delta", "")
+            if delta:
+                text = f"{label}: {value} ({delta})"
+            else:
+                text = f"{label}: {value}"
+            props["text"] = text
+        layout = ShapeBox(
+            text=str(props.get("text", "")),
+            color=str(style.get("bg", "bg_alt")),
+            border=str(style.get("border", "border")),
+            text_color=str(style.get("color", "text")),
+            font_size=_build_style_font_size(style, theme),
+            bold=_is_bold(style.get("font-weight")),
+            align=_build_style_text_align(style),
+        )
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    # Default text-like leaf
+    layout = TextBlock(
+        text=text,
+        font_size=_build_style_font_size(style, theme),
+        color=str(style.get("color", "text")),
+        align=_build_style_text_align(style),
+        bold=_is_bold(style.get("font-weight")),
+        italic=bool(str(style.get("font-style", "")).lower() == "italic"),
+        line_spacing=float(style.get("line-height", 1.25)),
+        margin_x=float(style.get("padding-left", 0.0) or 0.0),
+        margin_y=float(style.get("padding-top", 0.0) or 0.0),
+    )
+    _apply_style_to_layout_node(layout, node)
+    _attach_source(layout, node)
+    return layout
+
+
+def _build_layout_children(node: Node, theme) -> list[LayoutNode]:
+    children: list[LayoutNode] = []
+    for child in node.children or []:
+        if isinstance(child, str):
+            children.append(
+                TextBlock(
+                    text=child,
+                    font_size=float(theme.fonts.get("body", 18)),
+                    align="left",
+                    color=str((node.computed_style.snapshot() if getattr(node, "computed_style", None) else {}).get("color", "text")),
+                )
+            )
+            continue
+        children.append(_ir_node_to_layout(child, theme))
+    return children
+
+
+def _ir_node_to_layout(node: Node, theme) -> LayoutNode:
+    node_type = node.type.lower()
+    if node_type == "slide":
+        layout = Layer(children=_build_layout_children(node, theme))
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type in {"flex", "hstack", "stack"}:
+        children = _build_layout_children(node, theme)
+        gap = _resolve_layout_metrics_from_style(node).get("gap")
+        layout = Flex(
+            direction="row" if node_type != "stack" else "column",
+            children=children,
+            gap=float(gap) if isinstance(gap, (int, float)) else 0.3,
+        )
+        if node_type == "stack":
+            layout.direction = "column"
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type in {"vstack"}:
+        children = _build_layout_children(node, theme)
+        layout = Flex(direction="column", children=children)
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "grid":
+        children = _build_layout_children(node, theme)
+        # Convert explicit textual children into generic positioned entries if needed.
+        grid_children = []
+        for child in children:
+            if isinstance(child, LayoutNode):
+                grid_children.append(child)
+            else:
+                grid_children.append(child)
+        layout = Grid(children=grid_children)
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "layer":
+        layout = Layer(children=_build_layout_children(node, theme))
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "absolute":
+        children: list[AbsoluteItem] = []
+        for child in node.children or []:
+            if isinstance(child, str):
+                item_style = _resolve_layout_metrics_from_style(node)
+                item_child = TextBlock(text=child, font_size=float(theme.fonts.get("body", 18)))
+            elif isinstance(child, Node):
+                item_style = _resolve_layout_metrics_from_style(child)
+                item_child = _ir_node_to_layout(child, theme)
+            else:
+                continue
+            left = _to_float(item_style.get("left"), fallback=0.0)
+            top = _to_float(item_style.get("top"), fallback=0.0)
+            width = item_style.get("width")
+            height = item_style.get("height")
+            child_layout = AbsoluteItem(
+                child=item_child,
+                left=left,
+                top=top,
+                width=float(width) if isinstance(width, (int, float)) else None,
+                height=float(height) if isinstance(height, (int, float)) else None,
+            )
+            _attach_source(child_layout, child if isinstance(child, Node) else node)
+            children.append(child_layout)
+        layout = Absolute(children=children)
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type == "padding":
+        padding_value = _resolve_layout_metrics_from_style(node)
+        style = padding_value
+        all_padding = _float_or_none(style.get("padding"))
+        child_layout: LayoutNode | None = None
+        if node.children:
+            first = node.children[0]
+            if isinstance(first, Node):
+                child_layout = _ir_node_to_layout(first, theme)
+        layout = Padding(
+            child=child_layout,
+            all=all_padding,
+            left=float(style.get("padding-left") or 0.0) if _is_numeric(style.get("padding-left")) else None,
+            right=float(style.get("padding-right") or 0.0) if _is_numeric(style.get("padding-right")) else None,
+            top=float(style.get("padding-top") or 0.0) if _is_numeric(style.get("padding-top")) else None,
+            bottom=float(style.get("padding-bottom") or 0.0) if _is_numeric(style.get("padding-bottom")) else None,
+        )
+        _apply_style_to_layout_node(layout, node)
+        _attach_source(layout, node)
+        return layout
+
+    if node_type in {"text", "title", "subtitle", "heading"}:
+        layout = _build_layout_leaf(node, theme)
+        return layout
+
+    if node_type == "box" or node_type == "kpi":
+        return _build_layout_leaf(node, theme)
+
+    layout = LayoutNode(
+        children=_build_layout_children(node, theme),
+    )
+    _apply_style_to_layout_node(layout, node)
+    _attach_source(layout, node)
+    return layout
+
+
+def _attach_source(layout_node: LayoutNode, source_node: Node | None) -> None:
+    setattr(layout_node, "_ir_node", source_node)
+    return None
+
+
+def _is_numeric(value: Any) -> bool:
+    return isinstance(value, (int, float))
+
+
+def _float_or_none(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _is_bold(font_weight: Any) -> bool:
+    if font_weight in {None, "inherit", "auto"}:
+        return False
+    if isinstance(font_weight, bool):
+        return font_weight
+    if isinstance(font_weight, (int, float)):
+        return float(font_weight) >= 600
+    if isinstance(font_weight, str):
+        return font_weight.lower() in {"bold", "bolder"}
+    return False
+
+
+def _to_float(value: Any, *, fallback: float = 0.0) -> float:
+    if value is None:
+        return fallback
+    if value in {"auto", "inherit", "none"}:
+        return fallback
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
+
 
 
 def _layout(
@@ -104,7 +499,7 @@ def _layout_flex(node: Flex, region: Region, theme, issues: list[LayoutIssue], n
         _layout_wrapped_row(node, region, theme, issues, node_path, slide)
         return
 
-    gap = node.main_gap()
+    gap = node.main_gap() or 0.0
     is_row = node.direction == "row"
     available_main = (region.width if is_row else region.height) - gap * max(len(node.children) - 1, 0)
     resolved = _resolve_flex_main_sizes(node, theme, available_main, region, issues, node_path, slide)
@@ -138,7 +533,7 @@ def _layout_wrapped_row(node: Flex, region: Region, theme, issues: list[LayoutIs
     lines: list[list[tuple[int, LayoutNode, IntrinsicSize, float]]] = []
     current_line: list[tuple[int, LayoutNode, IntrinsicSize, float]] = []
     current_width = 0.0
-    gap = node.main_gap()
+    gap = node.main_gap() or 0.0
 
     for index, child in enumerate(node.children):
         intrinsic = child.measure(_main_probe_constraints(child, node, region), theme)

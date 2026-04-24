@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from paperops.slides.components.shapes import _resolve_font_pt
 from paperops.slides.core.constants import Align
-from paperops.slides.layout.auto_size import TextStyle, build_intrinsic_size, measure_text_intrinsic
+from paperops.slides.layout.autofit import TextStyle, build_intrinsic_size, measure_text_intrinsic
 from paperops.slides.layout.containers import LayoutNode
 from paperops.slides.layout.types import Constraints, IntrinsicSize
 

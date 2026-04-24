@@ -12,7 +12,7 @@ from examples.self_intro.build import (
     build_presentation,
     make_theme,
 )
-from paperops.slides.layout.auto_size import _load_pil_font
+from paperops.slides.layout.autofit import _load_pil_font
 from paperops.slides.preview import _wrap_preview_text, check_presentation
 
 

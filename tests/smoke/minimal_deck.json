@@ -1,0 +1,90 @@
+{
+  "$schema": "paperops-slide-1.0",
+  "theme": "minimal",
+  "defines": {
+    "KpiSection": {
+      "type": "kpi",
+      "props": {
+        "label": "$label",
+        "value": "$value",
+        "delta": "$delta"
+      }
+    }
+  },
+  "slides": [
+    {
+      "type": "slide",
+      "class": "cover",
+      "children": [
+        {
+          "type": "title",
+          "text": "Phase 2 Smoke Deck"
+        },
+        {
+          "type": "subtitle",
+          "text": "cover + content + kpi"
+        }
+      ]
+    },
+    {
+      "type": "slide",
+      "children": [
+        {
+          "type": "text",
+          "text": "Content"
+        },
+        {
+          "type": "flex",
+          "style": {
+            "gap": "md"
+          },
+          "children": [
+            {"type": "box", "text": "Left"},
+            {"type": "box", "text": "Right"}
+          ]
+        },
+        {
+          "type": "stack",
+          "children": [
+            {"type": "text", "text": "Stack top"},
+            {"type": "text", "text": "Stack bottom"}
+          ]
+        },
+        {
+          "type": "padding",
+          "style": {
+            "padding": "sm"
+          },
+          "children": [
+            {"type": "text", "text": "Padded note"}
+          ]
+        },
+        {
+          "type": "grid",
+          "style": {
+            "cols": "1fr 1fr"
+          },
+          "children": [
+            {"type": "box", "text": "A"},
+            {"type": "box", "text": "B"},
+            {"type": "box", "text": "C"}
+          ]
+        },
+        {
+          "type": "layer",
+          "children": [
+            {"type": "text", "text": "Overlay"},
+            {"type": "text", "text": "Second label"}
+          ]
+        }
+      ]
+    },
+    {
+      "type": "slide",
+      "children": [
+        {"$use": "KpiSection", "label": "Users", "value": "12.4k", "delta": "+8%"},
+        {"$use": "KpiSection", "label": "Errors", "value": "13", "delta": "-1%"}
+      ]
+    }
+  ]
+}

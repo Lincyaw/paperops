@@ -12,7 +12,7 @@ from pathlib import Path
 from pptx import Presentation as PptxPresentation
 from pptx.util import Inches, Pt
 
-from paperops.slides.layout.auto_size import TextStyle, measure_text_metrics
+from paperops.slides.layout.autofit import TextStyle, measure_text_metrics
 
 
 # ──────────────────────────────────────────────────────────────────────

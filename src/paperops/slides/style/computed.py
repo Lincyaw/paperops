@@ -39,6 +39,14 @@ class ComputedStyle:
             return default
         return self.parent.get(key, default)
 
+    def __getattr__(self, key: str) -> Any:
+        if key in self.values:
+            return self.values[key]
+        raise AttributeError(key)
+
+    def as_dict(self) -> dict[str, Any]:
+        return dict(self.values)
+
     def snapshot(self) -> dict[str, Any]:
         merged: dict[str, Any] = {}
         cursor: ComputedStyle | None = self
