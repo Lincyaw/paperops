@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from paperops.slides.core.tokens import ShadowSpec
-
 STYLE_KEY_SCHEMAS: dict[str, dict[str, Any]] = {
     "color": {
         "type": ["string", "number", "null"],
@@ -80,6 +78,12 @@ STYLE_KEY_SCHEMAS: dict[str, dict[str, Any]] = {
     "stagger": {"type": ["string", "number", "null"]},
     "animate-trigger": {"type": ["string", "null"]},
     "animate-group": {"type": ["string", "null"]},
+    "baseline-snap": {"type": ["boolean", "null"]},
+    "align-to": {"type": ["string", "null"]},
+    "left": {"type": ["string", "number", "null"]},
+    "top": {"type": ["string", "number", "null"]},
+    "line-width": {"type": ["string", "number", "null"]},
+    "orientation": {"type": ["string", "null"]},
     "grow": {"type": ["number", "null"]},
     "shrink": {"type": ["number", "null"]},
     "basis": {"type": ["string", "number", "null"]},

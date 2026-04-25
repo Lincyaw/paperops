@@ -12,7 +12,6 @@ from paperops.slides.style.computed import ComputedStyle
 from paperops.slides.style.selector import matches_selector
 from paperops.slides.style.stylesheet import StyleSheet
 
-
 _KNOWN_STYLE_KEYS = set(STYLE_KEY_SCHEMAS.keys()) | {"lang"}
 _INHERITABLE_STYLE_KEYS = {
     "color",
@@ -130,6 +129,7 @@ class CascadeResult:
     computed: dict[int, ComputedStyle]
     errors: list[StyleResolutionError]
     root: Node | None = None
+    trace: list[dict[str, Any]] | None = None
 
     def style_for(self, node_or_id: Node | int) -> ComputedStyle:
         key = node_or_id if isinstance(node_or_id, int) else id(node_or_id)
@@ -154,6 +154,7 @@ def resolve_computed_styles(
     defaults = dict(theme_defaults or {})
     computed: dict[int, ComputedStyle] = {}
     errors: list[StyleResolutionError] = []
+    trace: list[dict[str, Any]] = []
 
     root_node = _coerce_node(root, path="root")
     _walk_node(
@@ -168,11 +169,12 @@ def resolve_computed_styles(
         parent_computed=None,
         computed=computed,
         errors=errors,
+        trace=trace,
     )
 
     if strict and errors:
         raise errors[0]
-    return CascadeResult(computed=computed, errors=errors, root=root_node)
+    return CascadeResult(computed=computed, errors=errors, root=root_node, trace=trace)
 
 
 def _walk_node(
@@ -188,6 +190,7 @@ def _walk_node(
     parent_computed: ComputedStyle | None,
     computed: dict[int, ComputedStyle],
     errors: list[StyleResolutionError],
+    trace: list[dict[str, Any]],
 ) -> None:
     current_computed = _compute_node_style(
         node=node,
@@ -200,6 +203,7 @@ def _walk_node(
         parent_style=parent_computed,
         path=path,
         errors=errors,
+        trace=trace,
     )
     object.__setattr__(node, "computed_style", current_computed)
     computed[id(node)] = current_computed
@@ -227,6 +231,7 @@ def _walk_node(
             parent_computed=current_computed,
             computed=computed,
             errors=errors,
+            trace=trace,
         )
 
 
@@ -242,8 +247,10 @@ def _compute_node_style(
     parent_style: ComputedStyle | None,
     path: str,
     errors: list[StyleResolutionError],
+    trace: list[dict[str, Any]],
 ) -> ComputedStyle:
     style_candidates: dict[str, tuple[tuple[int, int, int, int], Any]] = {}
+    matched_rules: list[str] = []
 
     theme_defaults = defaults.get(node.type, {}) if defaults else {}
     _apply_style_source(
@@ -260,6 +267,7 @@ def _compute_node_style(
 
     for rule in style_sheet:
         if matches_selector(rule.selector, node, ancestors, sibling_meta):
+            matched_rules.append(rule.selector_text)
             _apply_style_source(
                 style_candidates,
                 declarations=rule.declarations,
@@ -274,6 +282,7 @@ def _compute_node_style(
 
     for rule in deck_style:
         if matches_selector(rule.selector, node, ancestors, sibling_meta):
+            matched_rules.append(rule.selector_text)
             _apply_style_source(
                 style_candidates,
                 declarations=rule.declarations,
@@ -318,6 +327,14 @@ def _compute_node_style(
             if inherited is not None:
                 resolved[key] = inherited
 
+    trace.append(
+        {
+            "stage": "style",
+            "node": path,
+            "matched_rules": matched_rules,
+            "computed_style_keys": sorted(resolved.keys()),
+        }
+    )
     return ComputedStyle(resolved, parent=parent_style)
 
 
@@ -365,7 +382,12 @@ def _apply_style_source(
 
         try:
             resolved_value = _resolve_style_value(theme, key, raw_value)
-        except (UnknownTokenCategoryError, UnknownTokenError, TypeError, ValueError) as exc:
+        except (
+            UnknownTokenCategoryError,
+            UnknownTokenError,
+            TypeError,
+            ValueError,
+        ) as exc:
             errors.append(
                 StyleResolutionError(
                     code="INVALID_STYLE_VALUE",

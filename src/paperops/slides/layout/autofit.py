@@ -5,9 +5,24 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
+from paperops.slides.ir.validator import (
+    StructuredValidationError,
+    ValidationMessage,
+    ValidationReport,
+)
+from paperops.slides.layout.containers import (
+    Absolute,
+    AbsoluteItem,
+    Grid,
+    GridItem,
+    LayoutNode,
+    Padding,
+)
 from paperops.slides.layout.types import Constraints, IntrinsicSize
 
 logger = logging.getLogger(__name__)
@@ -210,10 +225,14 @@ def _measure_line_width(line: str, font, font_size_pt: float) -> float:
     cjk_count = sum(1 for ch in line if _is_cjk(ch))
     non_cjk_count = len(line) - cjk_count
     scale = font_size_pt / 12.0
-    return (non_cjk_count * _AVG_CHAR_WIDTH_FACTOR + cjk_count * _CJK_CHAR_WIDTH_FACTOR) * scale
+    return (
+        non_cjk_count * _AVG_CHAR_WIDTH_FACTOR + cjk_count * _CJK_CHAR_WIDTH_FACTOR
+    ) * scale
 
 
-def _split_long_token(token: str, max_width: float, font, font_size_pt: float) -> list[str]:
+def _split_long_token(
+    token: str, max_width: float, font, font_size_pt: float
+) -> list[str]:
     if not token:
         return [token]
     pieces: list[str] = []
@@ -230,7 +249,9 @@ def _split_long_token(token: str, max_width: float, font, font_size_pt: float) -
     return pieces or [token]
 
 
-def _wrap_tokens(tokens: list[str], max_width: float | None, font, font_size_pt: float) -> tuple[str, ...]:
+def _wrap_tokens(
+    tokens: list[str], max_width: float | None, font, font_size_pt: float
+) -> tuple[str, ...]:
     if max_width is None:
         return ("".join(tokens),)
 
@@ -247,7 +268,10 @@ def _wrap_tokens(tokens: list[str], max_width: float | None, font, font_size_pt:
             continue
 
         candidate = current + token
-        if current and _measure_line_width(candidate.rstrip(), font, font_size_pt) > max_width:
+        if (
+            current
+            and _measure_line_width(candidate.rstrip(), font, font_size_pt) > max_width
+        ):
             lines.append(current.rstrip())
             current = ""
             if _measure_line_width(token, font, font_size_pt) > max_width:
@@ -257,7 +281,10 @@ def _wrap_tokens(tokens: list[str], max_width: float | None, font, font_size_pt:
             else:
                 current = token
         else:
-            if not current and _measure_line_width(token, font, font_size_pt) > max_width:
+            if (
+                not current
+                and _measure_line_width(token, font, font_size_pt) > max_width
+            ):
                 token_lines = _split_long_token(token, max_width, font, font_size_pt)
                 lines.extend(token_lines[:-1])
                 current = token_lines[-1]
@@ -268,7 +295,9 @@ def _wrap_tokens(tokens: list[str], max_width: float | None, font, font_size_pt:
     return tuple(lines)
 
 
-def measure_text_metrics(text: str, style: TextStyle, max_width_inches: float | None = None) -> TextMetrics:
+def measure_text_metrics(
+    text: str, style: TextStyle, max_width_inches: float | None = None
+) -> TextMetrics:
     if not text:
         return TextMetrics(0.0, 0.0, 0, tuple(), 0.0)
 
@@ -285,11 +314,22 @@ def measure_text_metrics(text: str, style: TextStyle, max_width_inches: float | 
         tokens = _tokenize_text(paragraph)
         for token in tokens:
             if token.strip():
-                longest_unbreakable = max(longest_unbreakable, _measure_line_width(token, font, style.font_size_pt))
-        wrapped_lines.extend(_wrap_tokens(tokens, max_width_inches, font, style.font_size_pt))
+                longest_unbreakable = max(
+                    longest_unbreakable,
+                    _measure_line_width(token, font, style.font_size_pt),
+                )
+        wrapped_lines.extend(
+            _wrap_tokens(tokens, max_width_inches, font, style.font_size_pt)
+        )
 
-    widths = [_measure_line_width(line, font, style.font_size_pt) for line in wrapped_lines] or [0.0]
-    width = min(max(widths), max_width_inches) if max_width_inches is not None and widths else max(widths)
+    widths = [
+        _measure_line_width(line, font, style.font_size_pt) for line in wrapped_lines
+    ] or [0.0]
+    width = (
+        min(max(widths), max_width_inches)
+        if max_width_inches is not None and widths
+        else max(widths)
+    )
     height = line_height * max(len(wrapped_lines), 1)
     return TextMetrics(
         width=width,
@@ -300,17 +340,25 @@ def measure_text_metrics(text: str, style: TextStyle, max_width_inches: float | 
     )
 
 
-def measure_text_intrinsic(text: str, style: TextStyle, max_width_inches: float | None = None) -> TextIntrinsic:
+def measure_text_intrinsic(
+    text: str, style: TextStyle, max_width_inches: float | None = None
+) -> TextIntrinsic:
     unconstrained = measure_text_metrics(text, style, None)
     wrapped = measure_text_metrics(text, style, max_width_inches)
     min_width = unconstrained.longest_unbreakable_width + style.margin_x
-    preferred_width = (max_width_inches if max_width_inches is not None else unconstrained.width) if text else 0.0
+    preferred_width = (
+        (max_width_inches if max_width_inches is not None else unconstrained.width)
+        if text
+        else 0.0
+    )
     if max_width_inches is not None:
         preferred_width = min(unconstrained.width, max_width_inches)
     preferred_width += style.margin_x
     preferred_height = wrapped.height + style.margin_y
     effective_line_spacing = max(style.line_spacing, _LINE_HEIGHT_FACTOR)
-    min_height = max((style.font_size_pt / 72.0) * effective_line_spacing + style.margin_y, 0.0)
+    min_height = max(
+        (style.font_size_pt / 72.0) * effective_line_spacing + style.margin_y, 0.0
+    )
     return TextIntrinsic(
         min_width=max(min_width, 0.0),
         preferred_width=max(preferred_width, min_width),
@@ -329,7 +377,9 @@ def build_intrinsic_size(intrinsic: TextIntrinsic) -> IntrinsicSize:
     )
 
 
-def preferred_size_from_intrinsic(intrinsic: TextIntrinsic, constraints: Constraints | None = None) -> tuple[float, float]:
+def preferred_size_from_intrinsic(
+    intrinsic: TextIntrinsic, constraints: Constraints | None = None
+) -> tuple[float, float]:
     if constraints is None:
         return intrinsic.preferred_width, intrinsic.preferred_height
     boxed = build_intrinsic_size(intrinsic).clamp(constraints)
@@ -360,7 +410,9 @@ def measure_wrapped_text_height(
     usable_width_inches: float,
 ) -> float:
     style = TextStyle(font_family=font_family, font_size_pt=font_size_pt)
-    metrics = measure_text_metrics(text, style, max_width_inches=max(usable_width_inches, 0.01))
+    metrics = measure_text_metrics(
+        text, style, max_width_inches=max(usable_width_inches, 0.01)
+    )
     return metrics.height
 
 
@@ -372,3 +424,411 @@ def estimate_min_text_width(
     style = TextStyle(font_family=font_family, font_size_pt=font_size_pt)
     intrinsic = measure_text_intrinsic(text, style)
     return intrinsic.min_width
+
+
+_DEFAULT_OVERFLOW = {
+    "title": "shrink",
+    "heading": "shrink",
+    "subtitle": "shrink",
+    "prose": "reflow",
+    "code": "clip",
+}
+
+
+@dataclass(frozen=True)
+class OverflowInfo:
+    policy: str
+    overflows: bool
+    needed_height: float
+    available_height: float
+
+
+def _layout_children(node: LayoutNode) -> list[LayoutNode]:
+    if isinstance(node, Padding):
+        return [node.child] if node.child is not None else []
+    if isinstance(node, Absolute):
+        return [
+            item.child
+            for item in node.children
+            if item is not None and item.child is not None
+        ]
+    if isinstance(node, Grid):
+        return [
+            item.child
+            for item in node.iter_items()
+            if item is not None and item.child is not None
+        ]
+    if isinstance(node, GridItem):
+        return [node.child] if node.child is not None else []
+    if isinstance(node, AbsoluteItem):
+        return [node.child] if node.child is not None else []
+    children = getattr(node, "children", None)
+    if children is None:
+        return []
+    return [child for child in children if child is not None]
+
+
+def _extract_text(node: Any) -> str:
+    if node is None:
+        return ""
+    if getattr(node, "text", None):
+        return str(node.text)
+    if getattr(node, "props", None) and isinstance(node.props.get("text"), str):
+        return str(node.props["text"])
+    chunks: list[str] = []
+    for child in getattr(node, "children", None) or []:
+        if isinstance(child, str):
+            chunks.append(child)
+        else:
+            chunks.append(_extract_text(child))
+    return "".join(chunks)
+
+
+def _style_snapshot(source_node: Any) -> dict[str, Any]:
+    if source_node is None:
+        return {}
+    computed = getattr(source_node, "computed_style", None)
+    snapshot = computed.snapshot() if computed is not None else {}
+    for key, value in (getattr(source_node, "style", None) or {}).items():
+        snapshot.setdefault(key, value)
+    return snapshot
+
+
+def overflow_policy(source_node: Any) -> str:
+    style = _style_snapshot(source_node)
+    if style.get("overflow") is not None:
+        return str(style["overflow"])
+    node_type = getattr(source_node, "type", None)
+    return _DEFAULT_OVERFLOW.get(node_type, "shrink")
+
+
+def measure_overflow(layout_node: LayoutNode, theme) -> OverflowInfo | None:
+    source_node = getattr(layout_node, "_ir_node", None)
+    region = getattr(layout_node, "_region", None)
+    if source_node is None or region is None:
+        return None
+    text = _extract_text(source_node).strip()
+    if not text:
+        return None
+
+    available_width = max(float(region.width), 0.1)
+    available_height = max(float(region.height), 0.1)
+    style = _style_snapshot(source_node)
+    font_token = style.get("font")
+    font_pt = theme.resolve_font_size(
+        font_token or _DEFAULT_FONT_FOR_TYPE(getattr(source_node, "type", None))
+    )
+    metrics = measure_text_intrinsic(
+        text,
+        TextStyle(
+            font_family=getattr(theme, "font_family", "Calibri"),
+            font_size_pt=float(font_pt),
+            line_spacing=float(style.get("line-height", 1.25) or 1.25),
+            margin_x=0.0,
+            margin_y=0.0,
+        ),
+        max_width_inches=available_width,
+    )
+    return OverflowInfo(
+        policy=overflow_policy(source_node),
+        overflows=metrics.preferred_height > available_height + 1e-6,
+        needed_height=metrics.preferred_height,
+        available_height=available_height,
+    )
+
+
+def _DEFAULT_FONT_FOR_TYPE(node_type: str | None) -> str:
+    if node_type == "title":
+        return "title"
+    if node_type == "subtitle":
+        return "subtitle"
+    if node_type == "heading":
+        return "heading"
+    return "body"
+
+
+def _collect_textual_nodes(
+    layout_node: LayoutNode,
+) -> list[tuple[Any, LayoutNode, OverflowInfo]]:
+    matches: list[tuple[Any, LayoutNode, OverflowInfo]] = []
+    for child in _layout_children(layout_node):
+        matches.extend(_collect_textual_nodes(child))
+    return matches
+
+
+def _iter_layout_nodes(layout_node: LayoutNode):
+    yield layout_node
+    for child in _layout_children(layout_node):
+        yield from _iter_layout_nodes(child)
+
+
+def _find_reflow_target(layout_root: LayoutNode, theme):
+    for node in _iter_layout_nodes(layout_root):
+        info = measure_overflow(node, theme)
+        if info is None or not info.overflows:
+            continue
+        source_node = getattr(node, "_ir_node", None)
+        if source_node is None:
+            continue
+        return source_node, node, info
+    return None
+
+
+def _clone_node(node):
+    from paperops.slides.ir.node import Node
+
+    if isinstance(node, str):
+        return node
+    if isinstance(node, Node):
+        return Node.from_dict(node.to_dict())
+    return deepcopy(node)
+
+
+def _replace_child_path(root, path: list[int], replacement):
+    from paperops.slides.ir.node import Node
+
+    if not path:
+        return replacement
+    children = list(root.children or [])
+    index = path[0]
+    child = children[index]
+    if not isinstance(child, Node):
+        raise TypeError("Expected node child while cloning reflow slide")
+    children[index] = _replace_child_path(child, path[1:], replacement)
+    return Node(
+        type=root.type,
+        class_=root.class_,
+        id=root.id,
+        style=dict(root.style) if root.style is not None else None,
+        text=root.text,
+        props=dict(root.props) if root.props is not None else None,
+        children=children,
+    )
+
+
+def _find_child_path(root, target, prefix: list[int] | None = None):
+    from paperops.slides.ir.node import Node
+
+    if prefix is None:
+        prefix = []
+    if root is target:
+        return prefix
+    for index, child in enumerate(root.children or []):
+        if isinstance(child, Node):
+            path = _find_child_path(child, target, [*prefix, index])
+            if path is not None:
+                return path
+    return None
+
+
+def _continuation_suffix(meta: dict[str, Any] | None) -> str:
+    lang = str((meta or {}).get("lang", "")).lower()
+    if lang.startswith("zh"):
+        return "(续)"
+    return "(cont.)"
+
+
+def _apply_title_suffix(slide_node, suffix: str):
+    from paperops.slides.ir.node import Node
+
+    children = list(slide_node.children or [])
+    updated = False
+    new_children: list[Any] = []
+    for child in children:
+        if not isinstance(child, Node):
+            new_children.append(child)
+            continue
+        if not updated and child.type == "title":
+            title_text = _extract_text(child).strip()
+            if suffix not in title_text:
+                child = Node(
+                    type=child.type,
+                    class_=child.class_,
+                    id=child.id,
+                    style=dict(child.style) if child.style is not None else None,
+                    text=(title_text + f" {suffix}").strip(),
+                    props=dict(child.props) if child.props is not None else None,
+                    children=child.children,
+                )
+            updated = True
+        new_children.append(child)
+    return Node(
+        type=slide_node.type,
+        class_=slide_node.class_,
+        id=slide_node.id,
+        style=dict(slide_node.style) if slide_node.style is not None else None,
+        text=slide_node.text,
+        props=dict(slide_node.props) if slide_node.props is not None else None,
+        children=new_children,
+    )
+
+
+def _split_reflow_content(
+    node, layout_node: LayoutNode, theme
+) -> tuple[Any, Any, bool]:
+    from paperops.slides.ir.node import Node
+
+    segments: list[Any]
+    if node.children:
+        segments = list(node.children)
+    else:
+        text = _extract_text(node)
+        parts = [part.strip() for part in text.split("\n\n") if part.strip()]
+        segments = parts if len(parts) > 1 else [text]
+
+    if len(segments) <= 1:
+        return node, None, True
+
+    region = getattr(layout_node, "_region", None)
+    style = _style_snapshot(node)
+    available_width = max(float(region.width), 0.1)
+    available_height = max(float(region.height), 0.1)
+    font_pt = theme.resolve_font_size(
+        style.get("font") or _DEFAULT_FONT_FOR_TYPE(getattr(node, "type", None))
+    )
+    text_style = TextStyle(
+        font_family=getattr(theme, "font_family", "Calibri"),
+        font_size_pt=float(font_pt),
+        line_spacing=float(style.get("line-height", 1.25) or 1.25),
+    )
+
+    def fits(count: int) -> bool:
+        content = "".join(
+            _extract_text(item) if not isinstance(item, str) else item
+            for item in segments[:count]
+        )
+        intrinsic = measure_text_intrinsic(
+            content, text_style, max_width_inches=available_width
+        )
+        return intrinsic.preferred_height <= available_height + 1e-6
+
+    lo, hi = 1, len(segments)
+    best = 0
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if fits(mid):
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+
+    if best <= 0:
+        return node, None, True
+    if best >= len(segments):
+        return node, None, False
+
+    first = segments[:best]
+    rest = segments[best:]
+    front = Node(
+        type=node.type,
+        class_=node.class_,
+        id=node.id,
+        style=dict(node.style) if node.style is not None else None,
+        text=(
+            node.text
+            if node.children is not None
+            else ("\n\n".join(str(item) for item in first))
+        ),
+        props=dict(node.props) if node.props is not None else None,
+        children=first if node.children is not None else None,
+    )
+    back = Node(
+        type=node.type,
+        class_=node.class_,
+        id=node.id,
+        style=dict(node.style) if node.style is not None else None,
+        text=(
+            node.text
+            if node.children is not None
+            else ("\n\n".join(str(item) for item in rest))
+        ),
+        props=dict(node.props) if node.props is not None else None,
+        children=rest if node.children is not None else None,
+    )
+    return front, back, False
+
+
+def resolve_overflow(
+    slide_layouts: list[tuple[Any, LayoutNode]],
+    *,
+    theme,
+    meta: dict[str, Any] | None = None,
+) -> list[tuple[Any, LayoutNode]]:
+    resolved: list[tuple[Any, LayoutNode]] = []
+    queue = list(slide_layouts)
+
+    while queue:
+        slide_node, layout_root = queue.pop(0)
+        reflow_target = _find_reflow_target(layout_root, theme)
+        if reflow_target is None:
+            resolved.append((slide_node, layout_root))
+            continue
+
+        source_node, target_layout, overflow = reflow_target
+        policy = overflow.policy
+        if policy == "shrink" or policy == "clip":
+            resolved.append((slide_node, layout_root))
+            continue
+        if policy == "error":
+            report = ValidationReport(
+                errors=[
+                    ValidationMessage(
+                        code="OVERFLOW_UNRECOVERABLE",
+                        message=(
+                            f"Text overflows its region: needs {overflow.needed_height:.2f}in, "
+                            f"has {overflow.available_height:.2f}in"
+                        ),
+                        path=getattr(target_layout, "_node_path", "slide"),
+                        severity="error",
+                        meta={
+                            "needed_height": round(overflow.needed_height, 4),
+                            "available_height": round(overflow.available_height, 4),
+                        },
+                    )
+                ]
+            )
+            raise StructuredValidationError(report)
+
+        front, back, fallback_shrink = _split_reflow_content(
+            source_node, target_layout, theme
+        )
+        if fallback_shrink or back is None:
+            source_style = dict(getattr(source_node, "style", None) or {})
+            source_style.setdefault("overflow", "shrink")
+            source_style.setdefault("overflow-warning", "reflow-fallback-shrink")
+            from paperops.slides.ir.node import Node
+
+            replacement = Node(
+                type=source_node.type,
+                class_=source_node.class_,
+                id=source_node.id,
+                style=source_style,
+                text=source_node.text,
+                props=(
+                    dict(source_node.props) if source_node.props is not None else None
+                ),
+                children=source_node.children,
+            )
+            path = _find_child_path(slide_node, source_node)
+            if path is None:
+                resolved.append((slide_node, layout_root))
+            else:
+                resolved.append(
+                    (_replace_child_path(slide_node, path, replacement), None)
+                )
+            continue
+
+        path = _find_child_path(slide_node, source_node)
+        if path is None:
+            resolved.append((slide_node, layout_root))
+            continue
+
+        first_slide = _replace_child_path(slide_node, path, front)
+        continued_slide = _replace_child_path(_clone_node(slide_node), path, back)
+        continued_slide = _apply_title_suffix(
+            continued_slide, _continuation_suffix(meta)
+        )
+        resolved.append((first_slide, None))
+        queue.insert(0, (continued_slide, None))
+
+    return resolved

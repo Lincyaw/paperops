@@ -17,7 +17,6 @@ from paperops.slides.build import (
 from paperops.slides.components.registry import ComponentError
 from paperops.slides.ir.node import Node
 
-
 MINIMAL_RAW_IR = {
     "theme": "minimal",
     "slides": [
@@ -36,7 +35,10 @@ MINIMAL_RAW_IR = {
                     "type": "flex",
                     "children": [
                         {"type": "box", "text": "A"},
-                        {"type": "kpi", "props": {"label": "k", "value": "100", "delta": "+1%"}},
+                        {
+                            "type": "kpi",
+                            "props": {"label": "k", "value": "100", "delta": "+1%"},
+                        },
                     ],
                 },
                 {
@@ -132,7 +134,8 @@ def test_autofit_stage_is_stage_boundary_compatible():
     root, _ = style_stage(document)
     slide_layouts, _ = layout_stage(root, theme=document.theme)
     fixed = autofit_stage(slide_layouts, theme=document.theme)
-    assert fixed is slide_layouts
+    assert len(fixed) == len(slide_layouts)
+    assert all(source.type == "slide" for source, _ in fixed)
 
 
 def test_codegen_stage_writes_openable_pptx(tmp_path: Path):

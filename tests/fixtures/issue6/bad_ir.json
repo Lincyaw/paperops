@@ -1,0 +1,18 @@
+{
+  "defines": {
+    "KPI": {
+      "type": "text",
+      "text": "$trend"
+    }
+  },
+  "slides": [
+    {
+      "type": "slide",
+      "children": [
+        {"$use": "KPI"},
+        {"type": "mystery"},
+        {"type": "text", "text": "x", "style": {"display": "grid"}}
+      ]
+    }
+  ]
+}
