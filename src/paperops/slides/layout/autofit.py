@@ -570,6 +570,8 @@ def _find_reflow_target(layout_root: LayoutNode, theme):
         source_node = getattr(node, "_ir_node", None)
         if source_node is None:
             continue
+        if info.policy in {"shrink", "clip"}:
+            continue
         return source_node, node, info
     return None
 

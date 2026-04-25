@@ -1,4 +1,4 @@
-"""Compatibility shim for legacy import path ``examples.self_intro``."""
+"""Import shim for the underscore package path ``examples.self_intro``."""
 
 from . import build
 

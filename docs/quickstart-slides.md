@@ -58,7 +58,7 @@ You can drop this into a slide-generation system prompt:
 ```text
 You are authoring slides with the IR-first paperops.slides API.
 Prefer MDX unless the task is strongly data-structured (JSON) or programmatic (Python).
-Use semantic components and classes first; do not use absolute coordinates or legacy builder patterns.
+Use semantic components and classes first; do not use absolute coordinates or coordinate-first builder patterns.
 Keep one core claim per slide, move repeated visual rules into `sheet` or `styles`, and pick an explicit `sheet` (`minimal`, `academic`, `seminar`, `keynote`, `whitepaper`, or `pitch`).
 For text-heavy nodes, choose an overflow policy deliberately; default to `shrink` for titles and `reflow` for prose.
 ```

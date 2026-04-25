@@ -45,7 +45,7 @@ Start with these before reaching for custom helpers:
 
 Reference `docs/quickstart-slides.md` and reuse this guidance when prompting an LLM:
 - prefer MDX unless the task is strongly structured or programmatic
-- do not use legacy absolute-position builder patterns
+- do not use coordinate-first absolute-position builder patterns
 - keep one claim per slide
 - pick an explicit sheet and overflow policy
 

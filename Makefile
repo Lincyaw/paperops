@@ -1,7 +1,7 @@
 all: upload
 
 verify:
-	uv run pytest
+	uv run --extra all --extra dev pytest
 
 upload:
 	rm -rf dist
@@ -20,7 +20,7 @@ tag:
 	fi
 	@VERSION=$$(echo "$(TAG)" | sed 's/^v//'); \
 	echo "Updating version to $$VERSION in pyproject.toml"; \
-	sed -i '' "s/^version = ".*"/version = "$$VERSION"/" pyproject.toml
+	VERSION="$$VERSION" uv run python -c "from pathlib import Path; import os, re; p=Path('pyproject.toml'); s=p.read_text(); p.write_text(re.sub(r'^version = \".*\"', 'version = \"' + os.environ['VERSION'] + '\"', s, count=1), encoding='utf-8')"
 	@echo "Committing version change..."
 	git add pyproject.toml
 	git commit -m "Bump version to $(TAG)"
