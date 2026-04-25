@@ -5,66 +5,36 @@ description: "Use this skill whenever the user wants to turn one or more papers,
 
 # Talk Architect
 
-Design the talk before designing the deck.
+Design the talk before implementing the deck.
 
-## Use This Skill When
+## Core rule
 
-- the user wants a talk outline, slide-by-slide plan, speaker notes, or talk script
-- the user has one or more papers/notes and needs an audience-aware presentation story
-- the deck structure, pacing, or audience framing is still unstable
+Choose the authoring surface only after the story is stable enough.
 
-## Do Not Use This Skill When
+## Authoring DSL choice guide
 
-- the story is already locked and the task is to implement PPT code or layout
-- the main problem is visual consistency, symbol language, or diagram style
-- the task is to review an existing deck for clipping, density, or layout regressions
+- MDX: default for talk plans that mix prose, transitions, and semantic components
+- JSON: best when an upstream planner already outputs structured slide objects
+- Python: best when deck content depends on runtime data, loops, or reusable helper logic
 
-## Core Rule
+## Planning workflow
 
-Do not draft talk content until the talk style is known.
+1. lock audience, duration, and talk style
+2. reduce the talk to a setup -> development -> evidence -> resolution arc
+3. assign one claim per slide and write active titles
+4. decide which slides want dense evidence versus keynote-style emphasis
+5. hand the stable plan to `slidecraft` with an explicit authoring recommendation (MDX / JSON / Python)
 
-If the user wants a talk but style is missing, confirm at least:
-- talk style
-- audience type
-- duration
+## Deck handoff expectations
 
-Recommend a default instead of silently guessing:
-- `conference` for single-paper talks
-- `seminar` for internal or lab talks
-- `research-line` for multi-paper talks
-- `job-talk` for candidate-style talks
-
-## Workflow
-
-1. Intake
-   - gather the source documents, venue, duration, audience, language, must-cover points, and must-avoid points
-   - classify the request as single-paper, multi-paper, or research-line
-2. Lock the framing
-   - define the audience's core question, the talk thesis, and the main promise
-   - choose pacing based on talk style and audience distance
-3. Compress the story
-   - reorganize around audience value instead of paper section order
-   - reduce the story to setup -> development -> evidence -> resolution
-4. Plan slide by slide
-   - one primary message per slide
-   - active English title
-   - explicit transition from the previous slide
-   - Chinese speaker notes by default unless the user asks otherwise
-5. Keep or cut aggressively
-   - keep only the strongest evidence for each claim in the main flow
-   - move tables, dense ablations, and low-priority detail to backup
-6. Produce handoff artifacts
-   - `talk_master.md` for the presenter
-   - `slide_spec.md` or equivalent structured block for downstream deck generation
+When handing off to `slidecraft`, include:
+- recommended sheet (`minimal`, `academic`, `seminar`, `keynote`, `whitepaper`, or `pitch`)
+- which slides are prose-heavy and may want `reflow`
+- repeated class names or semantic roles worth encoding in `styles`
+- any assets, figures, or tables that must appear
 
 ## Handoff
 
-- if the story is stable and the next task is deck implementation, hand off to `slidecraft`
-- if the visual system is underspecified, produce a short style brief and hand off to `visual-language` before `slidecraft`
-- if the user later asks to diagnose an existing deck, hand off to `slide-review`
-
-## References
-
-- `references/style-taxonomy.md` for talk types and audience distance
-- `references/output-formats.md` for required artifact structure
-- `references/best-practices.md` for current talk-planning heuristics and rationale
+- to `slidecraft` when the narrative is locked and implementation can start
+- to `visual-language` when the visual system needs a short brief before deck coding
+- to `slide-review` when a rendered deck needs diagnosis instead of replanning

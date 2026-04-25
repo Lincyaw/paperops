@@ -19,15 +19,13 @@ def _text_nodes(node: Node) -> list[tuple[str, str]]:
     return out
 
 
-def test_kpi_expands_to_card_with_label_value_delta_text_nodes():
+def test_kpi_expands_to_card_with_label_value_delta_lines():
     node = Node(type="kpi", props={"label": "DAU", "value": "125k", "delta": "+56%"})
     expanded = expand_nodes([node])[0]
 
-    assert expanded.type == "padding"
-    texts = {value for _type, value in _text_nodes(expanded) if _type == "text"}
-    assert "DAU" in texts
-    assert "125k" in texts
-    assert "+56%" in texts
+    assert expanded.type == "box"
+    assert expanded.props is not None
+    assert expanded.props["text"].splitlines() == ["DAU", "125k", "+56%"]
 
 
 def test_missing_required_kpi_prop_raises_mapped_error():
@@ -44,7 +42,7 @@ def test_kpi_node_merges_default_and_user_classes_without_duplicates():
     )
     expanded = expand_node(node)
     classes = [token for token in (expanded.class_ or "").split() if token]
-    assert classes == ["card", "kpi", "value"], classes
+    assert classes == ["box", "card", "kpi", "value"], classes
 
 
 def test_unknown_kpi_prop_raises_mapped_error():
@@ -109,7 +107,7 @@ def test_all_semantic_components_expand():
         if expected:
             assert expected in class_tokens
 
-    # card-like nodes should resolve into a box-shaped subtree in at least one level
+    # card-like nodes should resolve directly into a styled box leaf.
     card_tree = expand_node(Node.from_dict({"type": "card", "children": [{"type": "text", "text": "x"}]}))
-    box_types = {"box", "spacer", "text", "icon", "svg", "image", "chart", "note", "table", "line", "arrow", "divider", "card", "callout", "quote", "pullquote", "keypoint", "stepper", "timeline", "figure", "caption"}
-    assert any(isinstance(child, Node) and child.type in box_types for child in card_tree.children or [])
+    assert card_tree.type == "box"
+    assert card_tree.props == {"text": "x"}

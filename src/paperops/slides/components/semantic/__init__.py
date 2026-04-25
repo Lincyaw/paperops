@@ -68,18 +68,12 @@ class Card:
     @staticmethod
     def expand(props, children=None, style=None):
         body = _normalize_children(children)
-        if not body:
-            body = [{"type": "text", "class": "prose", "text": ""}]
+        lines = [_flatten_node_text([item]) for item in body]
+        text = "\n".join(line for line in lines if line)
         return {
-            "type": "padding",
+            "type": "box",
             "class": "card",
-            "children": [
-                {
-                    "type": "box",
-                    "class": "card-body",
-                    "children": body,
-                }
-            ],
+            "props": {"text": text},
         }
 
 

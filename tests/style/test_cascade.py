@@ -157,6 +157,22 @@ def test_non_inheritable_style_key_does_not_inherit():
     assert _style(result, child).get("bg") is None
 
 
+def test_computed_snapshot_excludes_parent_non_inheritable_keys():
+    tree = Node(
+        type="slide",
+        class_="cover",
+        style={"padding": "xl", "bg": "bg_alt", "color": "primary"},
+        children=[Node(type="title", class_="title")],
+    )
+    result = resolve_computed_styles(tree, theme=themes.minimal, strict=False)
+    child = tree.children[0]
+    snapshot = _style(result, child).snapshot()
+
+    assert snapshot["color"] == themes.minimal.colors["primary"]
+    assert "padding" not in snapshot
+    assert "bg" not in snapshot
+
+
 def test_blacklist_style_key_reports_structured_error():
     node = Node(type="card", style={"display": "flex"})
     result = resolve_computed_styles(node, theme=themes.minimal, strict=False)

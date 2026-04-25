@@ -480,7 +480,13 @@ def _build_layout_children(node: Node, theme) -> list[LayoutNode]:
 def _ir_node_to_layout(node: Node, theme) -> LayoutNode:
     node_type = node.type.lower()
     if node_type == "slide":
-        layout = Layer(children=_build_layout_children(node, theme))
+        style = _resolve_layout_metrics_from_style(node)
+        gap = style.get("gap")
+        layout = Flex(
+            direction="column",
+            children=_build_layout_children(node, theme),
+            gap=float(gap) if isinstance(gap, (int, float)) else 0.35,
+        )
         _apply_style_to_layout_node(layout, node)
         _attach_source(layout, node)
         return layout

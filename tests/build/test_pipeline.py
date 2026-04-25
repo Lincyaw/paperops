@@ -129,6 +129,17 @@ def test_layout_stage_returns_slide_layout_roots():
     assert all(hasattr(layout_node, "_region") for _, layout_node in slide_layouts)
 
 
+def test_slide_children_flow_instead_of_overlaying():
+    document = parse_stage(MINIMAL_RAW_IR)
+    root, _ = style_stage(document)
+    slide_layouts, _ = layout_stage(root, theme=document.theme)
+    _source, layout_node = slide_layouts[0]
+
+    child_tops = [child._region.top for child in layout_node.children]
+    assert child_tops == sorted(child_tops)
+    assert len(set(child_tops)) == len(child_tops)
+
+
 def test_autofit_stage_is_stage_boundary_compatible():
     document = parse_stage(MINIMAL_RAW_IR)
     root, _ = style_stage(document)

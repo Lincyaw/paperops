@@ -48,12 +48,19 @@ class ComputedStyle:
         return dict(self.values)
 
     def snapshot(self) -> dict[str, Any]:
-        merged: dict[str, Any] = {}
-        cursor: ComputedStyle | None = self
-        while cursor is not None:
-            for key, value in cursor.values.items():
-                if key not in merged and value != "inherit":
-                    if value is not None:
-                        merged[key] = value
-            cursor = cursor.parent
-        return merged
+        merged = dict(self.values)
+        if self.parent is None:
+            return {key: value for key, value in merged.items() if value is not None}
+
+        for key in _INHERITABLE_KEYS:
+            if key in merged and merged[key] == "inherit":
+                inherited = self.parent.get(key)
+                if inherited is None:
+                    merged.pop(key, None)
+                else:
+                    merged[key] = inherited
+            elif key not in merged:
+                inherited = self.parent.get(key)
+                if inherited is not None:
+                    merged[key] = inherited
+        return {key: value for key, value in merged.items() if value is not None}
