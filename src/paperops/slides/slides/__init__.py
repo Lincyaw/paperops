@@ -1,3 +1,5 @@
-"""Slides layer: base slide builder."""
+"""Legacy slides layer exports."""
 
-from paperops.slides.slides.base import SlideBuilder
+from paperops.slides.slides.base import CanvasSlide
+
+__all__ = ["CanvasSlide"]

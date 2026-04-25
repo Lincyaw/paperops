@@ -18,6 +18,7 @@ from paperops.slides.dsl.python_builder import (
     Flex,
     Grid,
     Heading,
+    HStack,
     KPI,
     Layer,
     Padding,
@@ -26,6 +27,7 @@ from paperops.slides.dsl.python_builder import (
     Subtitle,
     Text,
     Title,
+    VStack,
     Box,
     render_json,
 )
@@ -37,6 +39,7 @@ __all__ = [
     "Grid",
     "Flex",
     "Heading",
+    "HStack",
     "KPI",
     "load_json_document",
     "load_markdown_document",
@@ -54,6 +57,7 @@ __all__ = [
     "Subtitle",
     "Text",
     "Title",
+    "VStack",
     "Box",
     "render_json",
 ]

@@ -5,47 +5,35 @@ description: "Use this skill when reviewing an existing PPT or SlideCraft deck, 
 
 # Slide Review
 
-Diagnose the current deck state before changing slide code.
+Diagnose the rendered deck before editing authoring code.
 
-## Use This Skill When
+## Review checklist
 
-- the user asks to review a deck, inspect the current PPT, or diagnose clipping/overflow
-- preview PNGs, layout checks, or saved-file validation artifacts already exist or should be generated
-- the next action depends on identifying whether the problem is content, component sizing, layout negotiation, preview mismatch, or style drift
-
-## Do Not Use This Skill When
-
-- the main task is to create a talk story from raw source material
-- the deck does not exist yet and the primary job is first-pass generation
-- the real issue is missing visual direction rather than a broken rendered deck
-
-## Core Rule
-
-Do not jump straight into editing slide code. First establish the current deck state through generated artifacts.
+- class naming: do classes describe semantic role (`cover`, `card`, `kpi`, `summary`) instead of accidental styling?
+- sheet fit: is the selected `sheet` helping the story, or fighting the density and emphasis pattern?
+- style drift: are repeated values living in `styles` / sheet rules instead of being copied slide by slide?
+- autofit policy: do titles use `shrink`, prose-heavy blocks use `reflow`, and error-prone dense shapes avoid silent clipping?
+- container logic: is the problem a `Grid`/`Flex` relationship issue rather than a text issue?
 
 ## Workflow
 
-1. Build or regenerate the deck
-2. Run integrated review such as `prs.review_deck(...)` when available
-3. Inspect issue summaries, slide-level findings, and preview PNGs
-4. Classify the likely source:
-   - content density
-   - intrinsic sizing
-   - container negotiation
-   - preview/render mismatch
-   - style drift
-5. Propose or apply the smallest targeted fix
-6. Regenerate and rerun review until the issue stabilizes
+1. build or regenerate the deck
+2. inspect review output, preview PNGs, and slide-level issues
+3. classify the failure as class naming, sheet mismatch, overflow policy, container negotiation, or content density
+4. make the smallest targeted fix
+5. rerender and compare again
+
+## Typical fixes
+
+- move repeated styling into `styles` or a built-in sheet override
+- rename vague classes so selectors and intent are obvious
+- swap `sheet` before inventing local one-off styles
+- change `overflow` deliberately instead of shrinking every text box blindly
+- reduce competing focal points so one slide carries one claim
 
 ## Handoff
 
-- if the root cause is story or pacing, hand off to `talk-architect`
-- if the root cause is visual inconsistency, palette drift, or symbol-language drift, hand off to `visual-language`
-- if the issue is implementation/layout after diagnosis, hand off to `slidecraft`
-- if the user asks for repository validation after fixes, hand off to `verify`
-
-## References
-
-- use `../slidecraft/references/workflow.md` for the expected build -> review loop
-- use `../visual-language/references/style-drift-checklist.md` when the deck feels visually inconsistent
-- keep recommendations concrete: identify the broken slide, failure mode, and likely fix surface
+- to `slidecraft` for implementation changes after diagnosis
+- to `talk-architect` when density problems are really story problems
+- to `visual-language` when inconsistency comes from an unstable visual system
+- to `verify` for final repo-aware regression checks

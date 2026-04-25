@@ -259,11 +259,11 @@ class Presentation:
         self._builders: list[object] = []
 
     def slide(self, title=None, reference=None, background=None):
-        from paperops.slides.slides.base import SlideBuilder
+        from paperops.slides.slides.base import CanvasSlide
 
         layout = self._pptx.slide_layouts[6]
         pptx_slide = self._pptx.slides.add_slide(layout)
-        sb = SlideBuilder(
+        sb = CanvasSlide(
             pptx_slide,
             self._theme,
             title=title,

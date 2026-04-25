@@ -5,64 +5,53 @@ description: "Use this skill whenever creating, modifying, or generating PowerPo
 
 # SlideCraft
 
-Use `paperops.slides` to implement the deck once the story and visual system are sufficiently stable.
+Use `paperops.slides` to implement the deck once the story and visual system are stable enough to render.
 
-## Use This Skill When
+## Core rule
 
-- the user wants to generate or modify PPT code with `paperops.slides`
-- the task is deck implementation, slide composition, or layout construction
-- the story already exists or can be treated as stable enough to render
+Author with the IR-first API. Prefer `Deck` / `Slide` / `Title` / `Subtitle` / `Heading` / `Text` / `Grid` / `Flex` / `KPI` and render through the shared pipeline.
 
-## Do Not Use This Skill When
+## Authoring defaults
 
-- the user first needs a talk outline, talk style, or speaker-note plan
-- the main need is defining the deck's visual language, symbol vocabulary, or diagram grammar
-- the task is primarily to diagnose an already-rendered deck from review artifacts
+- default to MDX for narrative decks with prose + components
+- use JSON when the structure is already known exactly
+- use Python when data, loops, or shared helper functions generate slide content
+- choose an explicit `sheet`: `minimal`, `academic`, `seminar`, `keynote`, `whitepaper`, or `pitch`
 
-## Entry Checklist
+## High-frequency components
 
-Before writing slide code, confirm or infer:
-- slide sequence or story arc
-- audience and duration
-- presentation theme or desired visual direction
-- required figures, tables, or external assets
-- whether a style brief from `visual-language` is needed
+Start with these before reaching for custom helpers:
+- structure: `Slide`, `Grid`, `Flex`, `HStack`, `VStack`, `Layer`, `Padding`
+- text: `Title`, `Subtitle`, `Heading`, `Text`
+- semantics: `KPI`, `card`, `callout`, `quote`, `figure`, `note`
+- assets: `Image`, `SvgImage`, `Table`
+
+## Style rules
+
+- put repeated visual decisions into `sheet` or deck-local `styles`
+- use classes to communicate role: `cover`, `card`, `kpi`, `rail`, `summary`, `hero`
+- prefer style keys such as `padding`, `gap`, `cols`, `bg`, `color`, `border`, `radius`, `font`, `font-weight`, `align`, and `overflow`
+- use animation style keys only when they reveal reasoning order: `animate`, `animate-trigger`, `animate-group`, `stagger`, `delay`, `duration`
 
 ## Workflow
 
-1. Stabilize inputs
-   - if the story is still moving, send the task to `talk-architect`
-   - if the deck lacks a coherent visual system, get a brief from `visual-language`
-2. Translate the brief into implementation choices
-   - map palette roles into theme and emphasis usage
-   - map layout families into reusable slide skeletons
-   - map symbol vocabulary into repeated components, icons, and connector styles
-3. Build the deck structure
-   - choose the theme, slide sequence, and reusable slide patterns
-   - decide where template slides are enough and where custom composition is needed
-4. Compose slides in code
-   - use containers to express relationships first, then fill them with content
-   - keep each slide centered on one message and one visual focal point
-   - add animations only when they reveal reasoning order
-5. Integrate assets
-   - embed plotting outputs, images, and diagrams only after the slide structure is clear
-   - reuse recurring visual motifs instead of inventing a new one per slide
-6. Validate the result
-   - save the deck
-   - run review/preview checks
-   - route rendering problems into `slide-review`
+1. stabilize the story and visual brief
+2. choose MDX / JSON / Python based on authoring pressure
+3. choose the sheet and only then add deck-local styles
+4. build the deck with semantic structure first, then fill in text and assets
+5. render, review, and route remaining issues into `slide-review`
+
+## LLM prompt fragment
+
+Reference `docs/quickstart-slides.md` and reuse this guidance when prompting an LLM:
+- prefer MDX unless the task is strongly structured or programmatic
+- do not use legacy absolute-position builder patterns
+- keep one claim per slide
+- pick an explicit sheet and overflow policy
 
 ## Handoff
 
-- to `talk-architect` when story, pacing, or slide purpose is still unstable
-- to `visual-language` when color roles, symbol choices, or diagram style are not locked
-- to `slide-review` when the question becomes "what is broken in the current deck?"
-- to `verify` when implementation changes need repo-aware checks
-
-## References
-
-- `references/workflow.md` for the generation loop and routing rules
-- `references/layout-patterns.md` for common slide structures
-- `references/component-reference.md` for high-frequency components and pairings
-- `references/brief-consumption.md` for turning a visual-language brief into SlideCraft choices
-- `references/handoff-rules.md` for skill boundaries and transitions
+- to `talk-architect` when the narrative or pacing is unstable
+- to `visual-language` when palette, diagram grammar, or symbol vocabulary is still unclear
+- to `slide-review` when the deck exists and the question is diagnosis rather than first-pass generation
+- to `verify` when you need repo-aware checks before shipping

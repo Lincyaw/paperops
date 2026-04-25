@@ -1,4 +1,4 @@
-"""SlideBuilder — renders a component tree onto a python-pptx slide."""
+"""CanvasSlide renders a legacy component tree onto a python-pptx slide."""
 
 from __future__ import annotations
 
@@ -46,8 +46,8 @@ _ALIGN_MAP = {
 }
 
 
-class SlideBuilder:
-    """Builder for a single slide. Created by Presentation.slide()."""
+class CanvasSlide:
+    """Legacy imperative slide canvas created by `Presentation.slide()`."""
 
     def __init__(self, pptx_slide, theme, title=None, reference=None, slide_number=None):
         self._slide = pptx_slide
