@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from paperops.slides.core.constants import CONTENT_REGION, Region, SLIDE_HEIGHT, SLIDE_WIDTH
+from paperops.slides.dsl.inline_html import run_style_overrides
 from paperops.slides.ir.node import Node
 from paperops.slides.components.table import Table as LayoutTable
 from paperops.slides.components.text import TextBlock
@@ -188,6 +189,100 @@ def _extract_node_text(node: Node) -> str:
     return "".join(chunks)
 
 
+def _inline_style_to_run_style(style: dict[str, Any]) -> dict[str, Any]:
+    run: dict[str, Any] = {}
+
+    if "color" in style:
+        run["color"] = style["color"]
+    if "background_color" in style:
+        run["background_color"] = style["background_color"]
+    if "background-color" in style:
+        run["background_color"] = style["background-color"]
+
+    if "font_weight" in style:
+        weight = style["font_weight"]
+        if isinstance(weight, (int, float)):
+            run["bold"] = float(weight) >= 600.0
+        elif isinstance(weight, str) and weight:
+            run["bold"] = weight.lower() in {"bold", "bolder", "600", "700", "800", "900"}
+    if "font-weight" in style:
+        weight = style["font-weight"]
+        if isinstance(weight, (int, float)):
+            run["bold"] = float(weight) >= 600.0
+        elif isinstance(weight, str) and weight:
+            run["bold"] = weight.lower() in {"bold", "bolder", "600", "700", "800", "900"}
+    if "font_style" in style:
+        run["italic"] = str(style["font_style"]).lower() == "italic"
+    if "font-style" in style:
+        run["italic"] = str(style["font-style"]).lower() == "italic"
+
+    if "font_family" in style:
+        run["font_family"] = style["font_family"]
+    if "font-family" in style:
+        run["font_family"] = style["font-family"]
+    if "vertAlign" in style:
+        run["vertAlign"] = style["vertAlign"]
+    if "vert-align" in style:
+        run["vertAlign"] = style["vert-align"]
+    if "href" in style:
+        run["href"] = style["href"]
+    if "bold" in style:
+        run["bold"] = style["bold"]
+    if "italic" in style:
+        run["italic"] = style["italic"]
+    if "underline" in style:
+        run["underline"] = style["underline"]
+    if "strike" in style:
+        run["strike"] = style["strike"]
+    if "text_decoration" in style:
+        deco = str(style["text_decoration"]).lower()
+        if "underline" in deco:
+            run["underline"] = True
+        if "line-through" in deco or "strike" in deco:
+            run["strike"] = True
+    if "text-decoration" in style:
+        deco = str(style["text-decoration"]).lower()
+        if "underline" in deco:
+            run["underline"] = True
+        if "line-through" in deco or "strike" in deco:
+            run["strike"] = True
+    if "highlight" in style:
+        run["highlight"] = style["highlight"]
+
+    return run
+
+
+def _merge_style(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    merged.update(overrides)
+    return merged
+
+
+def _node_rich_text_runs(nodes: list[str | Node], inherited: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    runs: list[tuple[str, dict[str, Any]]] = []
+    for child in nodes:
+        if isinstance(child, str):
+            runs.append((child, dict(inherited)))
+            continue
+        if not isinstance(child, Node):
+            continue
+
+        child_style = _merge_style(inherited, _inline_style_to_run_style(run_style_overrides(child.type, child.props or {})))
+
+        if child.type == "br":
+            runs.append(("\n", dict(inherited)))
+            continue
+
+        if child.children:
+            runs.extend(_node_rich_text_runs(child.children, child_style))
+            continue
+
+        if child.text:
+            runs.append((child.text, dict(child_style)))
+
+    return runs
+
+
 def _build_style_font_size(style: dict[str, Any], theme) -> float:
     value = style.get("font")
     if value is None:
@@ -209,6 +304,12 @@ def _build_layout_leaf(node: Node, theme) -> LayoutNode:
     text = _extract_node_text(node)
     node_type = node.type
     props = dict(node.props or {})
+    base_run_style = _inline_style_to_run_style(style)
+    runs = _node_rich_text_runs(node.children, base_run_style) if node.children else None
+    if runs is not None and not runs:
+        runs = None
+    if runs:
+        text = "".join(part for part, _ in runs)
 
     if node_type in {"box", "kpi"}:
         props = dict(node.props or {})
@@ -276,6 +377,7 @@ def _build_layout_leaf(node: Node, theme) -> LayoutNode:
             line_spacing=float(style.get("line-height", 1.25)),
             margin_x=float(style.get("padding-left", 0.0) or 0.0),
             margin_y=float(style.get("padding-top", 0.0) or 0.0),
+            runs=runs,
         )
         _apply_style_to_layout_node(layout, node)
         _attach_source(layout, node)
@@ -351,6 +453,7 @@ def _build_layout_leaf(node: Node, theme) -> LayoutNode:
         line_spacing=float(style.get("line-height", 1.25)),
         margin_x=float(style.get("padding-left", 0.0) or 0.0),
         margin_y=float(style.get("padding-top", 0.0) or 0.0),
+        runs=runs,
     )
     _apply_style_to_layout_node(layout, node)
     _attach_source(layout, node)

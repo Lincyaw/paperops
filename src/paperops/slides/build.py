@@ -18,6 +18,8 @@ from paperops.slides.core.constants import CONTENT_REGION, SLIDE_HEIGHT, SLIDE_W
 from paperops.slides.core.theme import Theme, themes
 from paperops.slides.dsl.json_loader import Document
 from paperops.slides.dsl.json_loader import load_json_document
+from paperops.slides.dsl.markdown_parser import load_markdown_document
+from paperops.slides.dsl.mdx_parser import load_mdx_document
 from paperops.slides.layout.engine import build_layout_tree, compute_layout
 from paperops.slides.components.registry import expand_nodes
 from paperops.slides.style import get_sheet, resolve_computed_styles
@@ -53,6 +55,15 @@ def parse_stage(
         return source
     if isinstance(source, Mapping):
         return load_json_document(dict(source), strict=strict)
+
+    path = Path(source)
+    if path.exists() and path.is_file():
+        name = path.name.lower()
+        if name.endswith(".deck.md") or name.endswith(".md"):
+            return load_markdown_document(path)
+        if name.endswith(".slide.mdx") or name.endswith(".deck.mdx") or name.endswith(".mdx"):
+            return load_mdx_document(path)
+
     return load_json_document(source, strict=strict)
 
 
