@@ -10,13 +10,16 @@ from typing import Any
 
 from paperops.slides.components.registry import registry
 from paperops.slides.dsl.json_loader import DEFAULT_SCHEMA, Document
-from paperops.slides.dsl.markdown_parser import _parse_frontmatter
-from paperops.slides.dsl.markdown_parser import parse_markdown_fragment
-from paperops.slides.ir.schema import STYLE_KEY_SCHEMAS
+from paperops.slides.dsl.markdown_parser import (
+    _load_source_text,
+    _parse_frontmatter,
+    parse_markdown_fragment,
+)
 from paperops.slides.ir.node import Node
+from paperops.slides.ir.schema import STYLE_KEY_SCHEMAS
 
 
-@dataclass(frozen=True)
+@dataclass
 class MDXParseError(ValueError):
     """Structured parser error for MDX parsing."""
 
@@ -27,7 +30,7 @@ class MDXParseError(ValueError):
 
     def __post_init__(self) -> None:
         suffix = f" suggestion={self.suggestion}" if self.suggestion else ""
-        object.__setattr__(self, "args", (f"[{self.code}] {self.path}: {self.message}{suffix}",))
+        self.args = (f"[{self.code}] {self.path}: {self.message}{suffix}",)
 
     def to_dict(self) -> dict[str, Any]:
         payload = {
@@ -50,7 +53,16 @@ _SINGLE_TAG_RE = re.compile(
 )
 _CLOSE_TAG_RE = re.compile(r"^\s*</(?P<name>[A-Za-z][A-Za-z0-9_]*)\s*>\s*$")
 _STYLE_KEYS = set(STYLE_KEY_SCHEMAS)
-_IR_LAYOUT_TYPES = {"grid", "flex", "hstack", "stack", "vstack", "layer", "absolute", "padding"}
+_IR_LAYOUT_TYPES = {
+    "grid",
+    "flex",
+    "hstack",
+    "stack",
+    "vstack",
+    "layer",
+    "absolute",
+    "padding",
+}
 
 
 def _is_component_tag(name: str) -> bool:
@@ -68,9 +80,8 @@ def _coerce_js_scalar(value: str) -> Any:
         return False
     if lowered in {"none", "null"}:
         return None
-    if (
-        (raw.startswith("\"") and raw.endswith("\""))
-        or (raw.startswith("'") and raw.endswith("'"))
+    if (raw.startswith('"') and raw.endswith('"')) or (
+        raw.startswith("'") and raw.endswith("'")
     ):
         return raw[1:-1]
     if re.fullmatch(r"-?\d+", raw):
@@ -117,8 +128,10 @@ def _build_single_line_component(
     path: str,
 ) -> Node:
     children = parse_markdown_fragment(body, path=path)
-    if _is_supported_text_component(node_type) and children and all(
-        _node_is_text_only(child) for child in children
+    if (
+        _is_supported_text_component(node_type)
+        and children
+        and all(_node_is_text_only(child) for child in children)
     ):
         text = "".join(_flatten_node_text(child) for child in children).strip()
         if text:
@@ -192,12 +205,7 @@ def _tokenize_attr_tokens(raw: str) -> list[str]:
             i += 1
             continue
 
-        if (
-            quote is None
-            and brace == 0
-            and bracket == 0
-            and ch.isspace()
-        ):
+        if quote is None and brace == 0 and bracket == 0 and ch.isspace():
             token = "".join(buffer).strip()
             if token:
                 tokens.append(token)
@@ -290,7 +298,9 @@ def _parse_attr_value(value: str, path: str, *, at: str) -> Any:
     return _coerce_js_scalar(value)
 
 
-def _parse_component_attrs(raw: str, path: str) -> tuple[dict[str, Any], dict[str, Any], str | None, str | None]:
+def _parse_component_attrs(
+    raw: str, path: str
+) -> tuple[dict[str, Any], dict[str, Any], str | None, str | None]:
     attrs = _tokenize_attr_tokens(raw)
     props: dict[str, Any] = {}
     style: dict[str, Any] = {}
@@ -336,7 +346,9 @@ def _parse_component_attrs(raw: str, path: str) -> tuple[dict[str, Any], dict[st
     return props, style, class_name, node_id
 
 
-def _extract_component_open(line: str, path: str) -> tuple[str, dict[str, Any], dict[str, Any], str | None, str | None, bool] | None:
+def _extract_component_open(
+    line: str, path: str
+) -> tuple[str, dict[str, Any], dict[str, Any], str | None, str | None, bool] | None:
     match = _OPEN_TAG_RE.match(line)
     if not match:
         return None
@@ -357,12 +369,18 @@ def _extract_component_open(line: str, path: str) -> tuple[str, dict[str, Any], 
             n=4,
             cutoff=0.5,
         )
-        suggestion_text = ", ".join(suggestion) if suggestion else "a different component name?"
+        suggestion_text = (
+            ", ".join(suggestion) if suggestion else "a different component name?"
+        )
         raise MDXParseError(
             "UNKNOWN_TYPE",
             path,
             f"Unknown component type '{name}'. Did you mean: {suggestion_text}?",
-            suggestion=[*suggestion] if suggestion else ["Did you mean a different component name?"],
+            suggestion=(
+                [*suggestion]
+                if suggestion
+                else ["Did you mean a different component name?"]
+            ),
         )
 
     return lowered, props, style, class_name, node_id, is_self_closing
@@ -426,12 +444,20 @@ def _parse_mdx_nodes(
                         n=4,
                         cutoff=0.5,
                     )
-                    suggestion_text = ", ".join(suggestion) if suggestion else "a different component name?"
+                    suggestion_text = (
+                        ", ".join(suggestion)
+                        if suggestion
+                        else "a different component name?"
+                    )
                     raise MDXParseError(
                         "UNKNOWN_TYPE",
                         f"{path}[{i}]",
                         f"Unknown component type '{single_line_name}'. Did you mean: {suggestion_text}?",
-                        suggestion=[*suggestion] if suggestion else ["Did you mean a different component name?"],
+                        suggestion=(
+                            [*suggestion]
+                            if suggestion
+                            else ["Did you mean a different component name?"]
+                        ),
                     )
                 nodes.extend(_flush_markdown_lines(buffer, path=f"{path}[{i}]"))
                 buffer = []
@@ -462,7 +488,7 @@ def _parse_mdx_nodes(
                         class_=class_name,
                         id=node_id,
                         style=style or None,
-                        props=props,
+                        props=props or None,
                         children=None,
                     ),
                 )
@@ -482,7 +508,7 @@ def _parse_mdx_nodes(
                     class_=class_name,
                     id=node_id,
                     style=style or None,
-                    props=props,
+                    props=props or None,
                     children=child_nodes or None,
                 ),
             )
@@ -575,20 +601,12 @@ def parse_mdx_text(
 
 
 def to_canonical_ir(source: str | Path) -> Document:
-    return parse_mdx_text(
-        Path(source).read_text(encoding="utf-8") if isinstance(source, Path) else str(source),
-        path=str(source),
-    )[0]
+    text, path = _load_source_text(source, fallback_path="mdx")
+    return parse_mdx_text(text, path=path)[0]
 
 
 def load_mdx_document(source: str | Path) -> Document:
-    if isinstance(source, Path):
-        text = source.read_text(encoding="utf-8")
-        path = str(source)
-    else:
-        text = str(source)
-        path = "<memory>"
-
+    text, path = _load_source_text(source, fallback_path="mdx")
     document, _ = parse_mdx_text(text, path=path)
     return document
 

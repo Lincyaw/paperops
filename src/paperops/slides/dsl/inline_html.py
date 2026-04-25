@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 from typing import Any
-
 
 INLINE_HTML_TAGS = {
     "b",
@@ -41,7 +40,7 @@ _RGB_FN = re.compile(
 _TOKEN = re.compile(r"^[A-Za-z_][A-Za-z0-9_./-]*$")
 
 
-@dataclass(frozen=True)
+@dataclass
 class InlineHtmlError(ValueError):
     """Structured parse-time inline HTML error."""
 
@@ -55,7 +54,7 @@ class InlineHtmlError(ValueError):
         if self.path:
             parts.append(f"{self.path}:")
         parts.append(self.message)
-        object.__setattr__(self, "args", (" ".join(parts),))
+        self.args = (" ".join(parts),)
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -181,7 +180,9 @@ def parse_style_declarations(raw: str, *, path: str = "") -> dict[str, str]:
                 "UNSUPPORTED_INLINE_HTML",
                 f"Unsupported <span> style property {key!r}",
                 path=path,
-                suggestion=["Allowed: color, background-color, font-weight, font-style, text-decoration"],
+                suggestion=[
+                    "Allowed: color, background-color, font-weight, font-style, text-decoration"
+                ],
             )
         style[key] = value.strip()
     return style
@@ -241,7 +242,9 @@ def _consume_matching_close(remaining: str, tag: str, start_offset: int) -> int:
     return start_offset + close.end()
 
 
-def parse_inline_html(text: str, *, path: str = "", start: int = 0) -> tuple[ParsedInlineHtml | None, int]:
+def parse_inline_html(
+    text: str, *, path: str = "", start: int = 0
+) -> tuple[ParsedInlineHtml | None, int]:
     """Parse one inline HTML token at ``text[start:]``.
 
     Returns (element, consumed_chars). If no valid inline HTML starts here,
@@ -252,7 +255,9 @@ def parse_inline_html(text: str, *, path: str = "", start: int = 0) -> tuple[Par
         return None, 0
 
     # Requirement: < followed by whitespace or digit should stay literal.
-    if start + 1 < len(text) and (text[start + 1].isspace() or text[start + 1].isdigit()):
+    if start + 1 < len(text) and (
+        text[start + 1].isspace() or text[start + 1].isdigit()
+    ):
         return None, 0
 
     # Match opening tag and keep raw attribute body.
@@ -280,22 +285,30 @@ def parse_inline_html(text: str, *, path: str = "", start: int = 0) -> tuple[Par
 
     if tag == "br":
         if is_self_closing:
-            return ParsedInlineHtml(
+            return (
+                ParsedInlineHtml(
+                    tag="br",
+                    attrs=attrs,
+                    content="",
+                    self_closing=True,
+                    consumed=open_match.end(),
+                ),
+                open_match.end(),
+            )
+        # Accept paired <br>...</br> as an alias.
+        consumed = (
+            _consume_matching_close(text[start:], tag=tag, start_offset=start) - start
+        )
+        return (
+            ParsedInlineHtml(
                 tag="br",
                 attrs=attrs,
                 content="",
-                self_closing=True,
-                consumed=open_match.end(),
-            ), open_match.end()
-        # Accept paired <br>...</br> as an alias.
-        consumed = _consume_matching_close(text[start:], tag=tag, start_offset=start) - start
-        return ParsedInlineHtml(
-            tag="br",
-            attrs=attrs,
-            content="",
-            self_closing=False,
-            consumed=consumed,
-        ), consumed
+                self_closing=False,
+                consumed=consumed,
+            ),
+            consumed,
+        )
 
     if is_self_closing:
         raise InlineHtmlError(
@@ -330,15 +343,20 @@ def parse_inline_html(text: str, *, path: str = "", start: int = 0) -> tuple[Par
                 "<span> style must be a string",
                 path=path,
             )
-        attrs["style"] = normalize_span_style(parse_style_declarations(style_value, path=path), path=path)
+        attrs["style"] = normalize_span_style(
+            parse_style_declarations(style_value, path=path), path=path
+        )
 
-    return ParsedInlineHtml(
-        tag=tag,
-        attrs=attrs,
-        content=content,
-        self_closing=False,
-        consumed=consumed,
-    ), start + consumed
+    return (
+        ParsedInlineHtml(
+            tag=tag,
+            attrs=attrs,
+            content=content,
+            self_closing=False,
+            consumed=consumed,
+        ),
+        start + consumed,
+    )
 
 
 def run_style_overrides(tag: str, attrs: dict[str, Any]) -> dict[str, Any]:

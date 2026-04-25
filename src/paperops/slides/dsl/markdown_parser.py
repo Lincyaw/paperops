@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-import re
 from typing import Any
 
 from paperops.slides.dsl.inline_html import parse_inline_html
@@ -12,14 +12,14 @@ from paperops.slides.dsl.json_loader import DEFAULT_SCHEMA, Document
 from paperops.slides.ir.node import Node
 
 
-@dataclass(frozen=True)
+@dataclass
 class MarkdownParseError(ValueError):
     code: str
     path: str
     message: str
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "args", (f"[{self.code}] {self.path}: {self.message}",))
+        self.args = (f"[{self.code}] {self.path}: {self.message}",)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -38,6 +38,23 @@ _FENCE_OPEN_RE = re.compile(r"^(?P<marker>:{3,})(?P<rest>.*)$")
 _LIST_RE = re.compile(r"^(?P<indent>\s*)(?P<marker>(?:-|\*|\+|\d+\.))\s+(?P<text>.*)$")
 
 
+def _load_source_text(
+    source: str | Path,
+    *,
+    fallback_path: str = "markdown",
+) -> tuple[str, str]:
+    if isinstance(source, Path):
+        return source.read_text(encoding="utf-8"), str(source)
+
+    if isinstance(source, str):
+        candidate = Path(source)
+        if candidate.exists():
+            return candidate.read_text(encoding="utf-8"), str(candidate)
+        return source, fallback_path
+
+    raise TypeError(f"Unsupported source type: {type(source)!r}")
+
+
 def _coerce_scalar(raw: str) -> Any:
     value = raw.strip()
     if not value:
@@ -51,7 +68,7 @@ def _coerce_scalar(raw: str) -> Any:
     if lower in {"false", "off", "no"}:
         return False
 
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\"", "'"}:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
         return value[1:-1]
 
     if re.fullmatch(r"-?\d+", value):
@@ -225,9 +242,8 @@ def _parse_attribute_block(raw: str) -> tuple[str | None, str | None, dict[str, 
             key = key.strip()
             if key:
                 value = value.strip()
-                if (
-                    (value.startswith('"') and value.endswith('"'))
-                    or (value.startswith("'") and value.endswith("'"))
+                if (value.startswith('"') and value.endswith('"')) or (
+                    value.startswith("'") and value.endswith("'")
                 ):
                     value = value[1:-1]
                 style[key] = _coerce_scalar(value)
@@ -295,7 +311,9 @@ def _parse_fence_open(line: str) -> tuple[int, str | None, str | None, dict[str,
             or "=" in token_part
             or " " in token_part
         ):
-            parsed_class, _, parsed_style = _parse_attribute_block("{" + token_part + "}")
+            parsed_class, _, parsed_style = _parse_attribute_block(
+                "{" + token_part + "}"
+            )
             class_name = parsed_class
             style.update(parsed_style)
         else:
@@ -316,7 +334,9 @@ def _parse_fence_open(line: str) -> tuple[int, str | None, str | None, dict[str,
 
 def _is_fence_close(line: str, marker_len: int) -> bool:
     stripped = line.strip()
-    return len(stripped) >= marker_len and len(stripped) <= marker_len and all(ch == ":" for ch in stripped)
+    if len(stripped) < marker_len:
+        return False
+    return bool(stripped) and all(ch == ":" for ch in stripped)
 
 
 def _parse_fenced_block(
@@ -423,9 +443,13 @@ def _parse_inline_runs(text: str, *, path: str) -> list[str | Node]:
                     continue
 
                 child_runs = (
-                    _parse_inline_runs(parsed.content, path=path) if parsed.content else []
+                    _parse_inline_runs(parsed.content, path=path)
+                    if parsed.content
+                    else []
                 )
-                out.append(Node(type=parsed.tag, props=parsed.attrs, children=child_runs))
+                out.append(
+                    Node(type=parsed.tag, props=parsed.attrs, children=child_runs)
+                )
                 i = consumed
                 continue
 
@@ -532,7 +556,9 @@ def _parse_list_block(lines: list[str], start: int, *, path: str) -> tuple[Node,
     i = start
     first = _LIST_RE.match(lines[i])
     if not first:
-        raise MarkdownParseError("INVALID_SYNTAX", path, f"Invalid list block: {lines[i]!r}")
+        raise MarkdownParseError(
+            "INVALID_SYNTAX", path, f"Invalid list block: {lines[i]!r}"
+        )
 
     base_indent = len(first.group("indent"))
     items: list[Node] = []
@@ -650,9 +676,12 @@ def _parse_block_nodes(
             i += 1
             continue
 
+        before = i
         node, i = _parse_paragraph(lines, i, path=f"{path}[{i}]")
-        if node.text is not None or node.children is not None:
+        if node.text or node.children is not None:
             nodes.append(node)
+        if i == before:
+            i += 1
 
     return nodes, i
 
@@ -683,7 +712,9 @@ def parse_markdown_text(
         for key in ["theme", "sheet", "meta", "styles", "defines", "$schema"]
         if key in metadata
     }
-    metadata_rest = {key: value for key, value in metadata.items() if key not in frontmatter}
+    metadata_rest = {
+        key: value for key, value in metadata.items() if key not in frontmatter
+    }
 
     lines = body.splitlines()
     slides: list[list[Node]] = [[]]
@@ -733,20 +764,12 @@ def parse_markdown_text(
 
 
 def to_canonical_ir(source: str | Path) -> Document:
-    return parse_markdown_text(
-        Path(source).read_text(encoding="utf-8") if isinstance(source, Path) else str(source),
-        path=str(source),
-    )[0]
+    text, path = _load_source_text(source)
+    return parse_markdown_text(text, path=path)[0]
 
 
 def load_markdown_document(source: str | Path) -> Document:
-    if isinstance(source, Path):
-        text = source.read_text(encoding="utf-8")
-        path = str(source)
-    else:
-        text = str(source)
-        path = "<memory>"
-
+    text, path = _load_source_text(source)
     document, _ = parse_markdown_text(text, path=path, parse_front_matter=True)
     return document
 
