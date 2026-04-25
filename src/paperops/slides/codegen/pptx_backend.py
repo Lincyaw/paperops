@@ -6,13 +6,17 @@ from pathlib import Path
 from typing import Any
 
 from pptx import Presentation
-from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.chart import XL_CHART_TYPE
-from pptx.enum.text import PP_ALIGN
 from pptx.chart.data import ChartData
+from pptx.dml.color import RGBColor
+from pptx.enum.chart import XL_CHART_TYPE
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.text import MSO_AUTO_SIZE, PP_ALIGN
 from pptx.util import Inches, Pt
 
+from paperops.slides.animation import collect_animation_specs, inject_timing
+from paperops.slides.components.shapes import Box as ShapeBox
+from paperops.slides.components.table import Table as LayoutTable
+from paperops.slides.components.text import TextBlock
 from paperops.slides.core.constants import SLIDE_HEIGHT, SLIDE_WIDTH
 from paperops.slides.core.theme import Theme
 from paperops.slides.ir.node import Node
@@ -23,14 +27,10 @@ from paperops.slides.layout.containers import (
     Grid,
     GridItem,
     HStack,
-    LayoutNode,
     Layer,
+    LayoutNode,
     Padding,
 )
-from paperops.slides.components.shapes import Box as ShapeBox
-from paperops.slides.components.table import Table as LayoutTable
-from paperops.slides.components.text import TextBlock
-
 
 _LITERAL_COLORS = {
     "white": RGBColor(255, 255, 255),
@@ -60,7 +60,14 @@ def render_styled_layout(
         pptx_slide = prs.slides.add_slide(prs.slide_layouts[6])
         _render_slide_background(pptx_slide, source_slide, theme)
         _render_slide_notes(pptx_slide, source_slide)
-        _render_layout_node(pptx_slide, layout_root, theme)
+        node_to_shape: dict[int, int] = {}
+        _render_layout_node(pptx_slide, layout_root, theme, node_to_shape=node_to_shape)
+        specs = collect_animation_specs(source_slide, theme=theme)
+        inject_timing(
+            pptx_slide._element,
+            specs,
+            node_to_shape=node_to_shape,
+        )
 
     out.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(out))
@@ -106,7 +113,9 @@ def _render_slide_background(slide, source_node: Node | None, theme: Theme) -> N
     fill.fore_color.rgb = _resolve_color(theme, background)
 
 
-def _render_layout_node(slide, layout_node: LayoutNode, theme: Theme) -> None:
+def _render_layout_node(
+    slide, layout_node: LayoutNode, theme: Theme, *, node_to_shape: dict[int, int]
+) -> None:
     region = _layout_region(layout_node)
     if region is None:
         return
@@ -115,28 +124,38 @@ def _render_layout_node(slide, layout_node: LayoutNode, theme: Theme) -> None:
     if isinstance(layout_node, (Flex, HStack, Layer, Padding)):
         for child in _layout_children(layout_node):
             if child is not None:
-                _render_layout_node(slide, child, theme)
+                _render_layout_node(slide, child, theme, node_to_shape=node_to_shape)
         return
     if isinstance(layout_node, Absolute):
         for item in layout_node.children:
             if item is not None and item.child is not None:
-                _render_layout_node(slide, item.child, theme)
+                _render_layout_node(
+                    slide, item.child, theme, node_to_shape=node_to_shape
+                )
         return
     if isinstance(layout_node, Grid):
         for item in layout_node.iter_items():
             if item is not None and item.child is not None:
-                _render_layout_node(slide, item.child, theme)
+                _render_layout_node(
+                    slide, item.child, theme, node_to_shape=node_to_shape
+                )
         return
     if isinstance(layout_node, GridItem):
         if layout_node.child is not None:
-            _render_layout_node(slide, layout_node.child, theme)
+            _render_layout_node(
+                slide, layout_node.child, theme, node_to_shape=node_to_shape
+            )
         return
     if isinstance(layout_node, AbsoluteItem):
         if layout_node.child is not None:
-            _render_layout_node(slide, layout_node.child, theme)
+            _render_layout_node(
+                slide, layout_node.child, theme, node_to_shape=node_to_shape
+            )
         return
 
-    _render_leaf(slide, layout_node, source_node, region, theme)
+    _render_leaf(
+        slide, layout_node, source_node, region, theme, node_to_shape=node_to_shape
+    )
 
 
 def _layout_children(node: LayoutNode) -> list[LayoutNode]:
@@ -154,7 +173,12 @@ def _layout_region(node: LayoutNode):
     region = getattr(node, "_region", None)
     if region is None:
         return None
-    if region.left is None or region.top is None or region.width is None or region.height is None:
+    if (
+        region.left is None
+        or region.top is None
+        or region.width is None
+        or region.height is None
+    ):
         return None
     return region
 
@@ -165,6 +189,8 @@ def _render_leaf(
     source_node: Node | None,
     region,
     theme: Theme,
+    *,
+    node_to_shape: dict[int, int],
 ) -> None:
     text = _extract_text(source_node, layout_node)
     node_type = source_node.type if source_node is not None else None
@@ -181,6 +207,8 @@ def _render_leaf(
             style=style,
             theme=theme,
             text=text,
+            source_node=source_node,
+            node_to_shape=node_to_shape,
         )
         return
     if node_type == "roundedbox":
@@ -190,6 +218,8 @@ def _render_leaf(
             style=style,
             theme=theme,
             text=text,
+            source_node=source_node,
+            node_to_shape=node_to_shape,
         )
         return
     if node_type == "circle":
@@ -199,6 +229,8 @@ def _render_leaf(
             style=style,
             theme=theme,
             text=text,
+            source_node=source_node,
+            node_to_shape=node_to_shape,
         )
         return
     if node_type == "badge":
@@ -208,6 +240,8 @@ def _render_leaf(
             style=style,
             theme=theme,
             text=text,
+            source_node=source_node,
+            node_to_shape=node_to_shape,
         )
         return
     if node_type == "divider":
@@ -217,6 +251,8 @@ def _render_leaf(
             style=style,
             theme=theme,
             text=text,
+            source_node=source_node,
+            node_to_shape=node_to_shape,
         )
         return
     if node_type == "line":
@@ -226,6 +262,8 @@ def _render_leaf(
             style=style,
             theme=theme,
             node_type="line",
+            source_node=source_node,
+            node_to_shape=node_to_shape,
         )
         return
     if node_type == "arrow":
@@ -235,10 +273,21 @@ def _render_leaf(
             style=style,
             theme=theme,
             node_type="arrow",
+            source_node=source_node,
+            node_to_shape=node_to_shape,
         )
         return
     if node_type in {"image", "svg", "icon"}:
-        if _render_image_like(slide, node_type, source_node, style, theme, (left, top, width, height), text):
+        if _render_image_like(
+            slide,
+            node_type,
+            source_node,
+            style,
+            theme,
+            (left, top, width, height),
+            text,
+            node_to_shape=node_to_shape,
+        ):
             return
     if node_type == "chart":
         _render_chart(
@@ -247,6 +296,7 @@ def _render_leaf(
             style=style,
             theme=theme,
             source_node=source_node,
+            node_to_shape=node_to_shape,
         )
         return
 
@@ -258,6 +308,8 @@ def _render_leaf(
                 style=style,
                 layout_node=layout_node,
                 theme=theme,
+                source_node=source_node,
+                node_to_shape=node_to_shape,
             )
         return
 
@@ -272,6 +324,7 @@ def _render_leaf(
             style=style,
             theme=theme,
             text=text,
+            node_to_shape=node_to_shape,
         )
 
 
@@ -297,6 +350,13 @@ def _text_color(style: dict[str, Any], theme: Theme) -> RGBColor:
     return _resolve_color(theme, _style_value(style, "color", "text"))
 
 
+def _register_shape(
+    shape, source_node: Node | None, node_to_shape: dict[int, int]
+) -> None:
+    if source_node is not None:
+        node_to_shape[id(source_node)] = shape.shape_id
+
+
 def _render_box(
     *,
     slide,
@@ -304,6 +364,8 @@ def _render_box(
     style: dict[str, Any],
     theme: Theme,
     text: str,
+    source_node: Node | None,
+    node_to_shape: dict[int, int],
 ) -> None:
     left, top, width, height = region
     shape = slide.shapes.add_shape(
@@ -313,6 +375,7 @@ def _render_box(
         Inches(width),
         Inches(height),
     )
+    _register_shape(shape, source_node, node_to_shape)
 
     fill = shape.fill
     fill.solid()
@@ -351,6 +414,8 @@ def _render_rounded_box(
     style: dict[str, Any],
     theme: Theme,
     text: str,
+    source_node: Node | None,
+    node_to_shape: dict[int, int],
 ) -> None:
     left, top, width, height = region
     shape = slide.shapes.add_shape(
@@ -360,6 +425,7 @@ def _render_rounded_box(
         Inches(width),
         Inches(height),
     )
+    _register_shape(shape, source_node, node_to_shape)
 
     fill = shape.fill
     fill.solid()
@@ -393,6 +459,8 @@ def _render_circle(
     style: dict[str, Any],
     theme: Theme,
     text: str,
+    source_node: Node | None,
+    node_to_shape: dict[int, int],
 ) -> None:
     left, top, width, height = region
     diameter = max(width, height)
@@ -405,6 +473,7 @@ def _render_circle(
         Inches(diameter),
         Inches(diameter),
     )
+    _register_shape(shape, source_node, node_to_shape)
 
     fill = shape.fill
     fill.solid()
@@ -428,6 +497,8 @@ def _render_badge(
     style: dict[str, Any],
     theme: Theme,
     text: str,
+    source_node: Node | None,
+    node_to_shape: dict[int, int],
 ) -> None:
     left, top, width, height = region
     shape = slide.shapes.add_shape(
@@ -437,6 +508,7 @@ def _render_badge(
         Inches(width),
         Inches(height),
     )
+    _register_shape(shape, source_node, node_to_shape)
     fill = shape.fill
     fill.solid()
     fill.fore_color.rgb = _resolve_color(
@@ -459,8 +531,12 @@ def _render_divider(
     style: dict[str, Any],
     theme: Theme,
     text: str,
-)-> None:
-    style_orientation = _style_value(style, "orientation", _style_value(style, "direction", "horizontal"))
+    source_node: Node | None,
+    node_to_shape: dict[int, int],
+) -> None:
+    style_orientation = _style_value(
+        style, "orientation", _style_value(style, "direction", "horizontal")
+    )
     is_vertical = str(style_orientation).lower() in {"vertical", "v"}
 
     left, top, width, height = region
@@ -476,6 +552,7 @@ def _render_divider(
         y2 = Inches(top + height / 2.0)
 
     shape = slide.shapes.add_connector(1, x1, y1, x2, y2)
+    _register_shape(shape, source_node, node_to_shape)
     shape.line.color.rgb = _resolve_color(
         theme, _style_value(style, "color", _theme_default_color(theme, "border"))
     )
@@ -490,9 +567,14 @@ def _render_connector(
     style: dict[str, Any],
     theme: Theme,
     node_type: str,
+    source_node: Node | None,
+    node_to_shape: dict[int, int],
 ) -> None:
     left, top, width, height = region
-    is_vertical = str(_style_value(style, "orientation", "horizontal")).lower() in {"vertical", "v"}
+    is_vertical = str(_style_value(style, "orientation", "horizontal")).lower() in {
+        "vertical",
+        "v",
+    }
 
     x1 = left + 0.0
     y1 = top + height / 2.0
@@ -504,7 +586,10 @@ def _render_connector(
         x2 = left + width / 2.0
         y2 = top + height
 
-    connector = slide.shapes.add_connector(1, Inches(x1), Inches(y1), Inches(x2), Inches(y2))
+    connector = slide.shapes.add_connector(
+        1, Inches(x1), Inches(y1), Inches(x2), Inches(y2)
+    )
+    _register_shape(connector, source_node, node_to_shape)
     connector.line.color.rgb = _resolve_color(
         theme, _style_value(style, "color", _theme_default_color(theme, "border"))
     )
@@ -534,6 +619,8 @@ def _render_image_like(
     theme: Theme,
     region: tuple[float, float, float, float],
     extracted_text: str,
+    *,
+    node_to_shape: dict[int, int],
 ) -> bool:
     props = source_node.props if source_node is not None else {}
     left, top, width, height = region
@@ -547,6 +634,7 @@ def _render_image_like(
                 style=style,
                 theme=theme,
                 text=f"[icon] {text}",
+                node_to_shape=node_to_shape,
             )
             return True
         if extracted_text:
@@ -557,6 +645,7 @@ def _render_image_like(
                 style=style,
                 theme=theme,
                 text=extracted_text,
+                node_to_shape=node_to_shape,
             )
             return True
         return False
@@ -576,6 +665,7 @@ def _render_image_like(
                 style=style,
                 theme=theme,
                 text=placeholder,
+                node_to_shape=node_to_shape,
             )
             return True
         return False
@@ -583,13 +673,14 @@ def _render_image_like(
     if src and src != "missing.png" and Path(src).is_file():
         path = Path(src)
         try:
-            slide.shapes.add_picture(
+            picture = slide.shapes.add_picture(
                 str(path),
                 Inches(left),
                 Inches(top),
                 Inches(width),
                 Inches(height),
             )
+            _register_shape(picture, source_node, node_to_shape)
             return True
         except Exception:
             pass
@@ -602,6 +693,7 @@ def _render_image_like(
         style=style,
         theme=theme,
         text=label,
+        node_to_shape=node_to_shape,
     )
     return True
 
@@ -612,6 +704,8 @@ def _render_table(
     style: dict[str, Any],
     layout_node: LayoutTable,
     theme: Theme,
+    source_node: Node | None,
+    node_to_shape: dict[int, int],
 ) -> None:
     left, top, width, height = region
 
@@ -636,6 +730,7 @@ def _render_table(
         Inches(max(width, 0.1)),
         Inches(max(height, 0.1)),
     )
+    _register_shape(table_shape, source_node, node_to_shape)
     table = table_shape.table
 
     if headers:
@@ -693,6 +788,7 @@ def _render_text_box(
     style: dict[str, Any],
     theme: Theme,
     text: str,
+    node_to_shape: dict[int, int],
 ) -> None:
     left, top, width, height = region
     tb = slide.shapes.add_textbox(
@@ -701,11 +797,14 @@ def _render_text_box(
         Inches(width),
         Inches(height),
     )
+    _register_shape(tb, node, node_to_shape)
     tf = tb.text_frame
     _apply_text_frame_style(tf, style, theme=theme)
     paragraph = tf.paragraphs[0]
     paragraph.text = text
-    paragraph.alignment = _ALIGN_MAP.get(_style_value(style, "text-align", "left"), PP_ALIGN.LEFT)
+    paragraph.alignment = _ALIGN_MAP.get(
+        _style_value(style, "text-align", "left"), PP_ALIGN.LEFT
+    )
 
     node_type = node.type if node is not None else None
     font_name = theme.font_family
@@ -714,7 +813,9 @@ def _render_text_box(
     paragraph.font.size = Pt(_resolve_font_size(theme, font_token, "body"))
     paragraph.font.color.rgb = _text_color(style, theme)
     paragraph.font.bold = _as_bool(_style_value(style, "font-weight", "normal"))
-    paragraph.font.italic = str(_style_value(style, "font-style", "")).lower() == "italic"
+    paragraph.font.italic = (
+        str(_style_value(style, "font-style", "")).lower() == "italic"
+    )
     if (line_height := _style_value(style, "line-height")) is not None:
         numeric = _to_float(line_height)
         if numeric is not None:
@@ -788,14 +889,18 @@ def _coerce_chart_series(payload: object) -> list[tuple[str, list[float]]]:
             values = item.get("values") if isinstance(item, dict) else None
             if name is None:
                 name = f"Series {len(series) + 1}"
-            values_list = _coerce_chart_values(values if values is not None else item.get("data", []))
+            values_list = _coerce_chart_values(
+                values if values is not None else item.get("data", [])
+            )
             if values_list:
                 series.append((str(name), values_list))
             continue
         if isinstance(item, (list, tuple)):
             values = [value for value in item if _safe_float(value) is not None]
             if values:
-                series.append((f"Series {len(series) + 1}", _coerce_chart_values(values)))
+                series.append(
+                    (f"Series {len(series) + 1}", _coerce_chart_values(values))
+                )
     return series
 
 
@@ -821,7 +926,11 @@ def _resolve_chart_payload(
         if not series and isinstance(data.get("series"), (list, tuple, dict)):
             series = _coerce_chart_series(data.get("series"))
 
-        if not labels and "labels" in data and isinstance(data["labels"], (list, tuple)):
+        if (
+            not labels
+            and "labels" in data
+            and isinstance(data["labels"], (list, tuple))
+        ):
             labels = [str(label) for label in data["labels"]]
 
         if isinstance(data.get("values"), (list, tuple)):
@@ -850,7 +959,10 @@ def _resolve_chart_payload(
         if labels is None:
             labels = ["Point 1"]
     elif labels is None and series:
-        labels = [f"Point {idx + 1}" for idx in range(max(len(values) for _, values in series))]
+        labels = [
+            f"Point {idx + 1}"
+            for idx in range(max(len(values) for _, values in series))
+        ]
 
     normalized_labels: list[str] = []
     if labels:
@@ -858,7 +970,9 @@ def _resolve_chart_payload(
 
     max_len = max(len(values) for _, values in series) if series else 0
     if normalized_labels and len(normalized_labels) < max_len:
-        normalized_labels.extend(f"Point {idx + 1}" for idx in range(len(normalized_labels) + 1, max_len + 1))
+        normalized_labels.extend(
+            f"Point {idx + 1}" for idx in range(len(normalized_labels) + 1, max_len + 1)
+        )
     elif not normalized_labels and max_len:
         normalized_labels = [f"Point {idx + 1}" for idx in range(1, max_len + 1)]
 
@@ -872,9 +986,14 @@ def _render_chart(
     style: dict[str, Any],
     theme: Theme,
     source_node: Node | None,
+    node_to_shape: dict[int, int],
 ) -> None:
     left, top, width, height = region
-    props = source_node.props if source_node is not None and source_node.props is not None else {}
+    props = (
+        source_node.props
+        if source_node is not None and source_node.props is not None
+        else {}
+    )
     if not isinstance(props, dict):
         props = {}
 
@@ -908,6 +1027,7 @@ def _render_chart(
             Inches(height),
             chart_data,
         )
+    _register_shape(chart_shape, source_node, node_to_shape)
 
     chart = chart_shape.chart
     if props.get("title") or props.get("caption"):
@@ -934,10 +1054,20 @@ def _apply_text_frame_style(text_frame, style: dict[str, Any], *, theme: Theme) 
     text_frame.margin_bottom = Inches(_padding_or_margin(style, "bottom"))
 
     text_frame.word_wrap = True
+    overflow = _style_value(style, "overflow", "shrink")
+    if overflow == "shrink":
+        text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+    elif overflow == "clip":
+        text_frame.auto_size = MSO_AUTO_SIZE.NONE
+        text_frame.word_wrap = False
+    else:
+        text_frame.auto_size = MSO_AUTO_SIZE.NONE
     if not text_frame.text:
         first = text_frame.paragraphs[0]
         first.font.name = font_name
-        first.font.size = Pt(_resolve_font_size(theme, _style_value(style, "font", "body"), "body"))
+        first.font.size = Pt(
+            _resolve_font_size(theme, _style_value(style, "font", "body"), "body")
+        )
         first.font.color.rgb = _text_color(style, theme)
 
 
@@ -991,7 +1121,9 @@ def _resolve_color(theme: Theme, value: Any) -> RGBColor:
         raise TypeError(f"Unsupported color token value: {resolved!r}")
     if not resolved.startswith("#") or len(resolved) != 7:
         raise ValueError(f"Unsupported color format: {resolved!r}")
-    return RGBColor(int(resolved[1:3], 16), int(resolved[3:5], 16), int(resolved[5:7], 16))
+    return RGBColor(
+        int(resolved[1:3], 16), int(resolved[3:5], 16), int(resolved[5:7], 16)
+    )
 
 
 def _as_bool(value: Any) -> bool:

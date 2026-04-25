@@ -2,31 +2,42 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Mapping
-
 import os
 import sys
 import tempfile
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Mapping
 
 from pptx import Presentation as PptxPresentation
 from pptx.util import Inches
 
 from paperops.slides import components  # noqa: F401
 from paperops.slides.codegen import render_styled_layout
+from paperops.slides.components.registry import expand_nodes
 from paperops.slides.core.constants import CONTENT_REGION, SLIDE_HEIGHT, SLIDE_WIDTH
 from paperops.slides.core.theme import Theme, themes
-from paperops.slides.dsl.json_loader import Document
-from paperops.slides.dsl.json_loader import load_json_document
+from paperops.slides.dsl.json_loader import Document, load_json_document
 from paperops.slides.dsl.markdown_parser import load_markdown_document
 from paperops.slides.dsl.mdx_parser import load_mdx_document
+from paperops.slides.ir.node import Node
+from paperops.slides.layout.autofit import resolve_overflow
+from paperops.slides.layout.baseline import apply_baseline_alignment
 from paperops.slides.layout.engine import build_layout_tree, compute_layout
-from paperops.slides.components.registry import expand_nodes
+from paperops.slides.preview import review_deck_artifacts
 from paperops.slides.style import get_sheet, resolve_computed_styles
 from paperops.slides.style.stylesheet import StyleSheet
-from paperops.slides.preview import review_deck_artifacts
 
-from paperops.slides.ir.node import Node
+
+@dataclass(frozen=True)
+class RenderOptions:
+    strict: bool = False
+    trace: bool = False
+
+
+@dataclass(frozen=True)
+class RenderTrace:
+    entries: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _coerce_theme(value: Theme | str | None) -> Theme:
@@ -61,7 +72,11 @@ def parse_stage(
         name = path.name.lower()
         if name.endswith(".deck.md") or name.endswith(".md"):
             return load_markdown_document(path)
-        if name.endswith(".slide.mdx") or name.endswith(".deck.mdx") or name.endswith(".mdx"):
+        if (
+            name.endswith(".slide.mdx")
+            or name.endswith(".deck.mdx")
+            or name.endswith(".mdx")
+        ):
             return load_mdx_document(path)
 
     return load_json_document(source, strict=strict)
@@ -95,6 +110,7 @@ def style_stage(
         deck_style=StyleSheet(document.styles or {}),
         strict=strict,
     )
+    object.__setattr__(root, "_style_trace", list(getattr(resolved, "trace", [])))
     return root, resolved.computed
 
 
@@ -116,7 +132,16 @@ def layout_stage(
         layout_root = build_layout_tree(slide_node, layout_theme, region=region)
         slide_layouts.append((slide_node, layout_root))
         issues.extend(
-            compute_layout(layout_root, region, layout_theme, slide=index + 1, root_path=f"slide[{index}]")
+            compute_layout(
+                layout_root,
+                region,
+                layout_theme,
+                slide=index + 1,
+                root_path=f"slide[{index}]",
+            )
+        )
+        apply_baseline_alignment(
+            slide_node, layout_root, baseline=layout_theme.baseline
         )
     return slide_layouts, issues
 
@@ -125,9 +150,33 @@ def autofit_stage(
     slide_layouts: list[tuple[Node, Any]],
     *,
     theme: Theme | str | None = None,
+    meta: dict[str, Any] | None = None,
+    region=CONTENT_REGION,
 ) -> list[tuple[Node, Any]]:
-    """Placeholder autofit stage for Phase 2 (currently identity)."""
-    return slide_layouts
+    """Apply overflow policies, including slide reflow for overflowing prose."""
+    resolved_theme = _coerce_theme(theme)
+    pending = list(slide_layouts)
+    final: list[tuple[Node, Any]] = []
+    while pending:
+        current = pending.pop(0)
+        source_slide, layout_root = current
+        if layout_root is None:
+            layout_root = build_layout_tree(source_slide, resolved_theme, region=region)
+            compute_layout(layout_root, region, resolved_theme)
+            apply_baseline_alignment(
+                source_slide, layout_root, baseline=resolved_theme.baseline
+            )
+            current = (source_slide, layout_root)
+        updated = resolve_overflow([current], theme=resolved_theme, meta=meta)
+        if (
+            len(updated) == 1
+            and updated[0][0] is source_slide
+            and updated[0][1] is layout_root
+        ):
+            final.append((source_slide, layout_root))
+            continue
+        pending = updated + pending
+    return final
 
 
 def codegen_stage(
@@ -149,8 +198,36 @@ def render_json(
     """Run parse → style → layout → codegen and write a PPTX file."""
     document = parse_stage(source, strict=strict)
     styled_root, _ = style_stage(document, theme=document.theme, strict=strict)
-    layout_roots = autofit_stage(layout_stage(styled_root, theme=document.theme)[0], theme=document.theme)
+    layout_roots = autofit_stage(
+        layout_stage(styled_root, theme=document.theme)[0],
+        theme=document.theme,
+        meta=document.meta,
+    )
     return codegen_stage(layout_roots, theme=document.theme, out=out)
+
+
+def render_diagnostics(
+    source: str | Path | Mapping[str, Any] | Document,
+    *,
+    strict: bool = False,
+    trace: bool = False,
+) -> dict[str, Any]:
+    """Run the pipeline without writing a PPTX and return structured diagnostics."""
+    document = parse_stage(source, strict=strict)
+    styled_root, _ = style_stage(document, theme=document.theme, strict=strict)
+    slide_layouts, layout_issues = layout_stage(styled_root, theme=document.theme)
+    slide_layouts = autofit_stage(
+        slide_layouts,
+        theme=document.theme,
+        meta=document.meta,
+    )
+    payload: dict[str, Any] = {
+        "layout_issues": layout_issues,
+        "slide_count": len(slide_layouts),
+    }
+    if trace:
+        payload["trace"] = list(getattr(styled_root, "_style_trace", []))
+    return payload
 
 
 def _normalize_issue(issue: dict, slide_number: int) -> dict[str, Any]:
@@ -158,7 +235,9 @@ def _normalize_issue(issue: dict, slide_number: int) -> dict[str, Any]:
     normalized.setdefault("slide", slide_number)
     normalized.setdefault("source", "layout")
     normalized.setdefault("code", normalized.get("type", "layout_issue"))
-    normalized.setdefault("message", normalized.get("detail", normalized.get("code", "layout issue")))
+    normalized.setdefault(
+        "message", normalized.get("detail", normalized.get("code", "layout issue"))
+    )
     normalized.setdefault("detail", normalized["message"])
     normalized.setdefault("severity", "warning")
     return normalized
@@ -206,7 +285,10 @@ class Presentation:
         if all_issues:
             print(f"[SlideCraft] {len(all_issues)} layout issue(s):", file=sys.stderr)
             for issue in all_issues:
-                print(f"  [{issue.get('code', issue.get('type'))}] {issue.get('detail', issue.get('message'))}", file=sys.stderr)
+                print(
+                    f"  [{issue.get('code', issue.get('type'))}] {issue.get('detail', issue.get('message'))}",
+                    file=sys.stderr,
+                )
 
         self._pptx.save(path)
 
@@ -215,14 +297,18 @@ class Presentation:
         slides: list[dict] = []
         for slide_index, sb in enumerate(self._builders, 1):
             slide_issues = sb._render(slide_number=slide_index) or []
-            normalized = [_normalize_issue(issue, slide_index) for issue in slide_issues]
+            normalized = [
+                _normalize_issue(issue, slide_index) for issue in slide_issues
+            ]
             issues.extend(normalized)
-            slides.append({
-                "slide_number": slide_index,
-                "title": getattr(sb, "_title", None),
-                "issue_count": len(normalized),
-                "issues": normalized,
-            })
+            slides.append(
+                {
+                    "slide_number": slide_index,
+                    "title": getattr(sb, "_title", None),
+                    "issue_count": len(normalized),
+                    "issues": normalized,
+                }
+            )
 
         issue_counts = {
             "total": len(issues),
@@ -281,7 +367,9 @@ class Presentation:
         os.unlink(pptx_path)
 
         if slides is not None:
-            paths = [p for p in paths if any(f"slide_{s + 1:03d}.png" in p for s in slides)]
+            paths = [
+                p for p in paths if any(f"slide_{s + 1:03d}.png" in p for s in slides)
+            ]
         return sorted(paths)
 
 

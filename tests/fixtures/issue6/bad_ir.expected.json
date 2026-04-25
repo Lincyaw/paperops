@@ -1,0 +1,24 @@
+{
+  "errors": [
+    {
+      "code": "UNRESOLVED_MACRO_VAR",
+      "message": "Macro variable '$trend' not provided",
+      "path": "slides[0].children[0]"
+    },
+    {
+      "code": "UNKNOWN_TYPE",
+      "hint": "Use a registered atomic or semantic component.",
+      "message": "Unknown component type: 'mystery'",
+      "path": "slides[0].children[1].type"
+    },
+    {
+      "code": "UNKNOWN_STYLE_KEY",
+      "hint": "Layout is selected by component type, not CSS display.",
+      "message": "Unknown style key: 'display'",
+      "path": "slides[0].children[2].style.display",
+      "suggestion": ["<Flex>", "<Grid>", "<Stack>", "<Absolute>"]
+    }
+  ],
+  "status": "error",
+  "warnings": []
+}

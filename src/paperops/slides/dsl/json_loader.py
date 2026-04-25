@@ -2,29 +2,25 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from paperops.slides.ir import Node, validate_document
-from paperops.slides.ir.defines import expand_document
-
+from paperops.slides.ir import Node
+from paperops.slides.ir.validator import StructuredValidationError, validate_ir_document
 
 DEFAULT_SCHEMA = "paperops-slide-1.0"
 
 
-def load_json_document(source: str | Path | Mapping[str, Any], *, strict: bool = False) -> "Document":
+def load_json_document(
+    source: str | Path | Mapping[str, Any], *, strict: bool = False
+) -> "Document":
     """Load a JSON IR document and return a validated deck representation."""
-    raw = _load_source(source)
-    if not isinstance(raw, dict):
-        raise TypeError("Document payload must be an object")
-
-    # Parse macros first; this keeps callers free to validate expanded trees.
-    expanded = expand_document(raw, strict=strict)
-    validate_document(expanded)
-
-    return Document.from_dict(expanded)
+    report = validate_ir_document(source, strict=strict)
+    if report.has_errors() or report.document is None:
+        raise StructuredValidationError(report)
+    return Document.from_dict(report.document)
 
 
 def _load_source(source: str | Path | Mapping[str, Any]) -> Any:
@@ -72,14 +68,22 @@ class Document:
         return cls(
             schema=str(raw.get("$schema", DEFAULT_SCHEMA)),
             meta=dict(raw_meta) if isinstance(raw_meta, dict) else None,
-            theme=str(raw.get("theme", "minimal")) if raw.get("theme") is not None else "minimal",
+            theme=(
+                str(raw.get("theme", "minimal"))
+                if raw.get("theme") is not None
+                else "minimal"
+            ),
             sheet=str(raw.get("sheet")) if raw.get("sheet") is not None else None,
-            styles={key: dict(value) for key, value in raw_styles.items()}
-            if isinstance(raw_styles, dict)
-            else None,
-            defines={key: dict(value) for key, value in raw_defines.items()}
-            if isinstance(raw_defines, dict)
-            else None,
+            styles=(
+                {key: dict(value) for key, value in raw_styles.items()}
+                if isinstance(raw_styles, dict)
+                else None
+            ),
+            defines=(
+                {key: dict(value) for key, value in raw_defines.items()}
+                if isinstance(raw_defines, dict)
+                else None
+            ),
             slides=slides,
         )
 
