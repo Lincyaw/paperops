@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
-from paperops.slides.dsl.json_loader import DEFAULT_SCHEMA, Document, load_json_document
+from paperops.slides.dsl.json_loader import DEFAULT_SCHEMA, Document
 from paperops.slides.ir import Node
 
 
@@ -67,11 +67,7 @@ def _set_textive_props(
     merged = dict(props or {})
     if text is not None:
         merged["text"] = text
-    elif (
-        len(children) == 1
-        and isinstance(children[0], str)
-        and "text" not in merged
-    ):
+    elif len(children) == 1 and isinstance(children[0], str) and "text" not in merged:
         merged["text"] = children[0]
         return merged
     elif not children and "text" not in merged:
@@ -104,7 +100,9 @@ class _BuilderNode:
         merged_props.update(extra)
 
         self._children = _coerce_children(children)
-        merged_props = _set_textive_props(self.node_type, text, merged_props, self._children)
+        merged_props = _set_textive_props(
+            self.node_type, text, merged_props, self._children
+        )
 
         if (
             self.node_type in {"text", "title", "subtitle", "heading"}
@@ -115,7 +113,11 @@ class _BuilderNode:
             and merged_props.get("text") == self._children[0]
         ):
             self._children = []
-            if self.text is None and merged_props is not None and len(merged_props) == 1:
+            if (
+                self.text is None
+                and merged_props is not None
+                and len(merged_props) == 1
+            ):
                 self.text = str(merged_props["text"])
             if merged_props is not None and len(merged_props) == 1:
                 merged_props = {}
@@ -155,7 +157,11 @@ class _BuilderNode:
     def to_node(self) -> Node:
         props = dict(self.props) if self.props is not None else None
         text = self.text
-        if text is None and self.node_type in {"text", "title", "subtitle", "heading"} and props is not None:
+        if (
+            text is None
+            and self.node_type in {"text", "title", "subtitle", "heading"}
+            and props is not None
+        ):
             text = props.pop("text", None)
         return Node(
             type=self.node_type,
@@ -229,16 +235,148 @@ class Box(_BuilderNode):
 class KPI(_BuilderNode):
     node_type = "kpi"
 
-    def __init__(self, label: str, value: str, delta: str | None = None, trend: str | None = None, **kwargs: Any) -> None:
-        super().__init__(
-            **kwargs,
-            props={
-                "label": label,
-                "value": value,
-                "delta": delta,
-                "trend": trend,
-            },
-        )
+    def __init__(
+        self,
+        label: str,
+        value: str,
+        delta: str | None = None,
+        trend: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        props: dict[str, Any] = {"label": label, "value": value}
+        if delta is not None:
+            props["delta"] = delta
+        if trend is not None:
+            props["trend"] = trend
+        super().__init__(**kwargs, props=props)
+
+
+class Card(_BuilderNode):
+    node_type = "card"
+
+
+class Callout(_BuilderNode):
+    node_type = "callout"
+
+    def __init__(
+        self,
+        *children: Any,
+        kind: str | None = None,
+        text: str | None = None,
+        props: Mapping[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        merged = dict(_coerce_props(props) or {})
+        if kind is not None:
+            merged["kind"] = kind
+        if text is not None:
+            merged["text"] = text
+        super().__init__(*children, props=merged, **kwargs)
+
+
+class Quote(_BuilderNode):
+    node_type = "quote"
+
+    def __init__(
+        self,
+        text: str,
+        *,
+        author: str | None = None,
+        props: Mapping[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        merged = dict(_coerce_props(props) or {})
+        merged["text"] = text
+        if author is not None:
+            merged["author"] = author
+        super().__init__(props=merged, **kwargs)
+
+
+class PullQuote(Quote):
+    node_type = "pullquote"
+
+
+class KeyPoint(_BuilderNode):
+    node_type = "keypoint"
+
+
+class Stepper(_BuilderNode):
+    node_type = "stepper"
+
+
+class Timeline(_BuilderNode):
+    node_type = "timeline"
+
+
+class Figure(_BuilderNode):
+    node_type = "figure"
+
+
+class Caption(_BuilderNode):
+    node_type = "caption"
+
+    def __init__(
+        self,
+        text: str,
+        *,
+        props: Mapping[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        merged = dict(_coerce_props(props) or {})
+        merged["text"] = text
+        super().__init__(props=merged, **kwargs)
+
+
+class Note(_BuilderNode):
+    node_type = "note"
+
+
+class Spacer(_BuilderNode):
+    node_type = "spacer"
+
+
+class Image(_BuilderNode):
+    node_type = "image"
+
+
+class SvgImage(_BuilderNode):
+    node_type = "svg"
+
+
+class Table(_BuilderNode):
+    node_type = "table"
+
+
+class Chart(_BuilderNode):
+    node_type = "chart"
+
+
+class Divider(_BuilderNode):
+    node_type = "divider"
+
+
+class Line(_BuilderNode):
+    node_type = "line"
+
+
+class Arrow(_BuilderNode):
+    node_type = "arrow"
+
+
+class Badge(_BuilderNode):
+    node_type = "badge"
+
+
+class Circle(_BuilderNode):
+    node_type = "circle"
+
+
+class RoundedBox(_BuilderNode):
+    node_type = "roundedbox"
+
+
+class Icon(_BuilderNode):
+    node_type = "icon"
 
 
 class Deck:
@@ -310,34 +448,56 @@ def render_json(
     out: str | Path,
     strict: bool = False,
 ) -> Path:
-    """Compatibility helper for rendering an existing IR document."""
+    """Render a JSON, Markdown, MDX, mapping, or Document source."""
     if isinstance(source, Document):
-        payload = source.to_dict()
+        payload: str | Path | Mapping[str, Any] = source.to_dict()
     elif isinstance(source, Mapping):
         payload = dict(source)
     else:
-        payload = load_json_document(source, strict=strict).to_dict()
+        payload = source
 
     from paperops.slides import build as build_module
+
     return build_module.render_json(payload, out=out, strict=strict)
 
 
 __all__ = [
+    "Arrow",
+    "Badge",
+    "Box",
+    "Callout",
+    "Caption",
+    "Card",
+    "Chart",
+    "Circle",
     "Deck",
+    "Divider",
     "Document",
+    "Figure",
     "Flex",
     "Grid",
     "Heading",
     "HStack",
+    "Icon",
+    "Image",
+    "KeyPoint",
     "KPI",
     "Layer",
+    "Line",
+    "Note",
     "Padding",
+    "PullQuote",
+    "Quote",
+    "RoundedBox",
     "Slide",
+    "Spacer",
     "Stack",
     "Subtitle",
+    "SvgImage",
+    "Table",
     "Text",
+    "Timeline",
     "Title",
     "VStack",
-    "Box",
     "render_json",
 ]

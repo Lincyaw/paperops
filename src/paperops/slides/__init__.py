@@ -1,7 +1,7 @@
 """SlideCraft public API."""
 
 try:
-    from paperops.slides.build import Presentation
+    from paperops.slides.build import Presentation, render_json
 except ModuleNotFoundError as exc:  # pragma: no cover - depends on optional extras
     if exc.name != "pptx":
         raise
@@ -12,6 +12,13 @@ except ModuleNotFoundError as exc:  # pragma: no cover - depends on optional ext
             raise ModuleNotFoundError(
                 "Presentation requires the optional 'slides' extras; install python-pptx to use it."
             ) from _presentation_import_error
+
+    def render_json(*_args, **_kwargs):  # type: ignore[override]
+        raise ModuleNotFoundError(
+            "render_json requires the optional 'slides' extras; install python-pptx to use it."
+        ) from _presentation_import_error
+
+
 from paperops.slides.core.constants import Align, Direction
 from paperops.slides.core.theme import Theme, themes
 from paperops.slides.dsl import (
@@ -35,10 +42,35 @@ from paperops.slides.dsl import (
     load_mdx_document,
     parse_markdown_text,
     parse_mdx_text,
-    render_json,
 )
-from paperops.slides.layout import Absolute, AbsoluteItem, Column, Constraints, Flex, Grid, GridItem, HStack, IntrinsicSize, Layer, LayoutIssue, Padding, Row, Spacer, VStack, auto, fixed, fr
-from paperops.slides.components.shapes import Arrow, Badge, Box, Circle, Line, RoundedBox
+from paperops.slides.layout import (
+    Absolute,
+    AbsoluteItem,
+    Column,
+    Constraints,
+    Flex,
+    Grid,
+    GridItem,
+    HStack,
+    IntrinsicSize,
+    Layer,
+    LayoutIssue,
+    Padding,
+    Row,
+    Spacer,
+    VStack,
+    auto,
+    fixed,
+    fr,
+)
+from paperops.slides.components.shapes import (
+    Arrow,
+    Badge,
+    Box,
+    Circle,
+    Line,
+    RoundedBox,
+)
 from paperops.slides.components.text import BulletList, TextBlock
 from paperops.slides.components.table import Table
 from paperops.slides.components.image import Image, SvgImage
